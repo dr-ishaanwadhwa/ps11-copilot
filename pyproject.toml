@@ -1,0 +1,28 @@
+[project]
+name = "ps11-copilot"
+version = "0.1.0"
+description = "SME Cash-Flow Copilot MVP v1: explains every rupee between the bank and the books, read-only"
+requires-python = ">=3.12"
+dependencies = [
+  "pandas==2.2.3",
+  "openpyxl==3.1.5",
+  "duckdb==1.1.3",
+  "streamlit==1.40.2",
+  "streamlit-aggrid==1.0.5",
+  "rapidfuzz==3.10.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore::DeprecationWarning"]

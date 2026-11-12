@@ -20,6 +20,7 @@ from copilot.fmt import inr
 from copilot.forecast import as_of, evaluate_holdout, simulate_forecast
 from copilot.load import load_pack
 from copilot.match import match_all
+from copilot.match.audit import select_audit_sample
 from copilot.match.engine import ASK, SUGGEST
 from copilot.receivables import by_customer, open_items, overdue
 from copilot.score import score_matches, summary
@@ -317,6 +318,11 @@ with tab_queue:
             r = sel.iloc[0] if isinstance(sel, pd.DataFrame) else sel[0]
             m = matches[r["txn_id"]]
             st.markdown(f"**{r['amount']} · {r['date']}** · {r['rule']}")
+            # Weekly audit check label (D60 Task 4.3)
+            latest_week = pack.bank["txn_date"].max().strftime("%G-W%V")
+            audit_ids = set(select_audit_sample(matches, pack.bank, latest_week))
+            if r["txn_id"] in audit_ids or "audit miss" in (m.note or ""):
+                st.caption("🔍 Picked at random to check our automatic matches.")
             st.info(m.note or "Check the suggested documents.")
             if m.docs:
                 st.dataframe(pd.DataFrame(m.docs, columns=["document", "applied"]).assign(

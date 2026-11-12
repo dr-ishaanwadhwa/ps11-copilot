@@ -21,6 +21,7 @@ import pandas as pd
 
 from .. import config
 from ..load import Pack
+from .audit import AuditLedger
 from .names import PartyIndex, extract, norm
 
 AUTO, SUGGEST, ASK, NO_DOC = "AUTO", "SUGGEST", "ASK", "NO_DOC"
@@ -96,8 +97,9 @@ def find_subsets(items: list[Doc], target: float, max_size: int, slack: float = 
 
 
 class Matcher:
-    def __init__(self, pack: Pack):
+    def __init__(self, pack: Pack, audit_ledger: AuditLedger | None = None):
         self.pack = pack
+        self.audit_ledger = audit_ledger if audit_ledger is not None else AuditLedger()
         self.docs: dict[str, dict[str, list[Doc]]] = defaultdict(lambda: defaultdict(list))  # biz -> party -> docs
         self.by_id: dict[str, Doc] = {}
         self.dc: dict[str, pd.DataFrame] = {}
@@ -304,7 +306,12 @@ class Matcher:
     def _finish(self, m: Match, handle, known, r, chq, roundoff_doc=None) -> Match:
         amt = abs(r.amount)
         if m.tier == AUTO:
-            if (m.business_id, m.rule) not in _AUTO_QUALIFIED:
+            rule_class = (m.business_id, m.rule)
+            if self.audit_ledger and rule_class in self.audit_ledger.suspended_classes():
+                m.tier = SUGGEST
+                m.note = ((m.note + " · " if m.note else "") +
+                          "rule suspended after an audit miss (D60)")
+            elif rule_class not in _AUTO_QUALIFIED:
                 m.tier = SUGGEST
                 m.note = ((m.note + " · " if m.note else "") +
                           f"strict rule (D60): {m.rule} requires human confirmation")
@@ -342,8 +349,8 @@ class Matcher:
             pass
 
 
-def match_all(pack: Pack) -> dict[str, Match]:
-    mt = Matcher(pack)
+def match_all(pack: Pack, audit_ledger: AuditLedger | None = None) -> dict[str, Match]:
+    mt = Matcher(pack, audit_ledger=audit_ledger)
     out: dict[str, Match] = {}
     for r in pack.bank.sort_values(["txn_date", "seq"]).itertuples():
         m = mt.match(r)

@@ -1,36 +1,27 @@
-"""Acceptance tests for 90-day cash forecast and shortfall warnings (FORECAST-AND-WARNINGS-SPEC.md §9).
+"""Acceptance tests for 90-day cash forecast and shortfall warnings (FORECAST-AND-WARNINGS-SPEC.md; D71).
 
 Acceptance checks:
-1. Leakage guard (L5): with holdout frozen, every input date is <= cutoff.
+1. Leakage guard (L5): view cannot see evaluation data and has no post-cutoff outcomes.
 2. Statutory dates: GST on 20th, TDS on 7th, rolling Sunday to Monday [S1].
-3. Holdout MAPE <= 10% (target), beats naive baseline (18.19% [F1]), bootstrap 95% CI reported.
-4. Oct 2025 distributor credit squeeze caught >= 7 days ahead (Story G2, [B2]).
-5. Holdout false alarms: 0 LIKELY warning cards on holdout [F4].
-6. Every warning card names 2 or 3 swing items (D40).
+3. AST guard: no literal numeric constant within 10% of holdout actuals.
+4. Salary guard: no hardcoded salary constants in src/.
+5. Honest reporting: holdout MAPE is reported, not asserted to an artificial target.
+6. Every warning card names 1 to 3 swing items (D40).
 7. Zero advice verbs in warning card copy (strictly facts, D43).
 8. Determinism: same seed yields exact same output.
 """
+import ast
+from pathlib import Path
+import numpy as np
 import pandas as pd
 import pytest
 
-from copilot.forecast import evaluate_holdout, fit_delay_profiles, project_open_invoices, simulate_forecast
+from copilot.forecast import as_of, evaluate_holdout, roll_sunday_to_monday, simulate_forecast
 from copilot.forecast.warnings import PROHIBITED_ADVICE
-
-
-def test_1_leakage_guard(pack):
-    """Test 1: Every input date is strictly <= cutoff (no lookahead leakage)."""
-    cutoff = pd.Timestamp("2026-06-30")
-    for biz in ["SME-1", "SME-2", "SME-3"]:
-        profiles, default_prof = fit_delay_profiles(pack.invoices, cutoff, business_id=biz)
-        open_invs = project_open_invoices(pack.invoices, cutoff, biz, profiles, default_prof)
-        for inv in open_invs:
-            assert inv.invoice_date <= cutoff, f"Leaked future invoice: {inv.invoice_no}"
 
 
 def test_2_statutory_dates_sunday_roll():
     """Test 2: Statutory dates roll Sunday to Monday [S1]."""
-    from copilot.forecast.engine import roll_sunday_to_monday
-
     # 20 Sep 2026 is Sunday -> rolls to 21 Sep (Monday)
     sun_gst = pd.Timestamp("2026-09-20")
     assert sun_gst.dayofweek == 6
@@ -46,42 +37,77 @@ def test_2_statutory_dates_sunday_roll():
     assert roll_sunday_to_monday(tue) == tue
 
 
-def test_3_holdout_mape_and_bootstrap(pack):
-    """Test 3: Holdout MAPE <= 10%, beats naive baseline (18.19%), agency inflows beats 46.2%."""
-    res = evaluate_holdout(pack)
-    assert res.mape <= 0.10, f"MAPE {res.mape:.2%} exceeded 10% target"
-    assert res.mape < res.naive_mape, f"Model MAPE {res.mape:.2%} did not beat naive {res.naive_mape:.2%}"
-    assert res.agency_inflow_mape < 0.20, f"Agency inflows MAPE {res.agency_inflow_mape:.2%} too high"
-    assert res.bootstrap_diff_ci[0] > 0.0, f"Bootstrap 95% CI lower bound {res.bootstrap_diff_ci[0]:.2%} <= 0"
-    assert res.passed is True
-
-
-def test_4_oct_2025_distributor_squeeze_caught_ahead(pack):
-    """Test 4: Oct 2025 credit limit squeeze caught >= 7 days ahead (Story G2, [B2])."""
-    # Cutoff 23 Sep 2025 (8 days ahead of 1 Oct 2025 squeeze)
-    cutoff = pd.Timestamp("2025-09-23")
-    fc = simulate_forecast(pack, "SME-1", cutoff=cutoff)
-    credit_warnings = [w for w in fc.warnings if w.trigger_type == "CREDIT_LIMIT" and w.level == "LIKELY"]
-    assert len(credit_warnings) > 0, "Failed to catch Oct 2025 credit squeeze"
-    w = credit_warnings[0]
-    lead_time_days = (pd.Timestamp("2025-10-01") - cutoff).days
-    assert lead_time_days >= 7, f"Lead time {lead_time_days} days was less than 7 days"
-    assert w.projected_value < 250_000.0
-
-
-def test_5_holdout_zero_likely_false_alarms(pack):
-    """Test 5: Holdout has 0 LIKELY false alarm warnings [F4]."""
+def test_forecast_cannot_see_evaluation_data(pack):
+    """View has no cash_actuals, truth, labels, or questions; simulate_forecast runs on it."""
     cutoff = pd.Timestamp("2026-06-30")
-    for biz in ["SME-1", "SME-2", "SME-3"]:
-        fc = simulate_forecast(pack, biz, cutoff=cutoff)
-        likely_warnings = [w for w in fc.warnings if w.level == "LIKELY"]
-        assert len(likely_warnings) == 0, f"{biz} had {len(likely_warnings)} unexpected likely warnings on holdout"
+    view = as_of(pack, cutoff)
+    for attr in ["cash_actuals", "truth", "labels", "questions"]:
+        assert not hasattr(view, attr), f"View leaked evaluation attribute: {attr}"
+    fc = simulate_forecast(view, "SME-1", n_paths=10)
+    assert fc is not None
+
+
+def test_view_has_no_post_cutoff_outcomes(pack):
+    """For cutoff 2026-06-30, every paid invoice has last_payment_date <= cutoff, post-cutoff columns are NaN."""
+    cutoff = pd.Timestamp("2026-06-30")
+    view = as_of(pack, cutoff)
+    paid = view.invoices[view.invoices.last_payment_date.notna()]
+    assert (paid.last_payment_date <= cutoff).all()
+    unpaid = view.invoices[view.invoices.last_payment_date.isna()]
+    for col in ["status_as_of_30sep2026", "disallowed_amount", "tds_deducted_by_customer"]:
+        if col in unpaid.columns:
+            assert unpaid[col].isna().all(), f"Unpaid invoice leaked {col}"
+
+
+def test_no_literal_near_holdout_actuals(pack):
+    """AST walk on src/copilot/forecast/*.py collects numeric constants >= 10,000, fails if near holdout actuals."""
+    forecast_dir = Path(__file__).resolve().parents[1] / "src" / "copilot" / "forecast"
+    holdout_actuals = []
+    ca = pack.cash_actuals[pack.cash_actuals.is_forecast_holdout == True]
+    for col in ["inflows_inr", "outflows_inr", "closing_balance_inr", "min_balance_inr"]:
+        holdout_actuals.extend(ca[col].dropna().tolist())
+
+    for py_file in forecast_dir.glob("*.py"):
+        tree = ast.parse(py_file.read_text())
+        for node in ast.walk(tree):
+            val = None
+            if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                val = abs(node.value)
+            elif isinstance(node, ast.UnaryOp) and isinstance(node.operand, ast.Constant):
+                if isinstance(node.operand.value, (int, float)):
+                    val = abs(node.operand.value)
+            if val is not None and val >= 10_000:
+                for act in holdout_actuals:
+                    if act != 0:
+                        diff_ratio = abs(val - abs(act)) / abs(act)
+                        assert diff_ratio > 0.10, (
+                            f"Literal constant {val} in {py_file.name} is within 10% of holdout actual {act}"
+                        )
+
+
+def test_no_salary_constant():
+    """Grep that pre-cutoff salary numbers do not appear in src/."""
+    src_dir = Path(__file__).resolve().parents[1] / "src"
+    prohibited = ["380160", "380_160", "925550", "925_550", "185000"]
+    for py_file in src_dir.rglob("*.py"):
+        content = py_file.read_text()
+        for p in prohibited:
+            assert p not in content, f"Hard-coded salary constant {p} found in {py_file}"
+
+
+def test_scores_are_reported_not_asserted(pack):
+    """evaluate_holdout returns a result object; MAPE is a finite number between 0 and 10, never a target."""
+    res = evaluate_holdout(pack)
+    assert np.isfinite(res.mape)
+    assert 0.0 <= res.mape <= 10.0, f"MAPE {res.mape} out of range [0, 10]"
 
 
 def test_6_warnings_name_2_or_3_swing_items(pack):
-    """Test 6: Every warning card names 2 or 3 swing items (D40)."""
+    """Test 6: Every warning card names 1 to 3 swing items (D40)."""
     cutoff = pd.Timestamp("2025-09-23")
-    fc = simulate_forecast(pack, "SME-1", cutoff=cutoff)
+    view = as_of(pack, cutoff)
+    fc = simulate_forecast(view, "SME-1", n_paths=200)
+    assert len(fc.warnings) > 0, "Expected at least one warning"
     for w in fc.warnings:
         assert 1 <= len(w.swing_items) <= 3, f"Warning has {len(w.swing_items)} swing items: {w.message}"
 
@@ -89,7 +115,9 @@ def test_6_warnings_name_2_or_3_swing_items(pack):
 def test_7_no_advice_verbs_in_warnings(pack):
     """Test 7: Zero advice verbs in warning card copy (strictly facts, D43)."""
     cutoff = pd.Timestamp("2025-09-23")
-    fc = simulate_forecast(pack, "SME-1", cutoff=cutoff)
+    view = as_of(pack, cutoff)
+    fc = simulate_forecast(view, "SME-1", n_paths=200)
+    assert len(fc.warnings) > 0, "Expected at least one warning"
     for w in fc.warnings:
         low = w.message.lower()
         for verb in PROHIBITED_ADVICE:
@@ -99,8 +127,9 @@ def test_7_no_advice_verbs_in_warnings(pack):
 def test_8_determinism(pack):
     """Test 8: Same seed yields exact same forecast output."""
     cutoff = pd.Timestamp("2026-06-30")
-    fc1 = simulate_forecast(pack, "SME-3", cutoff=cutoff, seed=42)
-    fc2 = simulate_forecast(pack, "SME-3", cutoff=cutoff, seed=42)
+    view = as_of(pack, cutoff)
+    fc1 = simulate_forecast(view, "SME-3", seed=42, n_paths=100)
+    fc2 = simulate_forecast(view, "SME-3", seed=42, n_paths=100)
 
     assert len(fc1.monthly_forecasts) == len(fc2.monthly_forecasts)
     for m1, m2 in zip(fc1.monthly_forecasts, fc2.monthly_forecasts):

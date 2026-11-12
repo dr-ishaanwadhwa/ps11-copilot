@@ -52,3 +52,59 @@ def test_checklist_has_no_score():
         assert not any(ch.isdigit() for ch in text), f"Found digit in checklist text: {text}"
 
 
+def test_public_mode_has_no_free_text():
+    import ast
+
+    repo_root = Path(__file__).resolve().parent.parent
+    app_source = (repo_root / "app" / "streamlit_app.py").read_text(encoding="utf-8")
+    tree = ast.parse(app_source)
+
+    # Find the with tab_ask block
+    ask_block = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.With):
+            for item in node.items:
+                if isinstance(item.context_expr, ast.Name) and item.context_expr.id == "tab_ask":
+                    ask_block = node
+                    break
+
+    assert ask_block is not None, "Could not find with tab_ask block"
+
+    class AskVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.in_if_not_public = False
+            self.unguarded_input_calls = []
+
+        def visit_If(self, node):
+            old_val = self.in_if_not_public
+            is_not_public = False
+            if isinstance(node.test, ast.UnaryOp) and isinstance(node.test.op, ast.Not):
+                if isinstance(node.test.operand, ast.Name) and node.test.operand.id == "PUBLIC":
+                    is_not_public = True
+
+            if is_not_public:
+                self.in_if_not_public = True
+                for child in node.body:
+                    self.visit(child)
+                self.in_if_not_public = old_val
+                for child in node.orelse:
+                    self.visit(child)
+            else:
+                self.generic_visit(node)
+
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Attribute) and node.func.attr in ("text_input", "chat_input"):
+                if not self.in_if_not_public:
+                    self.unguarded_input_calls.append(node)
+            self.generic_visit(node)
+
+    visitor = AskVisitor()
+    for stmt in ask_block.body:
+        visitor.visit(stmt)
+
+    assert len(visitor.unguarded_input_calls) == 0, (
+        f"Found text/chat input calls in Ask block not guarded by 'if not PUBLIC': {visitor.unguarded_input_calls}"
+    )
+
+
+

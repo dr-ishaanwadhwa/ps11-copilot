@@ -38,6 +38,8 @@ from copilot.vault import (
 
 st.set_page_config(page_title="Cash Copilot · Dual-Plane MVP", layout="wide")
 
+PUBLIC = os.environ.get("COPILOT_PUBLIC") == "1"
+
 
 @st.cache_resource(show_spinner="Reading the data pack, matching every line, and booting Cash Book…")
 def boot():
@@ -337,19 +339,32 @@ with tab_ask:
         render_partial_view_notice()
 
     st.subheader("Ask")
-    examples = [
-        "Who owes me the most right now?",
+    chips = [
+        "Who owes me the most?",
         "Can I pay salaries on 1 October 2026?",
         "Should I take a loan to cover next month's shortfall?",
-        "Send a reminder to everyone who owes me money."
+        "Send a reminder to everyone who owes me money.",
+        "Explain my cash position in Hindi.",
     ]
-    pick = st.radio("Try an example", examples, index=None)
-    q = st.text_input("Your question", value=pick or "")
-    if q:
+
+    selected_q = None
+    if PUBLIC:
+        st.markdown("##### Choose a question")
+        for chip in chips:
+            if st.button(chip, key=f"chip_{chip}"):
+                st.session_state["selected_ask_q"] = chip
+        st.caption("Typing your own question is switched off in this preview until our safety checks pass.")
+        selected_q = st.session_state.get("selected_ask_q")
+    if not PUBLIC:
+        pick = st.radio("Try an example", chips, index=None)
+        typed_q = st.text_input("Your question", value=pick or "")
+        selected_q = typed_q
+
+    if selected_q:
         # Passes physical Galla cash to the answer generator for true liquidity context
         current_galla = vault.get_latest_galla(biz)
         galla_amt = current_galla.counted_cash if current_galla else 0.0
-        a = copilot.ask(biz, q, galla_cash=galla_amt)
+        a = copilot.ask(biz, selected_q, galla_cash=galla_amt)
         (st.warning if a.intent not in ("FACT",) else st.success)(a.text)
         if a.sources:
             with st.expander(f"Sources ({len(a.sources)} rows)"):

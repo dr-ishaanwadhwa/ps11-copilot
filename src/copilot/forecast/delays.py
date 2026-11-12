@@ -1,23 +1,23 @@
-"""Customer payment delay profiles and open invoice projection (FR-FC-1, FR-FC-2).
+"""Customer payment delay profiles and inflow modeling (FR-FC-1, FR-FC-2; D71).
 
 Handles:
-- Customer payment delay distributions (median, P10, P90)
-- Fallback to business-wide curve when < 5 historical payments
-- Censoring and age-conditioned delay sampling
-- Statutory TDS deductions (10% on taxable value for SME-3 and SME-2 insurance claims [R3])
+- Customer payment delay distributions fitted from invoices paid by cutoff
+- Conditional delay sampling given current invoice age
+- TPA historical disallowance and TDS rates for clinic claims
+- Statutory TDS deductions on open agency invoices (10% on taxable value)
+- New post-cutoff invoice issuance and arrival modeling
+- Non-invoice recurring receipts (clinic daily patient collections, cash deposits)
 """
 from dataclasses import dataclass
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 @dataclass
 class DelayProfile:
     customer_name: str
     count: int
-    median_delay: float
-    p10_delay: float
-    p90_delay: float
+    delays: np.ndarray
 
 
 @dataclass
@@ -35,135 +35,109 @@ class OpenInvoiceForecast:
     row_id: str
 
 
-def fit_delay_profiles(
-    invoices_df: pd.DataFrame,
-    cutoff: pd.Timestamp,
-    business_id: str | None = None,
-    min_invoices: int = 5,
-) -> tuple[dict[str, DelayProfile], DelayProfile]:
-    """Fit customer-level payment delay distributions from closed invoices before cutoff."""
-    sub = invoices_df[invoices_df.invoice_date <= cutoff].copy()
-    if business_id:
-        sub = sub[sub.business_id == business_id]
-
-    paid = sub[sub.last_payment_date <= cutoff].copy()
-    paid["delay_days"] = (paid["last_payment_date"] - paid["invoice_date"]).dt.days
-
-    # Business-wide default profile
-    if len(paid) > 0:
-        biz_median = float(paid["delay_days"].median())
-        biz_p10 = float(np.percentile(paid["delay_days"], 10))
-        biz_p90 = float(np.percentile(paid["delay_days"], 90))
-    else:
-        biz_median, biz_p10, biz_p90 = 30.0, 15.0, 60.0
-
-    default_profile = DelayProfile(
-        customer_name="__DEFAULT__",
-        count=len(paid),
-        median_delay=biz_median,
-        p10_delay=biz_p10,
-        p90_delay=biz_p90,
+def compute_tpa_rates(
+    invoices_df: pd.DataFrame, cutoff: pd.Timestamp
+) -> tuple[dict[str, tuple[float, float]], tuple[float, float]]:
+    """Compute historical amount-weighted disallowance and TDS rates per TPA from settled claims."""
+    paid = invoices_df[
+        (invoices_df.business_id == "SME-2")
+        & (invoices_df.invoice_date <= cutoff)
+        & invoices_df.last_payment_date.notna()
+        & (invoices_df.last_payment_date <= cutoff)
+    ]
+    tot_all = float(paid.invoice_total.sum()) if not paid.empty else 0.0
+    dis_all = float(paid.disallowed_amount.sum()) if not paid.empty else 0.0
+    tds_all = float(paid.tds_deducted_by_customer.sum()) if not paid.empty else 0.0
+    default_rates = (
+        dis_all / tot_all if tot_all > 0 else 0.047,
+        tds_all / tot_all if tot_all > 0 else 0.095,
     )
 
-    profiles: dict[str, DelayProfile] = {}
-    for cust, grp in paid.groupby("customer_name"):
-        delays = grp["delay_days"].values
-        n = len(delays)
-        if n >= min_invoices:
-            profiles[cust] = DelayProfile(
-                customer_name=cust,
-                count=n,
-                median_delay=float(np.median(delays)),
-                p10_delay=float(np.percentile(delays, 10)),
-                p90_delay=float(np.percentile(delays, 90)),
-            )
-        else:
-            # Fallback to business-wide curve (Section 3.1)
-            profiles[cust] = DelayProfile(
-                customer_name=cust,
-                count=n,
-                median_delay=biz_median,
-                p10_delay=biz_p10,
-                p90_delay=biz_p90,
-            )
-
-    return profiles, default_profile
+    tpa_rates: dict[str, tuple[float, float]] = {}
+    if not paid.empty:
+        for cust, grp in paid.groupby("customer_name"):
+            tot = float(grp.invoice_total.sum())
+            if tot > 0:
+                tpa_rates[str(cust)] = (
+                    float(grp.disallowed_amount.sum()) / tot,
+                    float(grp.tds_deducted_by_customer.sum()) / tot,
+                )
+    return tpa_rates, default_rates
 
 
-def project_open_invoices(
+def fit_delay_distributions(
     invoices_df: pd.DataFrame,
     cutoff: pd.Timestamp,
     business_id: str,
-    profiles: dict[str, DelayProfile],
-    default_profile: DelayProfile,
-) -> list[OpenInvoiceForecast]:
-    """Project receipt dates and net proceeds for all invoices open at cutoff."""
+    min_invoices: int = 5,
+) -> tuple[dict[str, np.ndarray], np.ndarray]:
+    """Fit customer-level and business-wide payment delay arrays from invoices paid by cutoff."""
     sub = invoices_df[
-        (invoices_df.business_id == business_id) & (invoices_df.invoice_date <= cutoff)
+        (invoices_df.business_id == business_id)
+        & (invoices_df.invoice_date <= cutoff)
+        & invoices_df.last_payment_date.notna()
+        & (invoices_df.last_payment_date <= cutoff)
     ].copy()
 
-    # Open invoices: either unpaid or paid after cutoff
-    open_inv = sub[(sub.last_payment_date > cutoff) | sub.last_payment_date.isna()].copy()
+    if len(sub) > 0:
+        sub["delay_days"] = (sub["last_payment_date"] - sub["invoice_date"]).dt.days
+        biz_delays = np.maximum(0, sub["delay_days"].values.astype(int))
+    else:
+        biz_delays = np.array([30], dtype=int)
 
-    forecasts: list[OpenInvoiceForecast] = []
-    for _, row in open_inv.iterrows():
-        cust = str(row["customer_name"])
-        profile = profiles.get(cust, default_profile)
+    cust_delays: dict[str, np.ndarray] = {}
+    if len(sub) > 0:
+        for cust, grp in sub.groupby("customer_name"):
+            delays = grp["delay_days"].values.astype(int)
+            if len(delays) >= min_invoices:
+                cust_delays[str(cust)] = np.maximum(0, delays)
 
-        # TDS calculation (Section 2, [R3])
-        # SME-3 creative agency has 10% TDS on pre-GST taxable value
-        taxable = float(row.get("taxable_value", 0.0) or 0.0)
-        total = float(row.get("invoice_total", 0.0) or 0.0)
+    return cust_delays, biz_delays
 
-        if business_id == "SME-3":
-            tds = round(taxable * 0.10, 2)
-            net_receipt = total - tds
-        elif business_id == "SME-2":
-            # TPA claims: disallowance + TDS
-            disallow = float(row.get("disallowed_amount", 0.0) or 0.0)
-            tds = round(taxable * 0.10, 2) if taxable > 0 else 0.0
-            net_receipt = max(0.0, total - disallow - tds)
-        else:
-            tds = 0.0
-            net_receipt = total
 
-        inv_date = pd.Timestamp(row["invoice_date"])
-        age_days = (cutoff - inv_date).days
+def sample_delay_conditional(
+    age: int,
+    cust_delays: np.ndarray | None,
+    biz_delays: np.ndarray,
+    rng: np.random.Generator,
+) -> int:
+    """Sample invoice delay conditional on current age (D71 §2.3)."""
+    if cust_delays is not None and len(cust_delays) >= 5:
+        eligible = cust_delays[cust_delays > age]
+        if len(eligible) > 0:
+            return int(rng.choice(eligible))
 
-        # P50 expected arrival date
-        if profile.median_delay > age_days:
-            p50_days = profile.median_delay
-        else:
-            # Already overdue: expected in 3 to 10 days
-            p50_days = age_days + max(3, int((profile.p90_delay - age_days) / 2))
+    # Business-wide distribution for delays > age
+    tail = biz_delays[biz_delays > age]
+    if len(tail) > 0:
+        return int(rng.choice(tail))
 
-        # P10 (optimistic / fast payer)
-        p10_days = max(age_days + 1, profile.p10_delay)
+    # Residual tail of positive delays
+    tail_pos = biz_delays[biz_delays > 0]
+    if len(tail_pos) > 0:
+        return int(age + rng.choice(tail_pos))
 
-        # P90 (late / stretched payer)
-        p90_days = max(age_days + 7, profile.p90_delay)
+    return int(age + 30)
 
-        exp_p50 = inv_date + pd.Timedelta(days=int(p50_days))
-        exp_p10 = inv_date + pd.Timedelta(days=int(p10_days))
-        exp_p90 = inv_date + pd.Timedelta(days=int(p90_days))
 
-        due_date = pd.Timestamp(row.get("due_date", inv_date + pd.Timedelta(days=30)))
-        row_id = str(row.get("invoice_no", row.name))
+def compute_net_amount(
+    row: pd.Series,
+    business_id: str,
+    tpa_rates: dict[str, tuple[float, float]],
+    default_tpa_rates: tuple[float, float],
+) -> float:
+    """Compute expected net receipt for an open invoice or claim."""
+    total = float(row.get("invoice_total", 0.0) or 0.0)
+    taxable = float(row.get("taxable_value", 0.0) or 0.0)
 
-        forecasts.append(
-            OpenInvoiceForecast(
-                invoice_no=str(row["invoice_no"]),
-                customer_name=cust,
-                invoice_date=inv_date,
-                due_date=due_date,
-                gross_amount=total,
-                net_receipt=net_receipt,
-                expected_p50_date=exp_p50,
-                expected_p10_date=exp_p10,
-                expected_p90_date=exp_p90,
-                tds_deducted=tds,
-                row_id=row_id,
-            )
-        )
-
-    return forecasts
+    if business_id == "SME-3":
+        # Agency: 10% TDS on taxable value when applicable [R3]
+        tds_app = bool(row.get("tds_applicable", True))
+        tds = taxable * 0.10 if tds_app else 0.0
+        return max(0.0, total - tds)
+    elif business_id == "SME-2":
+        # Clinic: net of historical disallowance and TDS rates
+        cust = str(row.get("customer_name", ""))
+        dis_rate, tds_rate = tpa_rates.get(cust, default_tpa_rates)
+        return max(0.0, total * (1.0 - dis_rate - tds_rate))
+    return total

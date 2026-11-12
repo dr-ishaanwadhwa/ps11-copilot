@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import pandas as pd
+from .. import config
 
 
 @dataclass
@@ -84,7 +85,7 @@ class TotalSolvency:
     informal_receivables: float
     informal_payables: float
     formal_commitments: float   # upcoming payroll, statutory dues, supplier bills
-    haircut_alpha: float = 0.85 # risk-adjusted recovery rate on informal receivables
+    haircut_alpha: float = config.KHATA_COLLECTION_ASSUMPTION # risk-adjusted recovery rate on informal receivables
 
     @property
     def net_bank_liquidity(self) -> float:

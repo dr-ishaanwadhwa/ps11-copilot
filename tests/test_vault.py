@@ -2,6 +2,7 @@
 import pandas as pd
 import pytest
 
+from copilot import config
 from copilot.vault import (
     GallaEntry,
     KhataAccount,
@@ -77,6 +78,15 @@ def test_total_solvency_engine(pack):
     assert "business_id" in rep
     assert rep["galla_cash"] == solvency.galla_cash
     assert "true_cash_runway_inr" in rep
+
+    # Test assumption parameterization (Task 5.2)
+    assert solvency.haircut_alpha == config.KHATA_COLLECTION_ASSUMPTION
+    assert solvency.haircut_alpha == 0.85
+
+    s_adjusted = compute_total_solvency(pack, vault, "SME-1", haircut_alpha=0.60)
+    assert s_adjusted.haircut_alpha == 0.60
+    assert s_adjusted.total_expected_inflows == round(s_adjusted.informal_receivables * 0.60, 2)
+    assert s_adjusted.true_cash_runway_inr < solvency.true_cash_runway_inr
 
 
 def test_statutory_guardrails():

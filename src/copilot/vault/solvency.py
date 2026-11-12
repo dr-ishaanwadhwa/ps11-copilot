@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import pandas as pd
+from .. import config
 from ..load import Pack
 from .db import VaultDB
 from .models import TotalSolvency
@@ -32,7 +33,8 @@ def compute_total_solvency(
     pack: Pack,
     vault: VaultDB,
     biz: str,
-    as_of: pd.Timestamp = pd.Timestamp("2026-09-30")
+    as_of: pd.Timestamp = pd.Timestamp("2026-09-30"),
+    haircut_alpha: float = config.KHATA_COLLECTION_ASSUMPTION,
 ) -> TotalSolvency:
     """Computes the unified dual-plane liquidity analysis for an SME."""
     # 1. Formal Bank Balances
@@ -74,7 +76,7 @@ def compute_total_solvency(
         informal_receivables=informal_recv,
         informal_payables=informal_pay,
         formal_commitments=round(formal_commitments, 2),
-        haircut_alpha=0.85
+        haircut_alpha=haircut_alpha,
     )
 
 

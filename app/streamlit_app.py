@@ -118,7 +118,20 @@ with tab_home:
         st.caption("Formal books only. Cash drawer and informal khata balances are not included.")
     else:
         # Dual-Plane Total Solvency View
-        solvency = compute_total_solvency(pack, vault, biz)
+        if is_owner:
+            alpha = st.slider(
+                "Khata collection assumption",
+                min_value=0.5,
+                max_value=1.0,
+                value=config.KHATA_COLLECTION_ASSUMPTION,
+                step=0.05,
+                help="Adjustable informal khata recovery expectation",
+            )
+        else:
+            alpha = config.KHATA_COLLECTION_ASSUMPTION
+
+        st.caption(f"Assumes {int(round(alpha * 100))}% of khata will be collected (adjustable)")
+        solvency = compute_total_solvency(pack, vault, biz, haircut_alpha=alpha)
         solv_rep = format_solvency_report(solvency)
 
         st.subheader("True Solvency (Dual-Plane Reality)")

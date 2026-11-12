@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SME Cash-Flow Copilot — User Flow Report</title>
+<style>
+  :root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--bg:#f8fafc;--card:#ffffff}
+  *{box-sizing:border-box;margin:0}
+  body{font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);padding:40px 20px;max-width:920px;margin:0 auto}
+  h1{font-size:28px;letter-spacing:-.02em;color:#0f172a}
+  h2{font-size:20px;margin:40px 0 8px;padding-top:20px;border-top:1px solid var(--line);color:#1e293b}
+  h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 0 10px}
+  .meta{color:var(--muted);font-size:14px;margin:6px 0 12px}
+  .skills{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 20px}
+  .chip{font-size:12px;font-weight:600;padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:#334155}
+  .chip-active{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+  .flow{list-style:none;padding:0;margin:16px 0}
+  .flow>li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .flow>li+li{margin-top:32px}
+  .flow>li+li::before{content:"";position:absolute;top:-25px;left:32px;width:2px;height:18px;background:var(--accent)}
+  .flow>li+li::after{content:"";position:absolute;top:-10px;left:28px;border:5px solid transparent;border-top-color:var(--accent)}
+  .step-n{display:inline-block;font-size:12px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:999px;padding:1px 9px;margin-right:8px;vertical-align:1px}
+  .step-t{font-weight:650;font-size:16px}
+  .step-d{color:var(--muted);font-size:14px;margin-top:6px;line-height:1.5}
+  .cta{font-size:13px;margin-top:10px;padding:6px 10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0}
+  .cta b{color:var(--ok)}
+  .branch{font-size:13px;margin-top:8px;padding:8px 12px;background:#f0fdf4;border-left:3px solid var(--ok);border-radius:0 6px 6px 0;color:#166534}
+  .branch-warn{background:#fffbeb;border-left-color:var(--warn);color:#92400e}
+  table{border-collapse:collapse;width:100%;font-size:14px;background:var(--card);border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  th,td{text-align:left;padding:10px 14px;border:1px solid var(--line);vertical-align:top}
+  th{background:#f1f5f9;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .pass{color:var(--ok);font-weight:700}.warn{color:var(--warn);font-weight:700}.fail{color:var(--bad);font-weight:700}
+  .overflow{overflow-x:auto;margin:12px 0}
+  footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media print{body{background:#fff;padding:0}.flow>li{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<h1>SME Cash-Flow Copilot — User Flow Report</h1>
+<p class="meta">November 2026 · Complete Persona-Driven Flow Architecture for Indian SMEs</p>
+<div class="skills">
+  <span class="chip chip-active">flow-app-shell</span>
+  <span class="chip chip-active">flow-ai-chat</span>
+  <span class="chip chip-active">flow-tables</span>
+  <span class="chip chip-active">flow-forms</span>
+  <span class="chip chip-active">flow-onboarding</span>
+  <span class="chip">userflow dispatcher</span>
+</div>
+
+<h2>Summary</h2>
+<p>
+  This report defines the end-to-end user flows for <b>SME Cash-Flow Copilot</b>, engineered specifically for 3 Indian SME personas: Prakash Kale (FMCG distributor, high volume, salesmen field slips), Dr. Kavya Hegde (multi-specialty clinic, TPA insurance lag), and Rohan Malhotra (design studio, retainer TDS disallowance). The flows eliminate accounting cognitive leakage, implement human-in-the-loop recovery loops, and adhere strictly to the proven patterns of Stripe, Linear, and ChatGPT.
+</p>
+
+<!-- ══ FLOW 1 ══ -->
+<h2>Flow 1: Morning 60-Second Cash Triage & Priority Action</h2>
+<p class="meta">Pattern source: <code>flow-app-shell</code> + <code>flow-ai-chat</code> · Entry point: App Launch / Browser Bookmark</p>
+
+<h3>Steps</h3>
+<ol class="flow">
+  <li>
+    <span class="step-n">1</span><span class="step-t">3-Second Hero Glance (Safe Runway & Net Headroom)</span>
+    <p class="step-d">
+      Owner opens the app. The screen renders the green/amber Executive Status Banner ("🟢 YOUR CASH POSITION IS SAFE: 100% Payroll Funded") alongside 4 vital non-overlapping money tiles: Safe to Spend from Bank (₹37.39L), Cash in Till (₹4.20L), Expected Market Dues (₹2.22L), and 30-Day Upcoming Commitments (₹10.96L).
+    </p>
+    <p class="cta">Primary action: <b>Review #1 Priority Action Card</b> → Step 2</p>
+    <div class="branch">If Cash is Tight (Bank + Till &lt; Commitments) → Hero displays amber deficit banner with exact shortfall date and suggested expense deferral advice.</div>
+  </li>
+  <li>
+    <span class="step-n">2</span><span class="step-t">One-Click Human-in-the-Loop Action (WhatsApp Takada)</span>
+    <p class="step-d">
+      Directly adjacent to the cash health banner, the owner sees today's highest-leverage operational task: "📞 Collect ₹29,295 from Om Supermarket, Bavdhan (Open 45 days · 3 salesman slips awaiting deposit)".
+    </p>
+    <p class="cta">Primary action: <b>Tap '📲 Send WhatsApp Reminder'</b> → Opens WhatsApp Web / Mobile Draft</p>
+    <div class="branch">Human-in-the-Loop Gate (flow-ai-chat rule 6): Pre-fills polite vernacular text with invoice reference and UPI handle. Never sends automatically; owner retains full control to edit or send.</div>
+  </li>
+  <li>
+    <span class="step-n">3</span><span class="step-t">Conversational Copilot Inquiry (Voice/Chip)</span>
+    <p class="step-d">
+      Owner taps a pre-populated chip ("Can I pay salaries on 1 Oct?") or types in English/Hindi. The system instantly returns the exact grounded calculation from the verifiable engine, accompanied by plain vernacular explanation and AI provider badge.
+    </p>
+    <p class="cta">Primary action: <b>Tap Dismiss (✕) or tap follow-up question</b> → Returns to cockpit</p>
+  </li>
+</ol>
+
+<h3>Screen Inventory</h3>
+<div class="overflow"><table>
+  <tr><th>Screen / Widget</th><th>Purpose</th><th>Primary action</th><th>States (empty / loading / error)</th></tr>
+  <tr>
+    <td>Executive Header</td>
+    <td>Glanceable solvency status for owner</td>
+    <td>View 1-sentence runway diagnosis</td>
+    <td>Skeleton badge on boot; Amber banner if runway &lt; 15 days; Red if negative.</td>
+  </tr>
+  <tr>
+    <td>Priority Action Card</td>
+    <td>Direct daily collection or payroll milestone</td>
+    <td>📲 Send WhatsApp Reminder</td>
+    <td>If 0 debts overdue: "✓ All customer collections are up to date".</td>
+  </tr>
+  <tr>
+    <td>4 Vital Money Tiles</td>
+    <td>Display available bank CC, till, dues, and bills</td>
+    <td>Click to inspect underlying breakdown</td>
+    <td>Tabular figures; subtle hover border; formatted in Indian numbering (Lakhs/Crores).</td>
+  </tr>
+  <tr>
+    <td>Copilot Search Bar & Chips</td>
+    <td>Natural language business inquiries</td>
+    <td>Submit prompt or tap chip</td>
+    <td>Instant response bubble; includes verified citation and vernacular Hindi summary.</td>
+  </tr>
+</table></div>
+
+<h3>Anti-Pattern Audit (flow-app-shell & flow-ai-chat)</h3>
+<div class="overflow"><table>
+  <tr><th>Check</th><th>Verdict</th><th>Note</th></tr>
+  <tr><td>Total fixed chrome ≤ 128px before content</td><td class="pass">PASS</td><td>Executive bar and tiles fit in upper viewport without pushdown.</td></tr>
+  <tr><td>Never duplicate identical metric cards on same screen</td><td class="pass">PASS</td><td>Purged the second set of 4 tiles from Tab 1; now rendered exactly once.</td></tr>
+  <tr><td>Empty state teaches by real examples (flow-ai-chat rule 1)</td><td class="pass">PASS</td><td>4 clickable prompt chips offer real questions ("Can I pay salaries on 1 Oct?"), not generic categories.</td></tr>
+  <tr><td>Consequential actions gate on human approval (flow-ai-chat rule 6)</td><td class="pass">PASS</td><td>WhatsApp reminder generates a client-side deep-link draft; never broadcasts messages silently.</td></tr>
+  <tr><td>Grounded facts vs hallucinated signals</td><td class="pass">PASS</td><td>Facts verified against duckdb ledger; AI badge clearly distinguishes grounded reasoning.</td></tr>
+</table></div>
+
+<!-- ══ FLOW 2 ══ -->
+<h2>Flow 2: Monday Receivables & Chronic Khata Recovery</h2>
+<p class="meta">Pattern source: <code>flow-tables</code> + <code>flow-errors</code> · Entry point: 'Receivables' Tab</p>
+
+<h3>Steps</h3>
+<ol class="flow">
+  <li>
+    <span class="step-n">1</span><span class="step-t">Filter Chronic Retailers by Aging Tier</span>
+    <p class="step-d">
+      User selects 'Receivables' tab. Toolbar presents quick filter chips: "🔥 45+ Days Overdue (19 Chronic)", "All Customers", and "⚠️ Over 30 Months (Check with CA)". Active count and total outstanding rupees update immediately.
+    </p>
+    <p class="cta">Primary action: <b>Select aging filter</b> → Table updates in place</p>
+  </li>
+  <li>
+    <span class="step-n">2</span><span class="step-t">Salesman Collection Slip Protection (Anti-Double-Call Guard)</span>
+    <p class="step-d">
+      Before calling a retailer, the system checks unbanked salesman collection slips. If Salesman Ramesh collected ₹15,000 yesterday (awaiting physical bank deposit), a prominent badge reads: "🛡️ Salesman Ramesh collected on 29 Sep; not banked yet. Do not call."
+    </p>
+    <p class="cta">Primary action: <b>Skip retailer or review collection memo</b> → Protects customer relationship</p>
+    <div class="branch branch-warn">If debt &gt; 30 months → Displays Limitation Act Section 18 alert advising owner to secure written acknowledgement from customer.</div>
+  </li>
+  <li>
+    <span class="step-n">3</span><span class="step-t">One-Click Polite WhatsApp Reminder</span>
+    <p class="step-d">
+      Owner clicks "📲 WhatsApp". Pre-composed message is generated in polite business language with UPI payment handle.
+    </p>
+    <p class="cta">Primary action: <b>Review in WhatsApp Web / App & Send</b> → Returns to receivables queue</p>
+  </li>
+</ol>
+
+<h3>Screen Inventory</h3>
+<div class="overflow"><table>
+  <tr><th>Screen / View</th><th>Purpose</th><th>Primary action</th><th>States</th></tr>
+  <tr>
+    <td>Monday Chasing Hub</td>
+    <td>Rank customer balances by age & urgency</td>
+    <td>Select filter chip (45+ days, 30+ mos)</td>
+    <td>Shows count and total outstanding at top; empty state if no overdue accounts.</td>
+  </tr>
+  <tr>
+    <td>Customer Collection Row</td>
+    <td>Display single debtor details with salesman notes</td>
+    <td>📲 Draft WhatsApp</td>
+    <td>Overdue badge; salesman protection badge; limitation warning banner.</td>
+  </tr>
+</table></div>
+
+<h3>Anti-Pattern Audit (flow-tables)</h3>
+<div class="overflow"><table>
+  <tr><th>Check</th><th>Verdict</th><th>Note</th></tr>
+  <tr><td>Numbers right-aligned with tabular figures</td><td class="pass">PASS</td><td>Rupee outstanding amounts formatted with tabular numbers and commas.</td></tr>
+  <tr><td>Applied filters render as removable chips with count</td><td class="pass">PASS</td><td>Explicit filter radio with dynamic retailer count and total sum displayed.</td></tr>
+  <tr><td>No bare raw DataFrames on the default mobile/owner view</td><td class="pass">PASS</td><td>Action cards are rendered for top 10 items; full tabular ledger is tucked into an expander.</td></tr>
+</table></div>
+
+<!-- ══ FLOW 3 ══ -->
+<h2>Flow 3: 60-Second Evening Till Close & Bank Deposit Matching</h2>
+<p class="meta">Pattern source: <code>flow-forms</code> + <code>flow-tables</code> · Entry point: 'Cash Book' Tab</p>
+
+<h3>Steps</h3>
+<ol class="flow">
+  <li>
+    <span class="step-n">1</span><span class="step-t">Role Access & PIN Protection</span>
+    <p class="step-d">
+      If role is Owner, cash book opens instantly. If Counter Staff, physical drawer notes and khata balances are locked behind Owner PIN (default "0000"). Staff enters PIN to unlock.
+    </p>
+    <p class="cta">Primary action: <b>Enter Owner PIN</b> → Unlocks Cash Book</p>
+    <div class="branch branch-warn">If Accountant role and owner unchecks sharing → Accountant sees formal bank records only, protecting private informal cash memos.</div>
+  </li>
+  <li>
+    <span class="step-n">2</span><span class="step-t">60-Second Day-Close Balancer</span>
+    <p class="step-d">
+      Owner or cashier enters: Opening Cash, Today's Takings, Cash Expenses (Hamali/Petty), Banked Cash, and Counted Physical Cash at close. System verifies drift against ±₹50 tolerance threshold and tags till as 'Balanced' or 'Drift to check'.
+    </p>
+    <p class="cta">Primary action: <b>Record in Cash Book</b> → Updates on-device local ledger</p>
+  </li>
+  <li>
+    <span class="step-n">3</span><span class="step-t">Salesman Cash Deposit Linking (Decision 55)</span>
+    <p class="step-d">
+      Salesmen submit individual shop collection slips. When banked into the current account, the engine links the single consolidated cash deposit to the 3 collection slips and presents it as a verified <b>SUGGEST</b> match in the review queue.
+    </p>
+    <p class="cta">Primary action: <b>Review suggested match</b> → Marks invoices paid</p>
+  </li>
+</ol>
+
+<h3>Anti-Pattern Audit (flow-forms & flow-permissions)</h3>
+<div class="overflow"><table>
+  <tr><th>Check</th><th>Verdict</th><th>Note</th></tr>
+  <tr><td>Dual-plane data isolation (never export cash memos to tax/GST)</td><td class="pass">PASS</td><td>Strict on-device VaultDB isolation. Formal bank export never leaks physical till notes.</td></tr>
+  <tr><td>Neutral commercial terminology (no incriminating labels)</td><td class="pass">PASS</td><td>Uses 'Cash Book', 'Physical Till', 'Customer Khata', 'SFT Reporting Facts'. Zero legal overreach.</td></tr>
+  <tr><td>Cash deposits never auto-accepted into statutory ledger</td><td class="pass">PASS</td><td>Strict D60 bar: cash deposits guaranteed to land in SUGGEST tier for human sign-off.</td></tr>
+</table></div>
+
+<h2>Open Decisions & Discussion Points</h2>
+<ul>
+  <li><b>Role Mode Switching:</b> Should the Owner Cockpit default to hiding all advanced tabs (Review queue, 90-Day Monte Carlo, Scores) under an explicit "Switch to CA / Books Mode" toggle in the header?</li>
+  <li><b>WhatsApp Automation Boundary:</b> Should we support direct WhatsApp Business Cloud API automated dispatch, or strictly preserve client-side 1-click deep-links to keep human-in-the-loop safety?</li>
+  <li><b>Vernacular Expansion:</b> Currently Marathi/Hindi audio prompts or voice notes could be integrated for godown salesmen in Phase 3.</li>
+</ul>
+
+<footer>Generated with <a href="https://github.com/jpoindexter/ux-flow-skills">ux-flow-skills</a> · Proven UX flow patterns audited against production standards.</footer>
+
+</body>
+</html>

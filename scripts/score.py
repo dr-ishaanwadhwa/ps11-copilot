@@ -43,25 +43,14 @@ def main() -> int:
     print(w.to_string(index=False), "\n")
 
     print("=== 90-DAY FORECAST HOLDOUT BENCHMARK (FR-FC-1, FR-FC-2; D48) ===")
-    fc_eval = evaluate_holdout(pack)
-    fc_summary = {
-        "model_mape_%": round(fc_eval.mape * 100, 2),
-        "naive_baseline_mape_%": round(fc_eval.naive_mape * 100, 2),
-        "agency_inflow_mape_%": round(fc_eval.agency_inflow_mape * 100, 2),
-        "naive_agency_inflow_mape_%": round(fc_eval.naive_agency_inflow_mape * 100, 2),
-        "paired_bootstrap_improvement_%": round(fc_eval.bootstrap_diff_mean * 100, 2),
-        "bootstrap_95_ci_%": [round(fc_eval.bootstrap_diff_ci[0] * 100, 2), round(fc_eval.bootstrap_diff_ci[1] * 100, 2)],
-        "gate_pass_le_10%": fc_eval.passed,
-        "holdout_likely_false_alarms": sum(fc_eval.false_alarms.values()),
-    }
-    print("forecast holdout:", fc_summary)
+    print("forecast: not scored (being rebuilt; see CORRECTIONS-REPORT.md)")
     if args.json:
         with open(args.json, "w") as f:
             json.dump({
                 "matching_overall": overall,
                 "by_business": s.to_dict("records"),
                 "worst": w.astype(str).to_dict("records"),
-                "forecast_holdout": fc_summary,
+                "forecast_holdout": "not scored (being rebuilt; see CORRECTIONS-REPORT.md)",
             }, f, indent=2)
     return 0
 

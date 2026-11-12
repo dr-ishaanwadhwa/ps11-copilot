@@ -236,49 +236,7 @@ with tab_forecast:
         render_partial_view_notice()
 
     st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
-    st.caption("Bottom-up daily simulation: open invoice payment delays, recurring commitments, and statutory Sunday rolls. Never an LLM guess.")
-
-    fc_res = simulate_forecast(pack, biz, cutoff=config.HOLDOUT_START)
-    total_inf_p50 = sum(m.inflows_p50 for m in fc_res.monthly_forecasts)
-    total_out_p50 = sum(m.outflows_p50 for m in fc_res.monthly_forecasts)
-    net_p50 = total_inf_p50 - total_out_p50
-
-    c = st.columns(4)
-    c[0].metric("Opening Cash (30 Jun 2026)", inr(fc_res.opening_balance))
-    c[1].metric("Projected Inflows (90d)", inr(total_inf_p50), "P50 estimate")
-    c[2].metric("Projected Outflows (90d)", inr(total_out_p50), "P50 commitments")
-    c[3].metric("Projected Net Cash Flow", inr(net_p50),
-                "Surplus Buffer" if net_p50 > 0 else "Net Deficit",
-                delta_color="normal" if net_p50 > 0 else "inverse")
-
-    # Shortfall Warning Cards (D50, D40)
-    if fc_res.warnings:
-        st.markdown("### ⚠️ Early Shortfall Warnings")
-        for w in fc_res.warnings:
-            (st.warning if w.level == "LIKELY" else st.info)(f"**[{w.level}]** {w.message}")
-    else:
-        st.success("✓ **No Projected Shortfalls:** Cash balance remains safely above credit limits, salary days, and owner floor throughout the 90-day window.")
-
-    st.markdown("### 📅 Monthly Breakdown (Cash You Can Plan On)")
-    m_rows = []
-    for mf in fc_res.monthly_forecasts:
-        m_rows.append({
-            "Month": mf.month,
-            "Expected Inflows": f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
-            "Committed Outflows": f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
-            "Net Cash Flow": inr(mf.net_p50),
-            "Lowest Daily Dip": inr(mf.min_balance_p50),
-            "Closing Balance": inr(mf.closing_balance_p50),
-        })
-    st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
-
-    with st.expander("📊 Benchmark & Accuracy Metrics (Holdout Scored against cash_actuals)", expanded=False):
-        st.markdown("""
-        - **Model MAPE:** `3.15%` on frozen holdout (Target: $\le 10\%$, Naive 3-month baseline: `18.19%`).
-        - **Agency Inflows MAPE:** `5.36%` (Naive baseline was `46.21%` due to lump-sum payment volatility).
-        - **Paired Bootstrap Improvement:** `+15.02%` (95% CI: `[+7.73%, +23.49%]`).
-        - **Holdout False Alarms:** `0` (Zero false alarms on holdout period per check `[F4]`).
-        """)
+    st.info("The 90-day forecast is being rebuilt. Scores will be shown once they're measured honestly.")
 
 # ── TAB: REVIEW QUEUE ────────────────────────────────────────────────────────
 with tab_queue:
@@ -379,4 +337,9 @@ with tab_scores:
     df = score_matches(pack, matches)
     st.dataframe(summary(df), hide_index=True)
     st.dataframe(score_categories(pack, copilot.cat), hide_index=True)
-    st.caption("AUTO precision is 100.0% under strict Decision 60 rules. Zero wrong auto matches across all three businesses.")
+    auto_lines = df[df.tier.isin(["AUTO", "NO_DOC"])]
+    if len(auto_lines) > 0:
+        auto_precision = auto_lines.correct.mean() * 100.0
+        st.caption(f"AUTO precision is {auto_precision:.1f}% under strict Decision 60 rules across all three businesses.")
+    else:
+        st.caption("No AUTO matches recorded.")

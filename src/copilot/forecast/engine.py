@@ -12,6 +12,7 @@ import re
 import numpy as np
 import pandas as pd
 
+from .. import config
 from ..categorise import payee_key
 from .asof import AsOfView
 from .delays import (
@@ -218,10 +219,8 @@ def simulate_forecast(
     # 3c. Non-invoice credits over 8 weeks
     start_8w = cutoff - pd.Timedelta(weeks=8)
     b_8w = b_cat[(b_cat.txn_date > start_8w) & (b_cat.txn_date <= cutoff) & (b_cat.amount > 0)]
-    if business_id == "SME-2":
-        non_inv = b_8w[~b_8w.category.isin(["Insurance/TPA receipt", "Capital infusion"])]
-    else:
-        non_inv = b_8w[~b_8w.category.isin(["Sales receipt — customer", "Capital infusion"])]
+    biz_profile = config.get_profile(business_id)
+    non_inv = b_8w[~b_8w.category.isin([biz_profile.primary_receipt_category, "Capital infusion"])]
     daily_credits = non_inv.groupby("txn_date").amount.sum()
     all_8w_dates = pd.date_range(start_8w + pd.Timedelta(days=1), cutoff)
     daily_credits = daily_credits.reindex(all_8w_dates, fill_value=0.0)
@@ -250,9 +249,9 @@ def simulate_forecast(
         # New invoices
         for idx, d in enumerate(dates):
             iss_amt = (tot_90 / 90.0) * 7.0 * weekday_shares[d.dayofweek]
-            if business_id == "SME-3":
-                iss_net = iss_amt * 0.90
-            elif business_id == "SME-2":
+            if biz_profile.has_tds:
+                iss_net = iss_amt * (1.0 - config.TDS_RATE)
+            elif biz_profile.archetype == "clinic":
                 iss_net = iss_amt * (1.0 - def_tpa[0] - def_tpa[1])
             else:
                 iss_net = iss_amt

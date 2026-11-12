@@ -7,6 +7,9 @@ import pandas as pd
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DATA_DIR = Path(os.environ.get("COPILOT_DATA", DEFAULT_DATA_DIR))
 
+DEFAULT_STATE_DIR = Path(__file__).resolve().parent.parent.parent / ".copilot_state"
+STATE_DIR = Path(os.environ.get("COPILOT_STATE_DIR", DEFAULT_STATE_DIR))
+
 BANK_XLSX = "PS-11_bank_statements.xlsx"
 DOCS_XLSX = "PS-11_invoices_and_reconciliation.xlsx"
 EVAL_XLSX = "PS-11_copilot_evaluation.xlsx"

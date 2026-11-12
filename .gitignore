@@ -19,6 +19,7 @@ __pycache__/
 .pytest_cache/
 .streamlit/secrets.toml
 scripts/out/
+.copilot_state/
 *.json
 !pyproject.json
 .DS_Store

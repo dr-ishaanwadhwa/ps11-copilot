@@ -103,7 +103,7 @@ class Matcher:
         self.dc: dict[str, pd.DataFrame] = {}
         self.owner_names: dict[str, list[str]] = {}
         self.cheques: dict[str, Match] = {}
-        self.handle_memory: dict[str, str] = {}      # UPI handle -> party, learned from AUTO matches
+        self.handle_memory: dict[str, str] = self._load_confirmed_handles()  # UPI handle -> party, learned ONLY from confirmed matches (D60)
         self.last_cash_deposit: dict[str, pd.Timestamp] = {}
         self._build()
 
@@ -313,12 +313,33 @@ class Matcher:
                 m.note = ((m.note + " · " if m.note else "") +
                           f"amount >= ₹1 Lakh (₹{amt:,.0f}): requires human confirmation")
 
-        if m.tier == AUTO and handle and m.payer:
-            self.handle_memory.setdefault(handle, m.payer)
         if chq:
             m.payer_date = r.txn_date   # type: ignore[attr-defined]
             self.cheques[chq.group(2)] = m
         return self._apply(m, roundoff_doc)
+
+    def _load_confirmed_handles(self) -> dict[str, str]:
+        path = config.STATE_DIR / "confirmed_handles.json"
+        if path.exists():
+            try:
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def confirm_payer(self, handle: str, party: str) -> None:
+        """Person confirms a payer handle in the review queue (D60 Task 4.2)."""
+        self.handle_memory[handle] = party
+        config.STATE_DIR.mkdir(parents=True, exist_ok=True)
+        path = config.STATE_DIR / "confirmed_handles.json"
+        try:
+            import json
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.handle_memory, f, indent=2)
+        except Exception:
+            pass
 
 
 def match_all(pack: Pack) -> dict[str, Match]:

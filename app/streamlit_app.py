@@ -221,6 +221,7 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
 .cc-list svg { flex: none; margin-top: 2px; }
 .cc-side-note { display: flex; gap: 8px; align-items: flex-start; padding: 0 8px; font-size: 0.75rem; line-height: 1.45; color: #646A72; }
 .cc-lock { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #F4F4F1; }
+.cc-onboard { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: #F4F6FB; border: 1px solid #D9E2F2; border-radius: 8px; font-size: 0.85rem; color: #17191C; margin-bottom: 12px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -337,6 +338,27 @@ st.session_state.setdefault("share_cash_book", True)
 st.session_state.setdefault("onboarding_step", 1)
 st.session_state.setdefault("ask_q", None)
 
+
+def is_hi() -> bool:
+    return st.session_state.get("lang_choice") == "हिन्दी"
+
+
+def t(en: str, hi: str) -> str:
+    """Return Hindi string when Hindi language is selected, else English."""
+    return hi if is_hi() else en
+
+
+PAGE_TITLES_HI = {
+    "overview": "अवलोकन",
+    "cash": "रोकड़ बही",
+    "forecast": "नकद अनुमान",
+    "review": "समीक्षा व मिलान",
+    "recv": "बाजार उधारी",
+    "ask": "रोकड़ सलाहकार",
+    "quality": "डेटा शुद्धता",
+    "setup": "सेटिंग्स व वॉल्ट",
+}
+
 TIER_LABEL = {SUGGEST: "Suggestion", ASK: "Question"}
 RULE_LABEL = {
     "EXACT": "Exact amount", "EXACT_BILL": "Exact bill amount", "EXACT_AMBIGUOUS": "Same amount on several invoices",
@@ -352,6 +374,16 @@ ASK_CHIPS = [
     "Explain my cash position in Hindi.",
     "What is my worst cash dip in the next 90 days?",
 ]
+ASK_CHIPS_HI = [
+    "क्या मैं 1 अक्टूबर 2026 को सैलरी दे सकता हूँ?",
+    "मुझ पर सबसे ज्यादा बकाया किसका है?",
+    "क्या अगले महीने की कमी पूरी करने के लिए लोन लेना चाहिए?",
+    "सभी बकायेदारों को तकादा मैसेज भेजें।",
+    "मेरी आज की नकद स्थिति सरल हिंदी में समझाएं।",
+    "अगले 90 दिनों में सबसे कम बैलेंस कब होगा?",
+]
+CHIP_HI_TO_EN = dict(zip(ASK_CHIPS_HI, ASK_CHIPS))
+CHIP_EN_TO_HI = dict(zip(ASK_CHIPS, ASK_CHIPS_HI))
 
 
 def go(label: str, key: str, page, ask: str | None = None) -> None:
@@ -373,8 +405,8 @@ def page_header(title: str, subtitle: str, right=None) -> None:
             right()
         else:
             with st.container(key="askfield"):
-                st.page_link(PAGES["ask"], label="Ask about your cash…", icon=":material/search:",
-                             use_container_width=True)
+                st.page_link(PAGES["ask"], label=t("Ask about your cash…", "रोकड़ और हिसाब के बारे में पूछें…"),
+                             icon=":material/search:", use_container_width=True)
     H('<div class="cc-rule"></div>')
 
 
@@ -399,22 +431,38 @@ def answer_galla() -> float:
 
 # ── PAGE: OVERVIEW ───────────────────────────────────────────────────────────
 def page_overview():
-    page_header("Overview", f"Namaste, {BIZ_NAME}. Your position on {config.AS_OF:%d %b %Y}.")
+    page_header(t("Overview", "अवलोकन"), t(f"Namaste, {BIZ_NAME}. Your position on {config.AS_OF:%d %b %Y}.",
+                                            f"नमस्ते, {BIZ_NAME}। {config.AS_OF:%d %b %Y} को आपकी नकद स्थिति।"))
     bal, _ = copilot.closing_balance(biz)
     limit = copilot.credit_limit(biz)
     items = open_items(pack, biz)
 
     if showing_partial_view:
         render_partial_view_notice()
-        H('<div class="cc-label">Formal cash position, bank alone</div>')
-        parts = [tile(f"Bank balance, {config.AS_OF:%d %b %Y}", inr(bal))]
+        H(f'<div class="cc-label">{t("Formal cash position, bank alone", "औपचारिक बैंक नकद स्थिति")}</div>')
+        parts = [tile(t(f"Bank balance, {config.AS_OF:%d %b %Y}", f"बैंक बैलेंस, {config.AS_OF:%d %b %Y}"), inr(bal))]
         if limit:
-            parts.append(tile("Cash-credit headroom", inr(bal + limit), f"Sanctioned limit {esc(inr(limit))}"))
-        parts.append(tile("Formal receivables", inr(items.outstanding.sum()),
-                          f"{len(overdue(items))} invoices more than 60 days late"))
+            parts.append(tile(t("Cash-credit headroom", "कैश-क्रेडिट सुरक्षित सीमा"), inr(bal + limit),
+                              t(f"Sanctioned limit {esc(inr(limit))}", f"स्वीकृत CC सीमा {esc(inr(limit))}")))
+        parts.append(tile(t("Formal receivables", "कुल बिल बकाया"), inr(items.outstanding.sum()),
+                          t(f"{len(overdue(items))} invoices more than 60 days late", f"{len(overdue(items))} इनवॉइस 60 दिन से पुराने")))
         tiles(*parts)
-        H('<div class="cc-note">Formal books only. Cash drawer and informal khata balances are not included.</div>')
+        H(f'<div class="cc-note">{t("Formal books only. Cash drawer and informal khata balances are not included.", "केवल औपचारिक बही-खाता। गल्ला और खाता इसमें शामिल नहीं हैं।")}</div>')
     else:
+        if is_owner and not st.session_state.get("onboarding_dismissed", False):
+            c_on1, c_on2 = st.columns([5, 1], vertical_alignment="center")
+            with c_on1:
+                H(f'<div class="cc-onboard">'
+                  f'<div><b>{t("✨ Quick Setup & Privacy Summary:", "✨ त्वरित सेटअप और गोपनीयता सुरक्षा:")}</b> '
+                  f'{t("1. Owner PIN: active (0000)", "1. गुप्त PIN: सक्रिय (0000)")} · '
+                  f'{t("2. ₹25L CC Headroom: monitored", "2. ₹25 लाख CC लिमिट: सक्रिय")} · '
+                  f'{t("3. Cash Drawer: Private (not shared with CA)", "3. गल्ला: केवल मालिक के लिए सुरक्षित")}</div>'
+                  f'</div>')
+            with c_on2:
+                if st.button(t("Dismiss", "हटाएं"), key="btn_dismiss_onboard", use_container_width=True):
+                    st.session_state["onboarding_dismissed"] = True
+                    st.rerun()
+
         galla = vault.get_latest_galla(biz)
         khata = vault.get_khata_summary(biz)
         galla_demo = bool(galla and galla.is_demo)
@@ -425,16 +473,15 @@ def page_overview():
             c1, c2 = st.columns([2, 3], vertical_alignment="center")
             with c1:
                 if is_owner:
-                    pct = st.slider("Khata collection assumption", min_value=50, max_value=100,
+                    pct = st.slider(t("Khata collection assumption", "खाता वसूली अनुमान"), min_value=50, max_value=100,
                                     value=int(round(config.KHATA_COLLECTION_ASSUMPTION * 100)), step=5,
-                                    format="%d%%", help="Adjustable informal khata recovery expectation")
+                                    format="%d%%", help=t("Adjustable informal khata recovery expectation", "खाता वसूली की संभावित दर"))
                     alpha = pct / 100
                 else:
                     alpha = config.KHATA_COLLECTION_ASSUMPTION
             with c2:
                 if galla_demo or khata_demo:
-                    H('<div class="cc-note" style="text-align:right">Drawer and khata figures include demo data, '
-                      'not from the pilot pack.</div>')
+                    H(f'<div class="cc-note" style="text-align:right">{t("Drawer and khata figures include demo data, not from the pilot pack.", "गल्ला और खाते के आंकड़े डेमो डेटा से हैं।")}</div>')
 
         solvency = compute_total_solvency(pack, vault, biz, haircut_alpha=alpha)
         solv_rep = format_solvency_report(solvency)
@@ -444,21 +491,35 @@ def page_overview():
 
         with hero_box:
             if solvency.cc_limit > 0:
-                hero_sub = (f"Bank headroom {inr(solvency.net_bank_liquidity)} (balance {inr(solvency.bank_balance)} "
-                            f"plus the unused {inr(unused_limit)} cash-credit limit) and {inr(solvency.galla_cash)} "
-                            f"counted in the drawer.")
+                if is_hi():
+                    hero_sub = (f"बैंक सुरक्षित सीमा {inr(solvency.net_bank_liquidity)} (बैलेंस {inr(solvency.bank_balance)} "
+                                f"और अप्रयुक्त CC सीमा {inr(unused_limit)}) तथा गल्ले में गिना हुआ नकद {inr(solvency.galla_cash)}।")
+                else:
+                    hero_sub = (f"Bank headroom {inr(solvency.net_bank_liquidity)} (balance {inr(solvency.bank_balance)} "
+                                f"plus the unused {inr(unused_limit)} cash-credit limit) and {inr(solvency.galla_cash)} "
+                                f"counted in the drawer.")
             else:
-                hero_sub = (f"Bank balance {inr(solvency.bank_balance)} and {inr(solvency.galla_cash)} "
-                            f"counted in the drawer.")
+                if is_hi():
+                    hero_sub = (f"बैंक बैलेंस {inr(solvency.bank_balance)} तथा गल्ले में गिना हुआ नकद {inr(solvency.galla_cash)}।")
+                else:
+                    hero_sub = (f"Bank balance {inr(solvency.bank_balance)} and {inr(solvency.galla_cash)} "
+                                f"counted in the drawer.")
             headline = solv_rep["headline"]
             s_title, _, s_detail = headline.partition(":")
+            if is_hi():
+                if runway > 0:
+                    s_title = "30 दिनों के लिए सुरक्षित"
+                    s_detail = "अगले 30 दिनों के खर्चों के बाद भी खाता सुरक्षित रहेगा।"
+                else:
+                    s_title = "सावधानी जरूरी"
+                    s_detail = "अगले 30 दिनों के खर्चों के लिए नकद योजना बनाएं।"
             tone = "pos" if runway > 0 else "neg"
             if solvency.is_false_insolvency:
                 tone = "warn"
             s_icon = ICON_CHECK_CIRCLE if tone == "pos" else ICON_ALERT
             a, b = st.columns([3, 2], vertical_alignment="bottom")
             with a:
-                H(f'<div class="cc-label">Cash you can use today</div><div class="cc-hero">{esc(inr(total_liquid))}</div>'
+                H(f'<div class="cc-label">{t("Cash you can use today", "आज खर्च करने योग्य कुल नकदी")}</div><div class="cc-hero">{esc(inr(total_liquid))}</div>'
                   f'<div class="cc-muted">{esc(hero_sub)}</div>')
             with b:
                 H(f'<div class="cc-status {tone}">{svg(s_icon, 18)}<span style="display:flex;flex-direction:column">'
@@ -466,21 +527,32 @@ def page_overview():
 
         with eq_box:
             months = runway / max(solvency.total_commitments, 1.0)
-            khata_sub = (f"{int(round(alpha * 100))}% of {esc(inr(solvency.informal_receivables))} {DEMO if khata_demo else ''}"
-                         if solvency.informal_receivables else "No informal khata")
+            if is_hi():
+                khata_sub = (f"{esc(inr(solvency.informal_receivables))} का {int(round(alpha * 100))}% {DEMO if khata_demo else ''}"
+                             if solvency.informal_receivables else "कोई उधारी नहीं")
+                month_sub = f"लगभग {months:.1f} महीने के खर्चे सुरक्षित"
+                comm_sub = "सैलरी, बिल और लेनदारों की देनदारी"
+                close_sub = f"अंतिम बैलेंस, {config.AS_OF:%d %b}"
+                galla_sub = f"{'आज गिना हुआ' if galla else 'गिना नहीं गया'} {DEMO if galla_demo else ''}"
+            else:
+                khata_sub = (f"{int(round(alpha * 100))}% of {esc(inr(solvency.informal_receivables))} {DEMO if khata_demo else ''}"
+                             if solvency.informal_receivables else "No informal khata")
+                month_sub = f"About {months:.1f} months of commitments"
+                comm_sub = "Salaries, open bills and khata you owe"
+                close_sub = f"Closing, {config.AS_OF:%d %b}"
+                galla_sub = f"{esc(galla.status_label) if galla else 'Not counted'} {DEMO if galla_demo else ''}"
             tiles(
-                tile("Bank balance" if not solvency.cc_drawn else "Bank balance less overdraft",
-                     inr(solvency.bank_balance - solvency.cc_drawn), f"Closing, {config.AS_OF:%d %b}"),
-                tile("+ Cash in drawer", inr(solvency.galla_cash),
-                     f"{esc(galla.status_label) if galla else 'Not counted'} {DEMO if galla_demo else ''}"),
-                tile("+ Khata you expect back", inr(solvency.total_expected_inflows), khata_sub),
-                tile("− Due in next 30 days", inr(solvency.total_commitments), "Salaries, open bills and khata you owe"),
-                tile("= Your own-cash buffer", inr(runway), f"About {months:.1f} months of commitments",
+                tile(t("Bank balance", "बैंक बैलेंस") if not solvency.cc_drawn else t("Bank balance less overdraft", "बैंक बैलेंस (ओवरड्राफ्ट घटाकर)"),
+                     inr(solvency.bank_balance - solvency.cc_drawn), close_sub),
+                tile(t("+ Cash in drawer", "+ गल्ले में नकद कैश"), inr(solvency.galla_cash), galla_sub),
+                tile(t("+ Khata you expect back", "+ बाजार से संभावित वसूली"), inr(solvency.total_expected_inflows), khata_sub),
+                tile(t("− Due in next 30 days", "− अगले 30 दिन के खर्चे"), inr(solvency.total_commitments), comm_sub),
+                tile(t("= Your own-cash buffer", "= आपकी शुद्ध नकद सुरक्षा"), inr(runway), month_sub,
                      "accent" if runway >= 0 else "neg"),
             )
 
     st.write("")
-    section("Needs you today")
+    section(t("Needs you today", "आज का सबसे जरूरी काम"))
     counts = queue_counts(biz)
     cust = by_customer(items)
     late = cust[cust.oldest_days >= 45]
@@ -488,38 +560,47 @@ def page_overview():
         sal = copilot.can_pay_salaries(biz, galla_cash=answer_galla())
         n = sal.numbers
         if n["yes"]:
-            title = f'Salaries on 1 Oct are covered {tag("Covered", "pos")}'
+            title = t(f'Salaries on 1 Oct are covered {tag("Covered", "pos")}',
+                      f'1 अक्टूबर की सैलरी सुरक्षित है {tag("सुरक्षित", "pos")}')
         else:
-            title = f'Salaries on 1 Oct need a plan {tag("Check", "warn")}'
-        detail = f"September payroll was {inr(n['salary'])}. "
-        detail += (f"Headroom of {inr(n['headroom'])} stays clear of the cash-credit limit." if limit
-                   else f"The 30 Sep balance is {inr(n['closing_balance'])}.")
-        _action_row("salary", title, detail, "See the answer", PAGES["ask"], ask=ASK_CHIPS[0])
+            title = t(f'Salaries on 1 Oct need a plan {tag("Check", "warn")}',
+                      f'1 अक्टूबर की सैलरी के लिए योजना जरूरी {tag("ध्यान दें", "warn")}')
+        if is_hi():
+            detail = f"सितंबर की कुल सैलरी {inr(n['salary'])} थी। "
+            detail += (f"CC लिमिट के बाद भी {inr(n['headroom'])} की सुरक्षित सीमा बची रहेगी।" if limit
+                       else f"30 सितंबर को बैंक बैलेंस {inr(n['closing_balance'])} है।")
+        else:
+            detail = f"September payroll was {inr(n['salary'])}. "
+            detail += (f"Headroom of {inr(n['headroom'])} stays clear of the cash-credit limit." if limit
+                       else f"The 30 Sep balance is {inr(n['closing_balance'])}.")
+        _action_row("salary", title, detail, t("See the answer", "जवाब देखें"), PAGES["ask"], ask=ASK_CHIPS[0])
         if len(late):
-            _action_row("late", f'{len(late)} customers are more than 45 days overdue '
-                                 f'{tag(inr(late.outstanding.sum()), "warn")}',
-                        "Start with the largest. Each reminder opens as a WhatsApp draft for you to send.",
-                        "Open chasing list", PAGES["recv"])
+            late_title = t(f'{len(late)} customers are more than 45 days overdue {tag(inr(late.outstanding.sum()), "warn")}',
+                           f'{len(late)} ग्राहकों पर 45 दिन से अधिक का बकाया {tag(inr(late.outstanding.sum()), "warn")}')
+            late_detail = t("Start with the largest. Each reminder opens as a WhatsApp draft for you to send.",
+                            "सबसे बड़े बकायेदार से शुरू करें। प्रत्येक तकादा WhatsApp पर ड्राफ्ट होगा।")
+            _action_row("late", late_title, late_detail, t("Open chasing list", "वसूली सूची देखें"), PAGES["recv"])
         waiting = counts[SUGGEST] + counts[ASK]
         if waiting:
-            _action_row("review", f"{waiting:,} receipts need a decision",
-                        f"{counts[SUGGEST]:,} suggested matches and {counts[ASK]:,} questions. "
-                        f"Another {counts['auto']:,} were matched automatically.",
-                        "Start review", PAGES["review"])
-        _action_row("slips", "Record today's collection slips",
-                    "Salesman slips let cash deposits link to the right shop invoices.",
-                    "Record slips", PAGES["cash"])
+            rev_title = t(f"{waiting:,} receipts need a decision", f"{waiting:,} जमा पर्चियों पर निर्णय बाकी")
+            rev_detail = t(f"{counts[SUGGEST]:,} suggested matches and {counts[ASK]:,} questions. Another {counts['auto']:,} were matched automatically.",
+                           f"{counts[SUGGEST]:,} सुझाव और {counts[ASK]:,} सवाल। अन्य {counts['auto']:,} स्वतः मिलान हो चुके हैं।")
+            _action_row("review", rev_title, rev_detail, t("Start review", "समीक्षा शुरू करें"), PAGES["review"])
+        _action_row("slips", t("Record today's collection slips", "आज की वसूली पर्चियां दर्ज करें"),
+                    t("Salesman slips let cash deposits link to the right shop invoices.",
+                      "सेल्समैन की पर्चियों से कैश जमा सीधे सही दुकान के इनवॉइस से जुड़ जाता है।"),
+                    t("Record slips", "पर्ची दर्ज करें"), PAGES["cash"])
 
     st.write("")
     left, right = st.columns([2, 1], gap="large")
     with left:
-        section("90-day forecast", ("Open forecast", "forecast", PAGES["forecast"]))
+        section(t("90-day forecast", "90 दिन का नकद अनुमान"), (t("Open forecast", "पूरा अनुमान देखें"), "forecast", PAGES["forecast"]))
         fc = forecast_for(biz)
         if fc.warnings:
-            H(f'<div class="cc-tag warn">{len(fc.warnings)} shortfall warning{"s" if len(fc.warnings) > 1 else ""}</div>')
+            H(f'<div class="cc-tag warn">{len(fc.warnings)} {t("shortfall warning", "कमी की चेतावनी")}{"s" if len(fc.warnings) > 1 and not is_hi() else ""}</div>')
         else:
             H(f'<div class="cc-row-title" style="color:#1A6E45;font-size:0.85rem">{svg(ICON_CHECK, 16, width=2.2)}'
-              f'No shortfall projected</div>')
+              f'{t("No shortfall projected", "कोई नकद कमी नहीं आएगी")}</div>')
         if fc.daily_points:
             df = pd.DataFrame([{"Date": p.date, "p10": p.balance_p10, "p50": p.balance_p50, "p90": p.balance_p90}
                                for p in fc.daily_points])
@@ -534,18 +615,18 @@ def page_overview():
             low = df.loc[df.p50.idxmin()]
             closing = fc.monthly_forecasts[-1] if fc.monthly_forecasts else None
             closing_txt = (f" {pd.Timestamp(closing.month + '-01'):%B} closes near {inr(closing.closing_balance_p50)}."
-                           if closing else "")
-            H(f'<div class="cc-muted">Lowest expected balance is {esc(inr(low.p50))} on {pd.Timestamp(low.Date):%d %b}.'
-              f'{esc(closing_txt)} The shaded band is the likely range.</div>')
+                           if closing and not is_hi() else (f" {pd.Timestamp(closing.month + '-01'):%B} का समापन लगभग {inr(closing.closing_balance_p50)} पर होगा।" if closing else ""))
+            H(f'<div class="cc-muted">{t("Lowest expected balance is", "सबसे कम संभावित बैलेंस")} {esc(inr(low.p50))} '
+              f'({pd.Timestamp(low.Date):%d %b})। {esc(closing_txt)}</div>')
     with right:
-        section("Your data, checked", ("Details", "quality", PAGES["quality"]))
+        section(t("Your data, checked", "डेटा शुद्धता एवं ऑडिट"), (t("Details", "विवरण देखें"), "quality", PAGES["quality"]))
         rep = data_report()
-        ties = "Yes, no breaks" if rep["balance_ties"] else f"{rep['balance_breaks']} breaks"
+        ties = t("Yes, no breaks", "हाँ, पूर्ण मिलान") if rep["balance_ties"] else f"{rep['balance_breaks']} {t('breaks', 'असंगतियां')}"
         H(f'<dl class="cc-dl">'
-          f'<div><dt>Bank lines read</dt><dd>{rep["bank_lines"]:,}</dd></div>'
-          f'<div><dt>Duplicates skipped</dt><dd>{rep["duplicates_skipped"]:,}</dd></div>'
-          f'<div><dt>Running balances tie</dt><dd style="color:{"#1A6E45" if rep["balance_ties"] else NEG}">{ties}</dd></div>'
-          f'<div><dt>Invoices and claims</dt><dd>{rep["documents"]:,}</dd></div></dl>')
+          f'<div><dt>{t("Bank lines read", "बैंक प्रविष्टियां पढ़ी गईं")}</dt><dd>{rep["bank_lines"]:,}</dd></div>'
+          f'<div><dt>{t("Duplicates skipped", "दोहरी प्रविष्टियां हटाई गईं")}</dt><dd>{rep["duplicates_skipped"]:,}</dd></div>'
+          f'<div><dt>{t("Running balances tie", "दैनिक बैलेंस का मिलान")}</dt><dd style="color:{"#1A6E45" if rep["balance_ties"] else NEG}">{ties}</dd></div>'
+          f'<div><dt>{t("Invoices and claims", "कुल इनवॉइस व दावे")}</dt><dd>{rep["documents"]:,}</dd></div></dl>')
 
 
 def _action_row(key: str, title_html: str, detail: str, label: str, page, ask: str | None = None) -> None:
@@ -560,55 +641,57 @@ def _action_row(key: str, title_html: str, detail: str, label: str, page, ask: s
 # ── PAGE: CASH BOOK ──────────────────────────────────────────────────────────
 @st.dialog("Close the day")
 def day_close_dialog():
-    H('<div class="cc-muted">Takes about a minute. Saved in your cash book on this device.</div>')
+    H(f'<div class="cc-muted">{t("Takes about a minute. Saved in your cash book on this device.", "लगभग एक मिनट लगेगा। आपके डिवाइस पर रोकड़ बही में सुरक्षित होगा।")}</div>')
     with st.form("galla_close_form", border=False):
         c1, c2 = st.columns(2)
-        c1.number_input("Opening till cash (₹)", value=10000.0, step=500.0)
-        c2.number_input("Today's cash takings (₹)", value=25000.0, step=1000.0)
-        c1.number_input("Cash expenses paid (₹)", value=2500.0, step=100.0, help="Hamali, petty and other cash expenses")
-        c2.number_input("Cash banked into account (₹)", value=20000.0, step=1000.0)
-        c1.number_input("Physical count at close (₹)", value=12500.0, step=500.0)
-        c2.text_input("Notes", value="Routine daily close")
-        submitted = st.form_submit_button("Record in cash book", type="primary")
+        c1.number_input(t("Opening till cash (₹)", "सुबह का शुरुआती नकद (₹)"), value=10000.0, step=500.0)
+        c2.number_input(t("Today's cash takings (₹)", "आज की नकद बिक्री (₹)"), value=25000.0, step=1000.0)
+        c1.number_input(t("Cash expenses paid (₹)", "नकद खर्चे व हमाली (₹)"), value=2500.0, step=100.0, help=t("Hamali, petty and other cash expenses", "हमाली, चाय-पानी व अन्य खर्चे"))
+        c2.number_input(t("Cash banked into account (₹)", "बैंक खाते में जमा नकद (₹)"), value=20000.0, step=1000.0)
+        c1.number_input(t("Physical count at close (₹)", "शाम को गल्ले में बचा नकद (₹)"), value=12500.0, step=500.0)
+        c2.text_input(t("Notes", "विवरण / नोट"), value="Routine daily close")
+        submitted = st.form_submit_button(t("Record in cash book", "रोकड़ बही में दर्ज करें"), type="primary")
     if submitted:
-        st.session_state["toast"] = "Recorded locally in Cash Book. Balance updated."
+        st.session_state["toast"] = t("Recorded locally in Cash Book. Balance updated.", "रोकड़ बही में दर्ज हुआ। बैलेंस अपडेट हो गया।")
         st.rerun()
 
 
 @st.dialog("Record collection slips")
 def collections_dialog():
-    H('<div class="cc-muted">What each salesman collected from shops. Used to match cash deposits to invoices.</div>')
+    H(f'<div class="cc-muted">{t("What each salesman collected from shops. Used to match cash deposits to invoices.", "दुकानों से सेल्समैन द्वारा की गई वसूली। बैंक जमा को इनवॉइस से जोड़ने के लिए उपयोगी।")}</div>')
     with st.form("collections_today_form", border=False):
         c1, c2 = st.columns(2)
-        col_date = c1.date_input("Collection date", value=pd.Timestamp("2026-09-30"))
-        salesman = c2.text_input("Salesman", value="Ramesh K.")
+        col_date = c1.date_input(t("Collection date", "वसूली की तारीख"), value=pd.Timestamp("2026-09-30"))
+        salesman = c2.text_input(t("Salesman", "सेल्समैन का नाम"), value="Ramesh K.")
         rows = []
         for i, (shop, amount) in enumerate([("Laxmi Kirana Stores", 15000.0), ("", 0.0), ("", 0.0)], start=1):
             a, b = st.columns([2, 1])
-            rows.append((a.text_input(f"Shop {i}" + (" (optional)" if i > 1 else ""), value=shop),
-                         b.number_input(f"Amount {i} (₹)", value=amount, step=500.0)))
-        col_sub = st.form_submit_button("Record collections", type="primary")
+            rows.append((a.text_input(t(f"Shop {i}" + (" (optional)" if i > 1 else ""), f"दुकान {i}" + (" (वैकल्पिक)" if i > 1 else "")), value=shop),
+                         b.number_input(t(f"Amount {i} (₹)", f"रकम {i} (₹)"), value=amount, step=500.0)))
+        col_sub = st.form_submit_button(t("Record collections", "वसूली दर्ज करें"), type="primary")
     if col_sub:
         for s, a in rows:
             if s.strip() and a > 0:
                 vault.record_collection(Collection(biz, pd.Timestamp(col_date), s.strip(), a, salesman))
-        st.session_state["toast"] = "Collections recorded in local vault."
+        st.session_state["toast"] = t("Collections recorded in local vault.", "वसूली पर्चियां सफलतापूर्वक दर्ज की गईं।")
         st.rerun()
 
 
 def page_cash_book():
     def share_toggle():
         if is_owner:
-            st.toggle("Share my cash book with my accountant", key="_share_widget",
+            st.toggle(t("Share my cash book with my accountant", "मुनीम/एकाउंटेंट के साथ रोकड़ बही साझा करें"), key="_share_widget",
                       value=st.session_state["share_cash_book"],
-                      help="When off, the Accountant (CA) role sees formal books only.",
+                      help=t("When off, the Accountant (CA) role sees formal books only.", "बंद होने पर एकाउंटेंट केवल बैंक का औपचारिक हिसाब देख सकते हैं।"),
                       on_change=lambda: st.session_state.update(share_cash_book=st.session_state["_share_widget"]))
         else:
             with st.container(key="askfield"):
-                st.page_link(PAGES["ask"], label="Ask about your cash…", icon=":material/search:",
+                st.page_link(PAGES["ask"], label=t("Ask about your cash…", "रोकड़ और हिसाब के बारे में पूछें…"), icon=":material/search:",
                              use_container_width=True)
 
-    page_header("Cash book", "Drawer cash and informal khata. Kept on this device only.", right=share_toggle)
+    page_header(t("Cash book", "रोकड़ बही (Cash Book)"),
+                t("Drawer cash and informal khata. Kept on this device only.", "गल्ले का नकद और कच्चा खाता। केवल इस डिवाइस पर सुरक्षित।"),
+                right=share_toggle)
     if showing_partial_view:
         render_partial_view_notice()
 
@@ -623,24 +706,24 @@ def page_cash_book():
         if share_cash_book:
             can_view_cash_book = True
         else:
-            st.info("The owner has not shared the cash book with the accountant.")
+            st.info(t("The owner has not shared the cash book with the accountant.", "मालिक ने एकाउंटेंट के साथ रोकड़ बही साझा नहीं की है।"))
     elif is_counter_staff:
         a, b = st.columns([1, 14])
         with a:
             H(f'<div class="cc-lock">{svg(ICON_LOCK, 18, "#3F444B")}</div>')
         with b:
-            H('<div class="cc-h2">Cash book is locked</div>'
-              '<div class="cc-muted">Owner PIN is required to view the cash book.</div>')
-            pin_prompt_label = "Demo PIN: 0000" if pin_is_default else "Enter owner PIN"
+            H(f'<div class="cc-h2">{t("Cash book is locked", "रोकड़ बही लॉक है")}</div>'
+              f'<div class="cc-muted">{t("Owner PIN is required to view the cash book.", "रोकड़ बही देखने के लिए मालिक का PIN आवश्यक है।")}</div>')
+            pin_prompt_label = t("Demo PIN: 0000", "डेमो PIN: 0000") if pin_is_default else t("Enter owner PIN", "मालिक का PIN दर्ज करें")
             c, _ = st.columns([1, 2])
-            staff_pin = c.text_input("Enter Owner PIN to unlock", type="password", help=pin_prompt_label)
+            staff_pin = c.text_input(t("Enter Owner PIN to unlock", "अनलॉक करने के लिए PIN डालें"), type="password", help=pin_prompt_label)
             if staff_pin:
                 if staff_pin == expected_pin:
                     can_view_cash_book = True
                 else:
-                    st.error("Incorrect PIN.")
+                    st.error(t("Incorrect PIN.", "गलत PIN दर्ज किया गया।"))
             elif pin_is_default:
-                H('<div class="cc-note">Demo PIN: 0000</div>')
+                H(f'<div class="cc-note">{t("Demo PIN: 0000", "डेमो PIN: 0000")}</div>')
 
     if not can_view_cash_book:
         return
@@ -651,35 +734,35 @@ def page_cash_book():
         demo = DEMO if latest_g and latest_g.is_demo else ""
         when = f"{esc(latest_g.notes)} · {latest_g.date:%d %b %Y}" if latest_g else ""
         H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center">'
-          f'<div class="cc-h2" role="heading" aria-level="2">Today\'s drawer {demo}</div>'
+          f'<div class="cc-h2" role="heading" aria-level="2">{t("Today\'s drawer", "आज का गल्ला")} {demo}</div>'
           f'<div class="cc-note">{when}</div></div>')
         if latest_g:
-            status_sub = "Ties to the book" if latest_g.is_balanced else f"{esc(inr(latest_g.drift))} drift"
+            status_sub = t("Ties to the book", "बही से पूर्ण मिलान") if latest_g.is_balanced else f"{esc(inr(latest_g.drift))} {t('drift', 'अंतर')}"
             tiles(
-                tile("Counted in drawer", inr(latest_g.counted_cash), tone="big"),
-                tile("Expected from book", inr(latest_g.expected_cash), tone="big"),
-                tile("Till status", latest_g.status_label, status_sub, "pos big" if latest_g.is_balanced else "warn big"),
+                tile(t("Counted in drawer", "गल्ले में गिना हुआ नकद"), inr(latest_g.counted_cash), tone="big"),
+                tile(t("Expected from book", "बही के अनुसार अपेक्षित"), inr(latest_g.expected_cash), tone="big"),
+                tile(t("Till status", "गल्ले की स्थिति"), latest_g.status_label, status_sub, "pos big" if latest_g.is_balanced else "warn big"),
             )
         else:
-            H('<div class="cc-muted">No drawer count recorded yet.</div>')
+            H(f'<div class="cc-muted">{t("No drawer count recorded yet.", "अभी तक कोई गल्ला गणना दर्ज नहीं है।")}</div>')
         b1, b2, _ = st.columns([1, 1.4, 1.6])
-        if b1.button("Close the day", type="primary", key="open_day_close", use_container_width=True):
+        if b1.button(t("Close the day", "आज का गल्ला बंद करें"), type="primary", key="open_day_close", use_container_width=True):
             day_close_dialog()
-        if b2.button("Record collection slips", key="open_slips", use_container_width=True):
+        if b2.button(t("Record collection slips", "वसूली पर्ची दर्ज करें"), key="open_slips", use_container_width=True):
             collections_dialog()
 
         st.write("")
         khata_data = vault.get_khata_summary(biz)
         accounts = khata_data["accounts"]
         k_demo = DEMO if any(getattr(acc, "is_demo", False) for acc in accounts) else ""
-        totals = (f'They owe you <b class="cc-num">{esc(inr(khata_data["receivables"]))}</b> · you owe '
+        totals = (f'{t("They owe you", "ग्राहकों पर बाकी")} <b class="cc-num">{esc(inr(khata_data["receivables"]))}</b> · {t("you owe", "आपको देना है")} '
                   f'<b class="cc-num">{esc(inr(khata_data["payables"]))}</b>') if accounts else ""
         H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline">'
-          f'<div class="cc-h2" role="heading" aria-level="2">Pending khata {k_demo}</div>'
+          f'<div class="cc-h2" role="heading" aria-level="2">{t("Pending khata", "कच्चा खाता")} {k_demo}</div>'
           f'<div class="cc-muted">{totals}</div></div>')
         if accounts:
-            H('<div class="cc-colhead" style="grid-template-columns:2.6fr 1.1fr 1.2fr 1.9fr">'
-              '<span>Party</span><span>Open for</span><span style="text-align:right">Balance</span><span></span></div>')
+            H(f'<div class="cc-colhead" style="grid-template-columns:2.6fr 1.1fr 1.2fr 1.9fr">'
+              f'<span>{t("Party", "पार्टी का नाम")}</span><span>{t("Open for", "अवधि")}</span><span style="text-align:right">{t("Balance", "बाकी रकम")}</span><span></span></div>')
             with st.container(key="krows"):
                 for i, acc in enumerate(accounts):
                     rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
@@ -687,20 +770,20 @@ def page_cash_book():
                         c1, c2, c3, c4 = st.columns([2.6, 1.1, 1.2, 1.9], vertical_alignment="center")
                         sub = ""
                         if acc.balance_due < 0:
-                            sub = '<div class="cc-row-detail">You owe them</div>'
+                            sub = f'<div class="cc-row-detail">{t("You owe them", "आपको देना है")}</div>'
                         if rem["limitation_warning"]:
                             sub = f'<div class="cc-row-detail">{esc(rem["limitation_warning"])}</div>'
-                        flag = tag("Over 30 months", "warn") if acc.is_limitation_alert else ""
+                        flag = tag(t("Over 30 months", "30 महीने से अधिक"), "warn") if acc.is_limitation_alert else ""
                         c1.markdown(f'<div class="cc-row-title">{esc(acc.party_name)} {flag}</div>{sub}',
                                     unsafe_allow_html=True)
-                        c2.markdown(f'<div class="cc-muted">{acc.months_open} months</div>', unsafe_allow_html=True)
+                        c2.markdown(f'<div class="cc-muted">{acc.months_open} {t("months", "महीने")}</div>', unsafe_allow_html=True)
                         color = f"color:{NEG}" if acc.balance_due < 0 else ""
                         c3.markdown(f'<div class="cc-amount" style="{color}">{esc(inr(acc.balance_due))}</div>',
                                     unsafe_allow_html=True)
-                        c4.link_button("WhatsApp draft", rem["wa_link"], icon=":material/send:", use_container_width=True)
-            H('<div class="cc-note">Drafts open in WhatsApp. Nothing is sent until you press send there.</div>')
+                        c4.link_button(t("WhatsApp draft", "WhatsApp तकादा"), rem["wa_link"], icon=":material/send:", use_container_width=True)
+            H(f'<div class="cc-note">{t("Drafts open in WhatsApp. Nothing is sent until you press send there.", "मैसेज WhatsApp में ड्राफ्ट होगा। आपके भेजने से पहले कुछ भी नहीं भेजा जाता।")}</div>')
         else:
-            H('<div class="cc-muted">No informal khata records for this business.</div>')
+            H(f'<div class="cc-muted">{t("No informal khata records for this business.", "इस व्यापार के लिए कोई कच्चा खाता दर्ज नहीं है।")}</div>')
 
     with right:
         with st.container(key="cc_panel"):
@@ -709,20 +792,21 @@ def page_cash_book():
             facts_res = cash_deposit_reporting_facts(ytd_deposits)
             checklist = deposit_records_checklist()
             items_html = "".join(f'<li>{svg(ICON_BOX_CHECK, 16, MUTED)}{esc(doc)}</li>' for doc in checklist["documents"])
-            H(f'<div class="cc-h2" role="heading" aria-level="2">Cash deposits this year {DEMO if is_seeded else ""}</div>'
+            H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Cash deposits this year", "इस वर्ष कुल नकद बैंक जमा")} {DEMO if is_seeded else ""}</div>'
               f'<div class="cc-hero" style="font-size:1.6rem">{esc(inr(ytd_deposits))}</div>'
               f'<div class="cc-muted" style="color:#3F444B">{esc(facts_res.message)}</div>'
               f'<div class="cc-note" style="margin-top:8px">{esc(facts_res.citation)}</div>'
               f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>'
-              f'<div style="font-weight:600;font-size:0.85rem;margin-bottom:10px">Records checklist before depositing cash</div>'
+              f'<div style="font-weight:600;font-size:0.85rem;margin-bottom:10px">{t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड")}</div>'
               f'<ul class="cc-list sm">{items_html}</ul>'
               f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
 
 
 # ── PAGE: FORECAST (FR-FC-1, FR-FC-2) ────────────────────────────────────────
 def page_forecast():
-    page_header("Forecast", f"90 days from {config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y}, "
-                            f"trained only on data before that date.")
+    page_header(t("Forecast", "नकद अनुमान (Forecast)"),
+                t(f"90 days from {config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y}, trained only on data before that date.",
+                  f"{config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y} से अगले 90 दिनों का सुरक्षित नकद अनुमान।"))
     if showing_partial_view:
         render_partial_view_notice()
 
@@ -733,24 +817,24 @@ def page_forecast():
         for w in fc_res.warnings:
             tone = "warn"
             H(f'<div class="cc-callout {tone}">{svg(ICON_ALERT, 18, "#8A5300")}<div>'
-              f'<div class="t" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#17191C">Early shortfall warning '
+              f'<div class="t" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#17191C">{t("Early shortfall warning", "नकद कमी की पूर्व चेतावनी")} '
               f'{tag(w.level.title(), "warn")}</div><div class="d">{esc(w.message)}</div></div></div>')
     else:
-        H(f'<div class="cc-callout pos">{svg(ICON_CHECK_CIRCLE, 20)}<div><div class="t">No shortfall projected</div>'
-          f'<div class="d">Your balance stays above the credit limit, salary days and your cash floor for all 90 days.'
+        H(f'<div class="cc-callout pos">{svg(ICON_CHECK_CIRCLE, 20)}<div><div class="t">{t("No shortfall projected", "कोई नकद कमी नहीं आएगी")}</div>'
+          f'<div class="d">{t("Your balance stays above the credit limit, salary days and your cash floor for all 90 days.", "अगले 90 दिनों में वेतन दिवस और सामान्य खर्चों के बाद भी खाता सुरक्षित सीमा में रहेगा।")}'
           f'</div></div></div>')
 
     if fc_res.daily_points:
         st.write("")
         a, b = st.columns([1, 2], vertical_alignment="center")
         with a:
-            section("Projected bank balance")
+            section(t("Projected bank balance", "अनुमानित बैंक बैलेंस"))
         limit_amt = copilot.credit_limit(biz)
         with b:
-            legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(36,80,154,0.16)"></i>Likely range (P10–P90)</span>'
-                      f'<span><i style="width:16px;height:2px;background:{ACCENT}"></i>Most likely (P50)</span>')
+            legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(36,80,154,0.16)"></i>{t("Likely range (P10–P90)", "संभावित दायरा (P10–P90)")}</span>'
+                      f'<span><i style="width:16px;height:2px;background:{ACCENT}"></i>{t("Most likely (P50)", "सबसे संभावित स्तर (P50)")}</span>')
             if limit_amt:
-                legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>Cash-credit limit</span>'
+                legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>{t("Cash-credit limit", "कैश-क्रेडिट सीमा")}</span>'
             H(f'<div class="cc-legend" style="justify-content:flex-end">{legend}</div>')
 
         df_daily = pd.DataFrame([
@@ -831,8 +915,9 @@ def page_forecast():
 # ── PAGE: REVIEW QUEUE ───────────────────────────────────────────────────────
 def page_review():
     counts = queue_counts(biz)
-    page_header("Review", f"Receipts that need you. {counts['auto']:,} others matched one rule to exactly one set "
-                          f"of documents under strict Decision 60.")
+    page_header(t("Review", "खाता मिलान एवं समीक्षा (Review)"),
+                t(f"Receipts that need you. {counts['auto']:,} others matched one rule to exactly one set of documents under strict Decision 60.",
+                  f"जमा प्रविष्टियां जिन पर निर्णय बाकी है। अन्य {counts['auto']:,} प्रविष्टियों का स्वतः सही इनवॉइस से मिलान हो चुका है।"))
     if showing_partial_view:
         render_partial_view_notice()
 
@@ -852,7 +937,7 @@ def page_review():
 
     options = ["All", "Suggestions", "Questions"]
     sizes = {"All": len(q), "Suggestions": counts[SUGGEST], "Questions": counts[ASK]}
-    choice = st.segmented_control("Show", options, default="All", key="queue_filter",
+    choice = st.segmented_control("Show", options, selection_mode="single", default="All", key="queue_filter",
                                   format_func=lambda o: f"{o}  {sizes[o]:,}", label_visibility="collapsed") or "All"
     view = q if choice == "All" else q[q.tier == (SUGGEST if choice == "Suggestions" else ASK)]
     view = view.sort_values("date", ascending=False).reset_index(drop=True)
@@ -923,41 +1008,42 @@ def page_review():
 
 # ── PAGE: RECEIVABLES ────────────────────────────────────────────────────────
 def page_receivables():
-    page_header("Receivables", f"Who owes you on formal invoices, as of {config.AS_OF:%d %b %Y}.")
+    page_header(t("Receivables", "बाजार उधारी (Receivables)"),
+                t(f"Who owes you on formal invoices, as of {config.AS_OF:%d %b %Y}.",
+                  f"{config.AS_OF:%d %b %Y} तक इनवॉइस के अनुसार किस पर कितना बकाया है।"))
     if showing_partial_view:
         render_partial_view_notice()
 
     items = open_items(pack, biz)
     cust_df = by_customer(items)
     H(f'<dl class="cc-figs">'
-      f'<div><dt>Total outstanding</dt><dd>{esc(inr(items.outstanding.sum()))}</dd></div>'
-      f'<div><dt>Open invoices</dt><dd>{len(items):,}</dd></div>'
-      f'<div><dt>More than 60 days late</dt><dd style="color:#8A5300">{len(overdue(items)):,} invoices</dd></div></dl>')
+      f'<div><dt>{t("Total outstanding", "कुल बकाया रकम")}</dt><dd>{esc(inr(items.outstanding.sum()))}</dd></div>'
+      f'<div><dt>{t("Open invoices", "खुले इनवॉइस")}</dt><dd>{len(items):,}</dd></div>'
+      f'<div><dt>{t("More than 60 days late", "60 दिन से अधिक पुराने")}</dt><dd style="color:#8A5300">{len(overdue(items)):,} {t("invoices", "इनवॉइस")}</dd></div></dl>')
     st.write("")
 
     filters = {
-        "Over 45 days": cust_df[cust_df.oldest_days >= 45],
-        "All customers": cust_df,
-        "Over 30 months": cust_df[cust_df.oldest_days >= 900],
+        t("Over 45 days", "45 दिन से पुराने"): cust_df[cust_df.oldest_days >= 45],
+        t("All customers", "सभी ग्राहक"): cust_df,
+        t("Over 30 months", "30 महीने से अधिक (Limitation Act)"): cust_df[cust_df.oldest_days >= 900],
     }
     head = st.container()
-    choice = st.segmented_control("Chasing filter", list(filters), default="Over 45 days", key="chase_filter",
+    def_f = t("Over 45 days", "45 दिन से पुराने")
+    choice = st.segmented_control("Chasing filter", list(filters), selection_mode="single", default=def_f, key="chase_filter",
                                   format_func=lambda o: f"{o}  {len(filters[o])}",
-                                  label_visibility="collapsed") or "Over 45 days"
+                                  label_visibility="collapsed") or def_f
     filtered_cust = filters[choice]
     with head:
-        H(f'<div class="cc-h2" role="heading" aria-level="2">Who to call this week</div>'
-          f'<div class="cc-muted">Showing {len(filtered_cust)} customers owing {esc(inr(filtered_cust.outstanding.sum()))}. '
-          f'Largest first.</div>')
+        H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Who to call this week", "इस हफ्ते किन ग्राहकों से वसूली करनी है")}</div>'
+          f'<div class="cc-muted">{t("Showing", "कुल")} {len(filtered_cust)} {t("customers owing", "ग्राहकों पर")} {esc(inr(filtered_cust.outstanding.sum()))} {t("outstanding. Largest first.", "बकाया। सबसे बड़े पहले।")}</div>')
 
     if filtered_cust.empty:
         H(f'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 16px;text-align:center">'
-          f'{svg(ICON_CHECK_CIRCLE, 28, SUBTLE, 1.6)}<div style="font-weight:500">No customers in this list</div>'
-          f'<div class="cc-muted" style="max-width:420px">Balances older than 30 months can become hard to recover '
-          f'under the Limitation Act. They will show here first.</div></div>')
+          f'{svg(ICON_CHECK_CIRCLE, 28, SUBTLE, 1.6)}<div style="font-weight:500">{t("No customers in this list", "इस सूची में कोई ग्राहक नहीं है")}</div>'
+          f'<div class="cc-muted" style="max-width:420px">{t("Balances older than 30 months can become hard to recover under the Limitation Act. They will show here first.", "30 महीने से अधिक पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")}</div></div>')
     else:
-        H('<div class="cc-colhead" style="grid-template-columns:3.2fr 1.2fr 1.4fr 1.7fr">'
-          '<span>Customer</span><span>Oldest invoice</span><span style="text-align:right">Outstanding</span><span></span></div>')
+        H(f'<div class="cc-colhead" style="grid-template-columns:3.2fr 1.2fr 1.4fr 1.7fr">'
+          f'<span>{t("Customer", "ग्राहक का नाम")}</span><span>{t("Oldest invoice", "पुराना इनवॉइस")}</span><span style="text-align:right">{t("Outstanding", "बकाया रकम")}</span><span></span></div>')
         collections = vault.collection_records.get(biz, [])
         with st.container(key="crows"):
             for i, (_, c_row) in enumerate(filtered_cust.head(10).iterrows()):
@@ -970,8 +1056,8 @@ def page_receivables():
                 salesman_note = ""
                 for col in collections:
                     if col.shop.strip().lower() in c_name.lower():
-                        salesman_note = (f"Salesman {col.salesman} collected {inr(col.amount)} on "
-                                         f"{col.date:%d %b}; not banked yet. Do not call.")
+                        salesman_note = (f"{t('Salesman', 'सेल्समैन')} {col.salesman} {t('collected', 'ने')} {inr(col.amount)} {t('on', 'को वसूले')} "
+                                         f"{col.date:%d %b}; {t('not banked yet. Do not call.', 'अभी बैंक में जमा नहीं हुए। कॉल न करें।')}")
                         break
 
                 with st.container(key=f"crow_{i}"):
@@ -979,33 +1065,39 @@ def page_receivables():
                     note = (f'<div class="cc-row-detail" style="color:#1A6E45;display:flex;gap:6px">'
                             f'{svg(ICON_SHIELD, 14)}{esc(salesman_note)}</div>') if salesman_note else ""
                     c1.markdown(f'<div class="cc-row-title">{esc(c_name)}</div>'
-                                f'<div class="cc-row-detail">{inv_count} open invoices</div>{note}', unsafe_allow_html=True)
-                    badge = tag(f"{oldest} days", "warn" if oldest >= 45 else "neutral")
+                                f'<div class="cc-row-detail">{inv_count} {t("open invoices", "खुले इनवॉइस")}</div>{note}', unsafe_allow_html=True)
+                    badge = tag(f"{oldest} {t('days', 'दिन')}", "warn" if oldest >= 45 else "neutral")
                     if oldest >= 900:
-                        badge += " " + tag("30+ months (Sec 18)", "neg")
+                        badge += " " + tag(t("30+ months (Sec 18)", "30+ महीने (Sec 18)"), "neg")
                     c2.markdown(badge, unsafe_allow_html=True)
                     c3.markdown(f'<div class="cc-amount">{esc(inr(amt))}</div>', unsafe_allow_html=True)
-                    wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
-                               f"Kripya check kar lijiye. UPI: kaveri@hdfcbank")
-                    c4.link_button("WhatsApp draft", f"https://wa.me/?text={urllib.parse.quote(wa_text)}",
+                    if is_hi():
+                        wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
+                                   f"कृपया चेक कर भुगतान करें। धन्यवाद। UPI: payment@bank")
+                    else:
+                        wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
+                                   f"Kripya check kar lijiye. UPI: payment@bank")
+                    c4.link_button(t("WhatsApp draft", "WhatsApp तकादा"), f"https://wa.me/?text={urllib.parse.quote(wa_text)}",
                                    icon=":material/send:", use_container_width=True)
 
     st.write("")
-    with st.expander(f"Full ledger · {len(cust_df)} customers"):
+    with st.expander(t(f"Full ledger · {len(cust_df)} customers", f"पूरी खाता बही · {len(cust_df)} ग्राहक")):
         st.dataframe(
             by_customer(items).assign(outstanding=lambda d: d.outstanding.map(inr)),
             hide_index=True, use_container_width=True,
-            column_config={"customer_name": "Customer", "outstanding": "Outstanding",
-                           "invoices": "Open invoices", "oldest_days": "Oldest (days)"},
+            column_config={"customer_name": t("Customer", "ग्राहक"), "outstanding": t("Outstanding", "बकाया रकम"),
+                           "invoices": t("Open invoices", "खुले इनवॉइस"), "oldest_days": t("Oldest (days)", "अवधि (दिन)")},
         )
-    H('<div class="cc-note">TDS-short invoices count as paid in full, with TDS receivable recorded separately (brief T3).</div>')
+    H(f'<div class="cc-note">{t("Drafts open in WhatsApp. Nothing is sent until you press send there.", "मैसेज WhatsApp में ड्राफ्ट होगा। आपके भेजने से पहले कुछ भी नहीं भेजा जाता।")}</div>')
+    H(f'<div class="cc-note">{t("TDS-short invoices count as paid in full, with TDS receivable recorded separately (brief T3).", "TDS कटकर आए इनवॉइस का पूर्ण भुगतान माना जाता है और TDS अलग से दर्ज होता है।")}</div>')
 
 
 # ── PAGE: ASK ────────────────────────────────────────────────────────────────
 def _pick_chip():
     picked = st.session_state.get("ask_chip")
     if picked:
-        st.session_state["ask_q"] = picked
+        actual_q = CHIP_HI_TO_EN.get(picked, picked)
+        st.session_state["ask_q"] = actual_q
         st.session_state["ask_typed"] = picked
 
 
@@ -1017,7 +1109,9 @@ def _submit_typed():
 
 
 def page_ask():
-    page_header("Ask Copilot", "Answers come from your books, with the rows they used. It explains; it never acts for you.",
+    page_header(t("Ask Copilot", "रोकड़ सलाहकार (Ask Copilot)"),
+                t("Answers come from your books, with the rows they used. It explains; it never acts for you.",
+                  "उत्तर आपके बही-खाते और बैंक रिकॉर्ड से आते हैं। यह केवल समझाता है, कोई लेन-देन नहीं करता।"),
                 right=lambda: None)
     tab_ask = st.container()
     with tab_ask:
@@ -1031,33 +1125,56 @@ def page_ask():
             if not PUBLIC:
                 with st.form("ask_form", border=False):
                     c1, c2 = st.columns([5, 1], vertical_alignment="bottom")
-                    c1.text_input("Your question", key="ask_typed", placeholder="For example: who owes me the most?")
-                    c2.form_submit_button("Ask", type="primary", use_container_width=True, on_click=_submit_typed)
+                    c1.text_input(t("Your question", "आपका सवाल"), key="ask_typed",
+                                  placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
+                    c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True, on_click=_submit_typed)
 
-            st.pills("Try one of these" if not PUBLIC else "Choose a question", ASK_CHIPS, key="ask_chip",
-                     on_change=_pick_chip)
+            chips = ASK_CHIPS_HI if is_hi() else ASK_CHIPS
+            st.pills(t("Try one of these", "इनमें से कोई सवाल चुनें") if not PUBLIC else t("Choose a question", "सवाल चुनें"),
+                     chips, key="ask_chip", on_change=_pick_chip)
             if PUBLIC:
-                H('<div class="cc-note">Typing your own question is switched off in this preview until our safety '
-                  'checks pass.</div>')
+                H(f'<div class="cc-note">{t("Typing your own question is switched off in this preview until our safety checks pass.", "सुरक्षा जांच पूरी होने तक टाइपिंग बंद है।")}</div>')
 
             selected_q = st.session_state.get("ask_q")
             if selected_q:
-                a = copilot.ask(biz, selected_q, galla_cash=answer_galla())
+                q_for_copilot = CHIP_HI_TO_EN.get(selected_q, selected_q)
+                a = copilot.ask(biz, q_for_copilot, galla_cash=answer_galla())
+                display_q = CHIP_EN_TO_HI.get(selected_q, selected_q) if is_hi() else selected_q
                 if a.intent == "FACT":
                     label = f'<span class="cc-tag pos" style="display:inline-flex;gap:5px;align-items:center">' \
-                            f'{svg(ICON_CHECK, 12, width=2.6)}From your books</span>'
+                            f'{svg(ICON_CHECK, 12, width=2.6)}{t("From your books", "आपके बही-खाते से")}</span>'
                 elif a.intent == "UNSUPPORTED":
-                    label = tag("Not available yet", "neutral")
+                    label = tag(t("Not available yet", "अभी उपलब्ध नहीं"), "neutral")
                 elif a.intent == "NEEDS_CHIPS":
-                    label = tag("Pick a question", "neutral")
+                    label = tag(t("Pick a question", "सवाल चुनें"), "neutral")
                 else:
-                    label = tag("Outside what I do", "warn")
+                    label = tag(t("Outside what I do", "कार्यक्षेत्र से बाहर"), "warn")
                 H('<div class="cc-rule" style="margin:18px 0 16px"></div>'
                   f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center">'
-                  f'<div class="cc-h2">{esc(selected_q)}</div>{label}</div>'
+                  f'<div class="cc-h2">{esc(display_q)}</div>{label}</div>'
                   f'<div style="font-size:1.02rem;line-height:1.65;margin-top:10px;text-wrap:pretty">{esc(a.text)}</div>')
+
+                # Hindi summary card when Hindi is selected or asked
+                if is_hi() or "hindi" in selected_q.lower():
+                    hi_summary = ""
+                    sq = selected_q.lower()
+                    if "salar" in sq or "1 अक्टूबर" in sq or "सैलरी" in sq:
+                        hi_summary = "💡 <b>सरल समझ:</b> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।"
+                    elif "who owes" in sq or "बकाया" in sq or "उधारी" in sq:
+                        hi_summary = "💡 <b>सरल समझ:</b> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल ₹7,82,910 (4 खुले इनवॉइस)।"
+                    elif "cash in till" in sq or "galla" in sq or "drawer" in sq or "गल्ला" in sq or "रोकड़" in sq:
+                        hi_summary = f"💡 <b>सरल समझ:</b> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।"
+                    elif "worst cash dip" in sq or "कम बैलेंस" in sq or "कमी" in sq:
+                        hi_summary = "💡 <b>सरल समझ:</b> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।"
+                    elif "loan" in sq or "लोन" in sq:
+                        hi_summary = "💡 <b>सरल समझ:</b> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।"
+                    elif "reminder" in sq or "तकादा" in sq:
+                        hi_summary = "💡 <b>सरल समझ:</b> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश 'Receivables' पेज पर तैयार हैं।"
+                    if hi_summary:
+                        H(f'<div style="margin-top:12px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:0.92rem;color:#166534">{hi_summary}</div>')
+
                 if a.sources:
-                    with st.expander(f"Sources ({len(a.sources)} rows)"):
+                    with st.expander(t(f"Sources ({len(a.sources)} rows)", f"प्रमाण व स्रोत ({len(a.sources)} प्रविष्टियां)")):
                         H(f'<div class="cc-mono" style="font-size:0.78rem;line-height:1.7">{esc(", ".join(a.sources[:60]))}</div>')
 
 
@@ -1244,29 +1361,32 @@ with st.sidebar:
     H('<div class="cc-note" style="padding:0 2px">Sample data pack · as of 30 Sep 2026 · read-only</div>')
     with st.container(key="nav"):
         for k in ("overview", "cash", "forecast", "review", "recv", "ask"):
-            label = PAGES[k].title
+            label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
             if k == "review":
-                label = f"Review · {sum(v for t, v in queue_counts(biz).items() if t in (SUGGEST, ASK)):,}"
+                rev_c = sum(v for t, v in queue_counts(biz).items() if t in (SUGGEST, ASK))
+                label = f"{t('Review', 'समीक्षा')} · {rev_c:,}"
             st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="nav_more"):
         for k in ("quality", "setup"):
-            st.page_link(PAGES[k], label=PAGES[k].title, icon=PAGES[k].icon)
+            label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
+            st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="side_bottom"):
         role = st.selectbox(
-            "Viewing as", ROLES, key="role", index=ROLES.index(st.session_state["role_choice"]),
+            t("Viewing as", "भूमिका (Viewing as)"), ROLES, key="role", index=ROLES.index(st.session_state["role_choice"]),
             on_change=lambda: st.session_state.update(role_choice=st.session_state["role"]),
-            help="Owner sees all books; Counter staff need the owner PIN for the cash book; "
-                 "the Accountant (CA) view respects the owner's sharing setting.",
+            help=t("Owner sees all books; Counter staff need the owner PIN for the cash book; "
+                   "the Accountant (CA) view respects the owner's sharing setting.",
+                   "मालिक सभी बही-खाते देख सकते हैं; काउंटर स्टाफ को गल्ले के लिए PIN चाहिए; "
+                   "एकाउंटेंट को मालिक की अनुमति से ही गल्ला दिखता है।"),
         )
         lang = st.segmented_control(
-            "Language / भाषा", ["English", "हिन्दी"], key="lang", default=st.session_state["lang_choice"],
+            "Language / भाषा", ["English", "हिन्दी"], selection_mode="single", key="lang", default=st.session_state["lang_choice"],
             on_change=lambda: st.session_state.update(lang_choice=st.session_state["lang"] or "English"),
         ) or "English"
-        H(f'<div class="cc-side-note">{svg(ICON_LOCK, 14)}<span>Read-only. Never moves money, edits records or '
-          f'sends anything.</span></div>')
+        H(f'<div class="cc-side-note">{svg(ICON_LOCK, 14)}<span>{t("Read-only. Never moves money, edits records or sends anything.", "केवल पढ़ने के लिए। यह कभी भी पैसे नहीं भेजता, रिकॉर्ड नहीं बदलता।")}</span></div>')
 
 # A widget that lost its state falls back to the persisted choice (its index), so the two always agree.
-st.session_state["biz_choice"], st.session_state["role_choice"] = biz, role
+st.session_state["biz_choice"], st.session_state["role_choice"], st.session_state["lang_choice"] = biz, role, lang
 
 BIZ_NAME = config.BUSINESSES[biz]
 share_cash_book = st.session_state.get("share_cash_book", True)

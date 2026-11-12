@@ -18,6 +18,8 @@ python3.13 -m venv .venv
 .venv/bin/streamlit run app/streamlit_app.py
 ```
 
+Run in public mode: `COPILOT_PUBLIC=1 streamlit run app/streamlit_app.py`
+
 The data pack is read from `~/Projects/ps11-research/PS-11 SME Cash-Flow Copilot/Data`; set `COPILOT_DATA` to point elsewhere. The pack is **not** in this repo and must never be committed (`.gitignore` blocks spreadsheets).
 
 ## Scores on the data pack (4 Nov 2026)

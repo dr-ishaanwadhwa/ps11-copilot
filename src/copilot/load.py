@@ -34,6 +34,8 @@ def _num(df: pd.DataFrame, cols) -> pd.DataFrame:
 
 def load_pack(data_dir: Path | None = None) -> Pack:
     d = Path(data_dir or config.DATA_DIR)
+    if not d.exists():
+        raise FileNotFoundError(f"Data pack not found at {d}. Set COPILOT_DATA to the folder that contains the PS-11 workbooks.")
     bank_x = pd.ExcelFile(d / config.BANK_XLSX)
     docs_x = pd.ExcelFile(d / config.DOCS_XLSX)
     eval_x = pd.ExcelFile(d / config.EVAL_XLSX)

@@ -69,7 +69,25 @@ st.markdown("""
       border-radius: 10px !important;
       font-weight: 500 !important;
       cursor: pointer !important;
-      transition: all 0.2s ease !important;
+      touch-action: manipulation !important;
+      -webkit-tap-highlight-color: transparent !important;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease !important;
+  }
+
+  /* Accessible visible focus states */
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid #3B82F6 !important;
+      outline-offset: 2px !important;
+  }
+
+  /* Honor user accessibility preferences for motion */
+  @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+      }
   }
 
   /* SME Cards - Calm & Restful */
@@ -224,14 +242,6 @@ with st.sidebar.expander("🛠️ Data Integrity & Verification Ledger", expande
     st.metric("Duplicates skipped", rep_side["duplicates_skipped"])
     st.metric("Running balance ties", "Yes" if rep_side["balance_ties"] else f"{rep_side['balance_breaks']} breaks")
     st.metric("Invoices & claims", f"{rep_side['documents']:,}")
-
-# ── ONBOARDING STATE & AI-NATIVE PROMPT STATE ────────────────────────────────
-if "show_onboarding" not in st.session_state:
-    st.session_state["show_onboarding"] = False
-if "onboarding_step" not in st.session_state:
-    st.session_state["onboarding_step"] = 1
-if "active_copilot_q" not in st.session_state:
-    st.session_state["active_copilot_q"] = None
 
 # ── 3-STEP ZERO-FRICTION ONBOARDING WIZARD ───────────────────────────────────
 if st.session_state["show_onboarding"]:
@@ -399,11 +409,8 @@ with c_input:
     )
 with c_btn:
     if st.button("Ask", key="main_copilot_submit_btn", type="primary"):
-        if user_typed:
-            st.session_state["active_copilot_q"] = user_typed
-
-if user_typed and user_typed != st.session_state.get("active_copilot_q"):
-    st.session_state["active_copilot_q"] = user_typed
+        if user_typed and user_typed.strip():
+            st.session_state["active_copilot_q"] = user_typed.strip()
 
 # Persistent Prompt Chips (compact, clean labels)
 chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
@@ -419,15 +426,21 @@ if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
 if st.session_state.get("active_copilot_q"):
     active_q = st.session_state["active_copilot_q"]
     ans = copilot.ask(biz, active_q, galla_cash=galla_cash_hero)
-    st.markdown(f"""
-    <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 12px 16px; margin: 6px 0 12px 0;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline;">
-        <span style="font-weight: 600; font-size: 0.84rem; color: #3B82F6;">{active_q}</span>
-        <span style="font-size: 0.72rem; opacity: 0.7;">Verified Ledger Sources</span>
-      </div>
-      <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500;">{ans.text}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    q_col, d_col = st.columns([11, 1])
+    with q_col:
+        st.markdown(f"""
+        <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 12px 16px; margin: 4px 0 10px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-weight: 600; font-size: 0.84rem; color: #3B82F6;">{active_q}</span>
+            <span style="font-size: 0.72rem; opacity: 0.7;">Verified Ledger Sources</span>
+          </div>
+          <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500;">{ans.text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with d_col:
+        if st.button("✕", key="dismiss_copilot_ans_btn", help="Dismiss answer"):
+            st.session_state["active_copilot_q"] = None
+            st.rerun()
 
 tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
     ["Cash Position", "Cash Book", "90-Day Forecast", "Review queue", "Receivables", "Ask", "Scores"]
@@ -504,28 +517,42 @@ with tab_home:
         # ── TODAY'S 3 OPERATING PRIORITIES ──
         st.markdown("### ⚡ Today's 3 Operating Priorities")
         p_cols = st.columns(3)
+
+        if biz == "SME-2":
+            p1_title, p1_sub = "1 Oct Salaries (₹9.26L)", f"Clinic doctor & staff payroll. Headroom {inr(solvency.net_bank_liquidity)}."
+            p2_badge, p2_title, p2_sub = "Insurance", "TPA Batch Claims", "13 TPAs pending. Review TPA batch claims to accelerate clinic receivables."
+            p3_badge, p3_title, p3_sub = "Patient Desk", "Daily Desk Collections", "Patient cash & card receipts auto-reconciled against clinic ledger."
+        elif biz == "SME-3":
+            p1_title, p1_sub = "1 Oct Salaries (₹1.85L)", f"Design team payroll 100% funded. Headroom {inr(solvency.net_bank_liquidity)}."
+            p2_badge, p2_title, p2_sub = "Tax Guard", "Section 194J TDS", "10% TDS deductions auto-verified on client retainers with certificates."
+            p3_badge, p3_title, p3_sub = "Milestones", "Client Milestones > 30d", "Track design deliverable sign-offs before issuing follow-up invoices."
+        else:
+            p1_title, p1_sub = "1 Oct Salaries (₹3.80L)", f"100% covered. Headroom remains {inr(solvency.net_bank_liquidity)} safely clear of CC limit."
+            p2_badge, p2_title, p2_sub = "Field Collections", "Salesman Collection Slips", "Salesmen collection slips auto-link cash deposits to shop invoices as SUGGEST."
+            p3_badge, p3_title, p3_sub = "Khata Chase Hub", "Retailers > 45 Days", "19 chronic accounts. Tap Receivables to send 1-click WhatsApp reminders."
+
         with p_cols[0]:
             st.markdown(f"""
             <div class="sme-card">
               <span class="sme-badge sme-badge-success">✓ Payroll Safety</span>
-              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">1 Oct Salaries (₹3.80L)</h4>
-              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">100% covered. Headroom remains {inr(solvency.net_bank_liquidity)} safely clear of CC limit.</p>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">{p1_title}</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">{p1_sub}</p>
             </div>
             """, unsafe_allow_html=True)
         with p_cols[1]:
-            st.markdown("""
+            st.markdown(f"""
             <div class="sme-card">
-              <span class="sme-badge sme-badge-info">🪙 Field Collections</span>
-              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">Salesman Collection Slips</h4>
-              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">Salesmen collection slips auto-link cash deposits to shop invoices as SUGGEST.</p>
+              <span class="sme-badge sme-badge-info">🪙 {p2_badge}</span>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">{p2_title}</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">{p2_sub}</p>
             </div>
             """, unsafe_allow_html=True)
         with p_cols[2]:
-            st.markdown("""
+            st.markdown(f"""
             <div class="sme-card">
-              <span class="sme-badge sme-badge-warning">📞 Khata Chase Hub</span>
-              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">Retailers > 45 Days</h4>
-              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">19 chronic accounts. Tap Receivables to send 1-click WhatsApp reminders.</p>
+              <span class="sme-badge sme-badge-warning">📞 {p3_badge}</span>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">{p3_title}</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">{p3_sub}</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -885,7 +912,8 @@ with tab_recv:
             st.markdown(f"**{inr(amt)}**")
             st.caption(f"{inv_count} open invoices")
         with col_c3:
-            wa_text = f"Namaste {c_name}, Kaveri Distributors se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. Kripya check kar lijiye. UPI: kaveri@hdfcbank"
+            biz_name = config.BUSINESSES.get(biz, biz)
+            wa_text = f"Namaste {c_name}, {biz_name} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. Kripya check kar lijiye. UPI: payment@bank"
             encoded_wa = urllib.parse.quote(wa_text)
             st.link_button("📲 Draft WhatsApp", f"https://wa.me/?text={encoded_wa}")
 

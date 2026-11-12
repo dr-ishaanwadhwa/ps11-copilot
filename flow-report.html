@@ -217,12 +217,25 @@
   <tr><td>Cash deposits never auto-accepted into statutory ledger</td><td class="pass">PASS</td><td>Strict D60 bar: cash deposits guaranteed to land in SUGGEST tier for human sign-off.</td></tr>
 </table></div>
 
-<h2>Open Decisions & Discussion Points</h2>
-<ul>
-  <li><b>Role Mode Switching:</b> Should the Owner Cockpit default to hiding all advanced tabs (Review queue, 90-Day Monte Carlo, Scores) under an explicit "Switch to CA / Books Mode" toggle in the header?</li>
-  <li><b>WhatsApp Automation Boundary:</b> Should we support direct WhatsApp Business Cloud API automated dispatch, or strictly preserve client-side 1-click deep-links to keep human-in-the-loop safety?</li>
-  <li><b>Vernacular Expansion:</b> Currently Marathi/Hindi audio prompts or voice notes could be integrated for godown salesmen in Phase 3.</li>
-</ul>
+<h2>Decisions Locked & Implementation Status</h2>
+<div class="overflow"><table>
+  <tr><th>Decision</th><th>Selection</th><th>Implementation Status</th></tr>
+  <tr>
+    <td><b>1. App Shell & Navigation</b></td>
+    <td><b>Option 1a: Calm Owner Cockpit</b> (4 tabs: Daily Cockpit, Cash Book, Receivables, Ask Copilot) with 1-click toggle to Accountant Workstation. Accountant role opens all 7 tabs.</td>
+    <td><span class="pass">SHIPPED</span> · Dynamic tab controller active in <code>streamlit_app.py</code>. Fully verified via AppTest & 71 unit tests.</td>
+  </tr>
+  <tr>
+    <td><b>2. WhatsApp Boundary</b></td>
+    <td><b>Option 2a: Human-in-the-Loop</b> 1-click pre-composed client-side WhatsApp drafts (<code>wa.me/?text=...</code>). No unreviewed auto-dispatch.</td>
+    <td><span class="pass">SHIPPED</span> · Verified in Daily Cockpit and Monday Chasing Hub with polite vernacular copy and UPI handle.</td>
+  </tr>
+  <tr>
+    <td><b>3. Audio / Voice Input</b></td>
+    <td><b>Option 3: Deferred to Final Build</b>. MVP remains focused on crisp, low-cognitive-load text, tap chips, and instant day-close.</td>
+    <td><span class="pass">SCHEDULED</span> · Reserved for post-MVP phase.</td>
+  </tr>
+</table></div>
 
 <footer>Generated with <a href="https://github.com/jpoindexter/ux-flow-skills">ux-flow-skills</a> · Proven UX flow patterns audited against production standards.</footer>
 

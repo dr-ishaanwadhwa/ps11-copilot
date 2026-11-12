@@ -266,6 +266,11 @@ if role == "Owner":
         key="share_cash_book",
         help="When unchecked, the Accountant (CA) role sees formal books only."
     )
+    st.sidebar.checkbox(
+        "📑 Open Accountant Workstation",
+        key="show_acct_workstation",
+        help="Reveal the 437-item reconciliation review queue, 90-day simulation tables, and scoring benchmarks."
+    )
 
 share_cash_book = st.session_state.get("share_cash_book", True)
 
@@ -611,9 +616,19 @@ if st.session_state.get("active_copilot_q"):
             st.session_state["active_copilot_q"] = None
             st.rerun()
 
-tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
-    ["Cash Position", "Cash Book", "90-Day Forecast", "Review queue", "Receivables", "Ask", "Scores"]
-)
+# ── WORKSTATION VIEW CONTROLLER (DECISION 1A) ────────────────────────────────
+# Owner defaults to calm 4-tab Daily Cockpit. Accountant/CA mode or toggle unlocks 7-tab full workstation.
+show_acct_workstation = is_accountant or st.session_state.get("show_acct_workstation", False)
+
+if show_acct_workstation:
+    tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
+        ["Daily Cockpit", "Cash Book", "90-Day Forecast", "Review queue", "Receivables", "Ask Copilot", "Scores"]
+    )
+else:
+    tab_home, tab_vault, tab_recv, tab_ask = st.tabs(
+        ["Daily Cockpit", "Cash Book", "Receivables", "Ask Copilot"]
+    )
+    tab_forecast, tab_queue, tab_scores = None, None, None
 
 # ── TAB: HOME / CASH POSITION ────────────────────────────────────────────────
 with tab_home:
@@ -743,6 +758,25 @@ with tab_home:
                 btn_label = "📲 WhatsApp" if not is_hindi else "📲 WhatsApp"
                 st.link_button(btn_label, wa_url, use_container_width=True)
 
+        # 1-Click toggle between Owner Cockpit and Full Accountant Workstation
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        if not show_acct_workstation and role == "Owner":
+            col_hint_l, col_hint_r = st.columns([4, 2])
+            with col_hint_l:
+                st.caption("Need full bank reconciliation review queue, 90-day simulation tables, or audit scores?")
+            with col_hint_r:
+                if st.button("📑 Open Accountant Workstation", key="open_acct_btn_in_tab", help="Unlock 90-day forecast, review queue, and scoring tabs"):
+                    st.session_state["show_acct_workstation"] = True
+                    st.rerun()
+        elif show_acct_workstation and role == "Owner":
+            col_hint_l, col_hint_r = st.columns([4, 2])
+            with col_hint_l:
+                st.caption("Accountant Workstation is active (all 7 tabs unlocked above).")
+            with col_hint_r:
+                if st.button("☀️ Return to Calm Owner View", key="close_acct_btn_in_tab", help="Return to 4-tab calm owner cockpit"):
+                    st.session_state["show_acct_workstation"] = False
+                    st.rerun()
+
 # ── TAB: CASH BOOK ───────────────────────────────────────────────────────────
 with tab_vault:
     if showing_partial_view:
@@ -862,199 +896,201 @@ with tab_vault:
             st.info("No informal khata records for this business.")
 
 # ── TAB: 90-DAY CASH FORECAST (FR-FC-1, FR-FC-2) ─────────────────────────────
-with tab_forecast:
-    if showing_partial_view:
-        render_partial_view_notice()
+if tab_forecast is not None:
+    with tab_forecast:
+        if showing_partial_view:
+            render_partial_view_notice()
 
-    st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
+        st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
 
-    view = as_of(pack, config.HOLDOUT_START)
-    fc_res = get_forecast(pack, config.HOLDOUT_START, biz)
+        view = as_of(pack, config.HOLDOUT_START)
+        fc_res = get_forecast(pack, config.HOLDOUT_START, biz)
 
-    # Shortfall Warning Cards (D50, D40)
-    if fc_res.warnings:
-        st.markdown("### ⚠️ Early Shortfall Warnings")
-        for w in fc_res.warnings:
-            (st.warning if w.level == "LIKELY" else st.info)(f"**[{w.level}]** {w.message}")
-    else:
-        st.success("✓ **No Projected Shortfalls:** Cash balance remains safely above credit limits, salary days, and owner floor throughout the 90-day window.")
+        # Shortfall Warning Cards (D50, D40)
+        if fc_res.warnings:
+            st.markdown("### ⚠️ Early Shortfall Warnings")
+            for w in fc_res.warnings:
+                (st.warning if w.level == "LIKELY" else st.info)(f"**[{w.level}]** {w.message}")
+        else:
+            st.success("✓ **No Projected Shortfalls:** Cash balance remains safely above credit limits, salary days, and owner floor throughout the 90-day window.")
 
-    # ── INTERACTIVE ALTAIR FAN CHART ──
-    if fc_res.daily_points:
-        chart_hdr = "📈 Safe Cash Trajectory (Next 90 Days)" if not is_hindi else "📈 अगले 90 दिनों का सुरक्षित नकद अनुमान"
-        chart_sub = (
-            "Safe projected cash balance. The shaded blue band shows your cash range between conservative and fast customer collections. The red dashed line shows your bank credit-limit safety floor."
-            if not is_hindi else
-            "सुरक्षित अनुमानित बैंक बैलेंस। नीला हिस्सा यह दर्शाता है कि ग्राहकों से वसूली धीमी या तेज होने पर कितना बैलेंस रहेगा। लाल रेखा बैंक क्रेडिट लिमिट की निचली सुरक्षा सीमा है।"
-        )
-        st.markdown(f"### {chart_hdr}")
-        st.caption(chart_sub)
-
-        df_daily = pd.DataFrame([
-            {
-                "Date": p.date,
-                "p10": p.balance_p10,
-                "p50": p.balance_p50,
-                "p90": p.balance_p90,
-            }
-            for p in fc_res.daily_points
-        ])
-
-        # P10-P90 Area Band
-        band = alt.Chart(df_daily).mark_area(
-            opacity=0.22,
-            color="#2563EB"
-        ).encode(
-            x=alt.X("Date:T", title="Date (90 Days) / तारीख"),
-            y=alt.Y("p10:Q", title="Projected Bank Balance (₹) / बैंक बैलेंस"),
-            y2="p90:Q",
-            tooltip=[
-                alt.Tooltip("Date:T", title="Date"),
-                alt.Tooltip("p10:Q", format=",.0f", title="Conservative (P10)"),
-                alt.Tooltip("p50:Q", format=",.0f", title="Expected (P50)"),
-                alt.Tooltip("p90:Q", format=",.0f", title="Fast Collections (P90)"),
-            ]
-        )
-
-        # P50 Median Line
-        line = alt.Chart(df_daily).mark_line(
-            strokeWidth=2.5,
-            color="#1D4ED8"
-        ).encode(
-            x="Date:T",
-            y="p50:Q"
-        )
-
-        # Sanctioned credit limit floor line if CC account
-        limit_amt = copilot.credit_limit(biz)
-        if limit_amt:
-            floor_df = pd.DataFrame([{"Floor": -limit_amt}])
-            floor_line = alt.Chart(floor_df).mark_rule(
-                strokeDash=[5, 5],
-                color="#EF4444",
-                strokeWidth=1.5
-            ).encode(
-                y="Floor:Q"
+        # ── INTERACTIVE ALTAIR FAN CHART ──
+        if fc_res.daily_points:
+            chart_hdr = "📈 Safe Cash Trajectory (Next 90 Days)" if not is_hindi else "📈 अगले 90 दिनों का सुरक्षित नकद अनुमान"
+            chart_sub = (
+                "Safe projected cash balance. The shaded blue band shows your cash range between conservative and fast customer collections. The red dashed line shows your bank credit-limit safety floor."
+                if not is_hindi else
+                "सुरक्षित अनुमानित बैंक बैलेंस। नीला हिस्सा यह दर्शाता है कि ग्राहकों से वसूली धीमी या तेज होने पर कितना बैलेंस रहेगा। लाल रेखा बैंक क्रेडिट लिमिट की निचली सुरक्षा सीमा है।"
             )
-            chart = (band + line + floor_line).properties(height=340)
-        else:
-            chart = (band + line).properties(height=340)
+            st.markdown(f"### {chart_hdr}")
+            st.caption(chart_sub)
 
-        st.altair_chart(chart, use_container_width=True)
+            df_daily = pd.DataFrame([
+                {
+                    "Date": p.date,
+                    "p10": p.balance_p10,
+                    "p50": p.balance_p50,
+                    "p90": p.balance_p90,
+                }
+                for p in fc_res.daily_points
+            ])
 
-    table_hdr = "### 📅 Monthly Cash Plan (What You Can Count On)" if not is_hindi else "### 📅 मासिक नकद योजना (आप कितना प्लान कर सकते हैं)"
-    st.markdown(table_hdr)
-    m_rows = []
-    col_month = "Month" if not is_hindi else "महीना"
-    col_in = "Expected Collections" if not is_hindi else "अपेक्षित वसूली"
-    col_out = "Planned Expenses" if not is_hindi else "योजनाबद्ध खर्चे"
-    col_net = "Net Cash Surplus" if not is_hindi else "शुद्ध मासिक बचत"
-    col_dip = "Lowest Cash Point" if not is_hindi else "महीने का निचला स्तर"
-    col_close = "Estimated Month-End" if not is_hindi else "महीने का अंत बैलेंस"
+            # P10-P90 Area Band
+            band = alt.Chart(df_daily).mark_area(
+                opacity=0.22,
+                color="#2563EB"
+            ).encode(
+                x=alt.X("Date:T", title="Date (90 Days) / तारीख"),
+                y=alt.Y("p10:Q", title="Projected Bank Balance (₹) / बैंक बैलेंस"),
+                y2="p90:Q",
+                tooltip=[
+                    alt.Tooltip("Date:T", title="Date"),
+                    alt.Tooltip("p10:Q", format=",.0f", title="Conservative (P10)"),
+                    alt.Tooltip("p50:Q", format=",.0f", title="Expected (P50)"),
+                    alt.Tooltip("p90:Q", format=",.0f", title="Fast Collections (P90)"),
+                ]
+            )
 
-    for mf in fc_res.monthly_forecasts:
-        m_rows.append({
-            col_month: mf.month,
-            col_in: f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
-            col_out: f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
-            col_net: inr(mf.net_p50),
-            col_dip: inr(mf.min_balance_p50),
-            col_close: inr(mf.closing_balance_p50),
-        })
-    st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
+            # P50 Median Line
+            line = alt.Chart(df_daily).mark_line(
+                strokeWidth=2.5,
+                color="#1D4ED8"
+            ).encode(
+                x="Date:T",
+                y="p50:Q"
+            )
 
-    with st.expander("📊 Benchmark & Accuracy Metrics (Holdout Scored against cash_actuals)", expanded=False):
-        holdout_res = get_holdout(pack)
-        mape_label = f"Model MAPE: `{holdout_res.mape:.2%}` on frozen holdout"
-        if holdout_res.mape > 0.182:
-            mape_label += " (worse than the simple 3-month average; kill metric (D31))"
-        elif holdout_res.mape > 0.10:
-            mape_label += " (target ≤ 10%)"
-        else:
-            mape_label += " (target ≤ 10%)"
+            # Sanctioned credit limit floor line if CC account
+            limit_amt = copilot.credit_limit(biz)
+            if limit_amt:
+                floor_df = pd.DataFrame([{"Floor": -limit_amt}])
+                floor_line = alt.Chart(floor_df).mark_rule(
+                    strokeDash=[5, 5],
+                    color="#EF4444",
+                    strokeWidth=1.5
+                ).encode(
+                    y="Floor:Q"
+                )
+                chart = (band + line + floor_line).properties(height=340)
+            else:
+                chart = (band + line).properties(height=340)
 
-        st.markdown(f"""
-        - **{mape_label}** (naive 3-month baseline: `{holdout_res.naive_mape:.2%}`).
-        - **Agency Inflows MAPE:** `{holdout_res.agency_inflow_mape:.2%}` (naive baseline: `{holdout_res.naive_agency_inflow_mape:.2%}`).
-        - **Paired Bootstrap Improvement (naive − model):** `{holdout_res.bootstrap_diff_mean:+.2%}` (95% CI: `[{holdout_res.bootstrap_diff_ci[0]:+.2%}, {holdout_res.bootstrap_diff_ci[1]:+.2%}]`).
-        - **Holdout P10–P90 Coverage:** `{holdout_res.coverage_p10_p90:.1%}` of actuals fell inside the forecast interval.
-        - **Holdout Likely Warnings:** `{holdout_res.false_alarms.get(biz, 0)}` for this business.
-        """)
-        st.caption("Scored on the Jul–Sep 2026 holdout; data pack only.")
+            st.altair_chart(chart, use_container_width=True)
 
-# ── TAB: REVIEW QUEUE ────────────────────────────────────────────────────────
-with tab_queue:
-    if showing_partial_view:
-        render_partial_view_notice()
+        table_hdr = "### 📅 Monthly Cash Plan (What You Can Count On)" if not is_hindi else "### 📅 मासिक नकद योजना (आप कितना प्लान कर सकते हैं)"
+        st.markdown(table_hdr)
+        m_rows = []
+        col_month = "Month" if not is_hindi else "महीना"
+        col_in = "Expected Collections" if not is_hindi else "अपेक्षित वसूली"
+        col_out = "Planned Expenses" if not is_hindi else "योजनाबद्ध खर्चे"
+        col_net = "Net Cash Surplus" if not is_hindi else "शुद्ध मासिक बचत"
+        col_dip = "Lowest Cash Point" if not is_hindi else "महीने का निचला स्तर"
+        col_close = "Estimated Month-End" if not is_hindi else "महीने का अंत बैलेंस"
 
-    st.subheader("Receipts that need you")
-    st.caption("Everything else was matched by one rule to exactly one set of documents under strict Decision 60.")
-    bank = pack.bank.set_index("txn_id")
-    rows = []
-    for m in matches.values():
-        if m.business_id != biz or m.tier not in (SUGGEST, ASK):
-            continue
-        b = bank.loc[m.txn_id]
-        rows.append({"txn_id": m.txn_id, "date": b.txn_date.date(), "amount": inr(abs(b.amount)),
-                     "tier": m.tier, "rule": m.rule, "why": m.note,
-                     "suggested documents": ", ".join(d for d, _ in m.docs), "narration": b.narration})
-    q = pd.DataFrame(rows)
-    if q.empty:
-        st.success("Nothing waiting.")
-    else:
-        c = st.columns(3)
-        c[0].metric("Suggestions", int((q.tier == SUGGEST).sum()))
-        c[1].metric("Questions", int((q.tier == ASK).sum()))
-        c[2].metric("Auto-Matched without human", sum(1 for m in matches.values()
-                                                       if m.business_id == biz and m.tier in ("AUTO", "NO_DOC")))
+        for mf in fc_res.monthly_forecasts:
+            m_rows.append({
+                col_month: mf.month,
+                col_in: f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
+                col_out: f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
+                col_net: inr(mf.net_p50),
+                col_dip: inr(mf.min_balance_p50),
+                col_close: inr(mf.closing_balance_p50),
+            })
+        st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
 
-        # ── CARD-BASED QUICK REVIEW (Top Pending Items) ──
-        st.markdown("#### Top Pending Items for Quick Review")
-        for _, q_item in q.head(3).iterrows():
-            m_obj = matches[q_item["txn_id"]]
-            latest_week = pack.bank["txn_date"].max().strftime("%G-W%V")
-            audit_ids = set(select_audit_sample(matches, pack.bank, latest_week))
-            is_audit = q_item["txn_id"] in audit_ids or "audit miss" in (m_obj.note or "")
+        with st.expander("📊 Benchmark & Accuracy Metrics (Holdout Scored against cash_actuals)", expanded=False):
+            holdout_res = get_holdout(pack)
+            mape_label = f"Model MAPE: `{holdout_res.mape:.2%}` on frozen holdout"
+            if holdout_res.mape > 0.182:
+                mape_label += " (worse than the simple 3-month average; kill metric (D31))"
+            elif holdout_res.mape > 0.10:
+                mape_label += " (target ≤ 10%)"
+            else:
+                mape_label += " (target ≤ 10%)"
 
             st.markdown(f"""
-            <div class="sme-card">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                  <span class="sme-badge {'sme-badge-info' if q_item['tier'] == 'SUGGEST' else 'sme-badge-warning'}">
-                    {q_item['tier']} · {q_item['rule']}
-                  </span>
-                  {'<span class="sme-badge sme-badge-danger" style="margin-left: 6px;">🔍 2% Weekly Audit Sample</span>' if is_audit else ''}
-                  <h4 style="margin: 6px 0 2px 0;">{q_item['amount']} · {q_item['date']}</h4>
-                  <p style="font-size: 0.82rem; opacity: 0.8; margin-bottom: 4px;">{q_item['narration']}</p>
-                  <p style="font-size: 0.82rem; color: #10B981; margin-bottom: 0;"><b>Matched:</b> {q_item['suggested documents'] or 'None'}</p>
-                </div>
-              </div>
-            </div>
-            """, unsafe_allow_html=True)
+            - **{mape_label}** (naive 3-month baseline: `{holdout_res.naive_mape:.2%}`).
+            - **Agency Inflows MAPE:** `{holdout_res.agency_inflow_mape:.2%}` (naive baseline: `{holdout_res.naive_agency_inflow_mape:.2%}`).
+            - **Paired Bootstrap Improvement (naive − model):** `{holdout_res.bootstrap_diff_mean:+.2%}` (95% CI: `[{holdout_res.bootstrap_diff_ci[0]:+.2%}, {holdout_res.bootstrap_diff_ci[1]:+.2%}]`).
+            - **Holdout P10–P90 Coverage:** `{holdout_res.coverage_p10_p90:.1%}` of actuals fell inside the forecast interval.
+            - **Holdout Likely Warnings:** `{holdout_res.false_alarms.get(biz, 0)}` for this business.
+            """)
+            st.caption("Scored on the Jul–Sep 2026 holdout; data pack only.")
 
-        st.markdown("#### Complete Reconciliation Ledger (Grid)")
-        gb = GridOptionsBuilder.from_dataframe(q)
-        gb.configure_default_column(minWidth=120, resizable=True)
-        gb.configure_column("why", minWidth=320)
-        gb.configure_column("narration", minWidth=380)
-        gb.configure_selection("single")
-        gb.configure_pagination(paginationPageSize=20)
-        grid = AgGrid(q, gridOptions=gb.build(), height=360, fit_columns_on_grid_load=False)
-        sel = grid.get("selected_rows")
-        if sel is not None and len(sel):
-            r = sel.iloc[0] if isinstance(sel, pd.DataFrame) else sel[0]
-            m = matches[r["txn_id"]]
-            st.markdown(f"**{r['amount']} · {r['date']}** · {r['rule']}")
-            # Weekly audit check label (D60 Task 4.3)
-            latest_week = pack.bank["txn_date"].max().strftime("%G-W%V")
-            audit_ids = set(select_audit_sample(matches, pack.bank, latest_week))
-            if r["txn_id"] in audit_ids or "audit miss" in (m.note or ""):
-                st.caption("🔍 Picked at random to check our automatic matches.")
-            st.info(m.note or "Check the suggested documents.")
-            if m.docs:
-                st.dataframe(pd.DataFrame(m.docs, columns=["document", "applied"]).assign(
-                    applied=lambda d: d.applied.map(inr)), hide_index=True)
-            st.button("Accept", disabled=True, help="Posting is wired in the next build; v1 is read-only.")
+# ── TAB: REVIEW QUEUE ────────────────────────────────────────────────────────
+if tab_queue is not None:
+    with tab_queue:
+        if showing_partial_view:
+            render_partial_view_notice()
+
+        st.subheader("Receipts that need you")
+        st.caption("Everything else was matched by one rule to exactly one set of documents under strict Decision 60.")
+        bank = pack.bank.set_index("txn_id")
+        rows = []
+        for m in matches.values():
+            if m.business_id != biz or m.tier not in (SUGGEST, ASK):
+                continue
+            b = bank.loc[m.txn_id]
+            rows.append({"txn_id": m.txn_id, "date": b.txn_date.date(), "amount": inr(abs(b.amount)),
+                         "tier": m.tier, "rule": m.rule, "why": m.note,
+                         "suggested documents": ", ".join(d for d, _ in m.docs), "narration": b.narration})
+        q = pd.DataFrame(rows)
+        if q.empty:
+            st.success("Nothing waiting.")
+        else:
+            c = st.columns(3)
+            c[0].metric("Suggestions", int((q.tier == SUGGEST).sum()))
+            c[1].metric("Questions", int((q.tier == ASK).sum()))
+            c[2].metric("Auto-Matched without human", sum(1 for m in matches.values()
+                                                           if m.business_id == biz and m.tier in ("AUTO", "NO_DOC")))
+
+            # ── CARD-BASED QUICK REVIEW (Top Pending Items) ──
+            st.markdown("#### Top Pending Items for Quick Review")
+            for _, q_item in q.head(3).iterrows():
+                m_obj = matches[q_item["txn_id"]]
+                latest_week = pack.bank["txn_date"].max().strftime("%G-W%V")
+                audit_ids = set(select_audit_sample(matches, pack.bank, latest_week))
+                is_audit = q_item["txn_id"] in audit_ids or "audit miss" in (m_obj.note or "")
+
+                st.markdown(f"""
+                <div class="sme-card">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <span class="sme-badge {'sme-badge-info' if q_item['tier'] == 'SUGGEST' else 'sme-badge-warning'}">
+                        {q_item['tier']} · {q_item['rule']}
+                      </span>
+                      {'<span class="sme-badge sme-badge-danger" style="margin-left: 6px;">🔍 2% Weekly Audit Sample</span>' if is_audit else ''}
+                      <h4 style="margin: 6px 0 2px 0;">{q_item['amount']} · {q_item['date']}</h4>
+                      <p style="font-size: 0.82rem; opacity: 0.8; margin-bottom: 4px;">{q_item['narration']}</p>
+                      <p style="font-size: 0.82rem; color: #10B981; margin-bottom: 0;"><b>Matched:</b> {q_item['suggested documents'] or 'None'}</p>
+                    </div>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("#### Complete Reconciliation Ledger (Grid)")
+            gb = GridOptionsBuilder.from_dataframe(q)
+            gb.configure_default_column(minWidth=120, resizable=True)
+            gb.configure_column("why", minWidth=320)
+            gb.configure_column("narration", minWidth=380)
+            gb.configure_selection("single")
+            gb.configure_pagination(paginationPageSize=20)
+            grid = AgGrid(q, gridOptions=gb.build(), height=360, fit_columns_on_grid_load=False)
+            sel = grid.get("selected_rows")
+            if sel is not None and len(sel):
+                r = sel.iloc[0] if isinstance(sel, pd.DataFrame) else sel[0]
+                m = matches[r["txn_id"]]
+                st.markdown(f"**{r['amount']} · {r['date']}** · {r['rule']}")
+                # Weekly audit check label (D60 Task 4.3)
+                latest_week = pack.bank["txn_date"].max().strftime("%G-W%V")
+                audit_ids = set(select_audit_sample(matches, pack.bank, latest_week))
+                if r["txn_id"] in audit_ids or "audit miss" in (m.note or ""):
+                    st.caption("🔍 Picked at random to check our automatic matches.")
+                st.info(m.note or "Check the suggested documents.")
+                if m.docs:
+                    st.dataframe(pd.DataFrame(m.docs, columns=["document", "applied"]).assign(
+                        applied=lambda d: d.applied.map(inr)), hide_index=True)
+                st.button("Accept", disabled=True, help="Posting is wired in the next build; v1 is read-only.")
 
 # ── TAB: RECEIVABLES ─────────────────────────────────────────────────────────
 with tab_recv:
@@ -1161,17 +1197,18 @@ with tab_ask:
                 st.write(", ".join(a.sources[:60]))
 
 # ── TAB: SCORES ──────────────────────────────────────────────────────────────
-with tab_scores:
-    if showing_partial_view:
-        render_partial_view_notice()
+if tab_scores is not None:
+    with tab_scores:
+        if showing_partial_view:
+            render_partial_view_notice()
 
-    st.subheader("Scored against the answer keys")
-    df, cat_df = get_scores(pack, matches, copilot.cat)
-    st.dataframe(summary(df), hide_index=True)
-    st.dataframe(cat_df, hide_index=True)
-    auto_lines = df[df.tier.isin(["AUTO", "NO_DOC"])]
-    if len(auto_lines) > 0:
-        auto_precision = auto_lines.correct.mean() * 100.0
-        st.caption(f"AUTO precision is {auto_precision:.1f}% under strict Decision 60 rules across all three businesses.")
-    else:
-        st.caption("No AUTO matches recorded.")
+        st.subheader("Scored against the answer keys")
+        df, cat_df = get_scores(pack, matches, copilot.cat)
+        st.dataframe(summary(df), hide_index=True)
+        st.dataframe(cat_df, hide_index=True)
+        auto_lines = df[df.tier.isin(["AUTO", "NO_DOC"])]
+        if len(auto_lines) > 0:
+            auto_precision = auto_lines.correct.mean() * 100.0
+            st.caption(f"AUTO precision is {auto_precision:.1f}% under strict Decision 60 rules across all three businesses.")
+        else:
+            st.caption("No AUTO matches recorded.")

@@ -62,35 +62,56 @@ st.markdown("""
       font-family: 'IBM Plex Sans', sans-serif !important;
   }
 
-  /* Sleek Modern Fintech Metric Cards */
+  /* Sleek Modern Fintech Metric Cards (High Contrast, Theme-Aware) */
   [data-testid="stMetric"] {
-      background: rgba(255, 255, 255, 0.02) !important;
-      border: 1px solid rgba(255, 255, 255, 0.09) !important;
+      background: #F8FAFC !important;
+      border: 1px solid #E2E8F0 !important;
       border-radius: 12px !important;
       padding: 12px 16px !important;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
       transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease !important;
   }
   [data-testid="stMetric"]:hover {
-      border-color: rgba(59, 130, 246, 0.35) !important;
-      background: rgba(255, 255, 255, 0.035) !important;
+      border-color: #0B5FFF !important;
+      background: #F1F5F9 !important;
   }
   [data-testid="stMetricLabel"] {
       font-size: 0.74rem !important;
       font-weight: 600 !important;
       text-transform: uppercase !important;
       letter-spacing: 0.05em !important;
-      color: #94A3B8 !important;
+      color: #64748B !important;
   }
   [data-testid="stMetricValue"] {
       font-size: 1.55rem !important;
       font-weight: 700 !important;
       letter-spacing: -0.02em !important;
-      color: #F8FAFC !important;
+      color: #0F1E2E !important;
   }
   [data-testid="stMetricDelta"] {
       font-size: 0.78rem !important;
       font-weight: 500 !important;
+      color: #475569 !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+      [data-testid="stMetric"] {
+          background: rgba(255, 255, 255, 0.04) !important;
+          border-color: rgba(255, 255, 255, 0.1) !important;
+      }
+      [data-testid="stMetric"]:hover {
+          background: rgba(255, 255, 255, 0.07) !important;
+          border-color: rgba(59, 130, 246, 0.45) !important;
+      }
+      [data-testid="stMetricLabel"] {
+          color: #94A3B8 !important;
+      }
+      [data-testid="stMetricValue"] {
+          color: #F8FAFC !important;
+      }
+      [data-testid="stMetricDelta"] {
+          color: #CBD5E1 !important;
+      }
   }
 
   /* 44px minimum touch targets for high-frequency actions */
@@ -111,14 +132,14 @@ st.markdown("""
 
   /* Accessible visible focus states */
   button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-      outline: 2px solid #3B82F6 !important;
+      outline: 2px solid #0B5FFF !important;
       outline-offset: 2px !important;
   }
 
   /* Clean Modern Streamlit Tabs */
   .stTabs [data-baseweb="tab-list"] {
       gap: 6px !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border-bottom: 1px solid #E2E8F0 !important;
       padding-bottom: 6px !important;
       margin-top: 6px !important;
   }
@@ -128,40 +149,73 @@ st.markdown("""
       padding: 6px 14px !important;
       font-size: 0.84rem !important;
       font-weight: 500 !important;
-      color: #94A3B8 !important;
+      color: #475569 !important;
       background: transparent !important;
       border: none !important;
       transition: all 0.15s ease !important;
   }
   .stTabs [data-baseweb="tab"]:hover {
-      color: #F8FAFC !important;
-      background: rgba(255, 255, 255, 0.04) !important;
+      color: #0B5FFF !important;
+      background: #F1F5F9 !important;
   }
   .stTabs [aria-selected="true"] {
-      color: #FFFFFF !important;
-      background: rgba(37, 99, 235, 0.14) !important;
-      border: 1px solid rgba(37, 99, 235, 0.32) !important;
+      color: #0B5FFF !important;
+      background: #EFF6FF !important;
+      border: 1px solid #BFDBFE !important;
       font-weight: 600 !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+      .stTabs [data-baseweb="tab-list"] {
+          border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+      }
+      .stTabs [data-baseweb="tab"] {
+          color: #94A3B8 !important;
+      }
+      .stTabs [data-baseweb="tab"]:hover {
+          color: #FFFFFF !important;
+          background: rgba(255, 255, 255, 0.05) !important;
+      }
+      .stTabs [aria-selected="true"] {
+          color: #60A5FA !important;
+          background: rgba(37, 99, 235, 0.18) !important;
+          border-color: rgba(37, 99, 235, 0.38) !important;
+      }
   }
 
   /* Executive Cards */
   .sme-exec-card {
-      background: rgba(255, 255, 255, 0.02);
+      background: #F8FAFC;
       border-radius: 12px;
       padding: 12px 16px;
       min-height: 104px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+      color: #0F1E2E;
   }
 
   .sme-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
       border-radius: 11px;
       padding: 12px 14px;
       margin-bottom: 8px;
+      color: #0F1E2E;
   }
 
-  /* Semantic badges with calm contrast */
+  @media (prefers-color-scheme: dark) {
+      .sme-exec-card {
+          background: rgba(255, 255, 255, 0.03);
+          color: #F8FAFC;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+      .sme-card {
+          background: rgba(255, 255, 255, 0.03);
+          border-color: rgba(255, 255, 255, 0.1);
+          color: #F8FAFC;
+      }
+  }
+
+  /* Semantic badges with high contrast (WCAG AAA) */
   .sme-badge {
       display: inline-block;
       padding: 2px 8px;
@@ -171,27 +225,50 @@ st.markdown("""
   }
 
   .sme-badge-success {
-      background: rgba(16, 185, 129, 0.1);
-      color: #10B981;
-      border: 1px solid rgba(16, 185, 129, 0.25);
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
   }
 
   .sme-badge-warning {
-      background: rgba(245, 158, 11, 0.1);
-      color: #F59E0B;
-      border: 1px solid rgba(245, 158, 11, 0.25);
+      background: #FFFBEB;
+      color: #92400E;
+      border: 1px solid #FDE68A;
   }
 
   .sme-badge-danger {
-      background: rgba(239, 68, 68, 0.1);
-      color: #EF4444;
-      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: #FEF2F2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
   }
 
   .sme-badge-info {
-      background: rgba(59, 130, 246, 0.1);
-      color: #3B82F6;
-      border: 1px solid rgba(59, 130, 246, 0.25);
+      background: #EFF6FF;
+      color: #1E40AF;
+      border: 1px solid #BFDBFE;
+  }
+
+  @media (prefers-color-scheme: dark) {
+      .sme-badge-success {
+          background: rgba(16, 185, 129, 0.15);
+          color: #34D399;
+          border-color: rgba(16, 185, 129, 0.35);
+      }
+      .sme-badge-warning {
+          background: rgba(245, 158, 11, 0.15);
+          color: #FBBF24;
+          border-color: rgba(245, 158, 11, 0.35);
+      }
+      .sme-badge-danger {
+          background: rgba(239, 68, 68, 0.15);
+          color: #F87171;
+          border-color: rgba(239, 68, 68, 0.35);
+      }
+      .sme-badge-info {
+          background: rgba(59, 130, 246, 0.15);
+          color: #60A5FA;
+          border-color: rgba(59, 130, 246, 0.35);
+      }
   }
 
   /* Prompt pill buttons styling */
@@ -200,14 +277,27 @@ st.markdown("""
       font-size: 0.78rem !important;
       padding: 4px 12px !important;
       min-height: 34px !important;
-      background: rgba(255, 255, 255, 0.03) !important;
-      border: 1px solid rgba(255, 255, 255, 0.09) !important;
-      color: #CBD5E1 !important;
+      background: #F8FAFC !important;
+      border: 1px solid #CBD5E1 !important;
+      color: #1E293B !important;
   }
   div[data-testid="stHorizontalBlock"] button[data-testid="baseButton-secondary"]:hover {
-      border-color: rgba(59, 130, 246, 0.45) !important;
-      background: rgba(59, 130, 246, 0.09) !important;
-      color: #FFFFFF !important;
+      border-color: #0B5FFF !important;
+      background: #EFF6FF !important;
+      color: #0B5FFF !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+      div[data-testid="stHorizontalBlock"] button[data-testid="baseButton-secondary"] {
+          background: rgba(255, 255, 255, 0.04) !important;
+          border-color: rgba(255, 255, 255, 0.14) !important;
+          color: #F1F5F9 !important;
+      }
+      div[data-testid="stHorizontalBlock"] button[data-testid="baseButton-secondary"]:hover {
+          border-color: #60A5FA !important;
+          background: rgba(37, 99, 235, 0.18) !important;
+          color: #93C5FD !important;
+      }
   }
 </style>
 """, unsafe_allow_html=True)
@@ -440,7 +530,7 @@ total_liquidity_hero = net_bank_hero + (galla_cash_hero if not showing_partial_v
 
 solvency_hero = compute_total_solvency(pack, vault, biz)
 is_safe = solvency_hero.true_cash_runway_inr > 0
-hero_border_color = "rgba(16, 185, 129, 0.35)" if is_safe else "rgba(245, 158, 11, 0.35)"
+hero_border_color = "#A7F3D0" if is_safe else "#FDE68A"
 hero_badge_class = "sme-badge-success" if is_safe else "sme-badge-warning"
 
 if not is_hindi:
@@ -488,15 +578,15 @@ with col_hero_status:
     st.markdown(f"""
     <div class="sme-exec-card" style="border: 1px solid {hero_border_color};">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: {'#10B981' if is_safe else '#F59E0B'};">
+        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: {'#065F46' if is_safe else '#92400E'};">
           ● {config.BUSINESSES[biz]} · {'नकद स्थिति' if is_hindi else 'Daily Cash Health'}
         </span>
         <span class="sme-badge {hero_badge_class}">{payroll_badge_text}</span>
       </div>
-      <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin: 3px 0 4px 0;">
+      <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin: 3px 0 4px 0; color: #0F1E2E;">
         {hero_title}
       </div>
-      <div style="font-size: 0.83rem; opacity: 0.86; line-height: 1.45;">
+      <div style="font-size: 0.83rem; line-height: 1.45; color: #475569;">
         {hero_subtitle}
       </div>
     </div>
@@ -504,12 +594,12 @@ with col_hero_status:
 
 with col_hero_action:
     st.markdown(f"""
-    <div class="sme-exec-card" style="border: 1px solid rgba(59, 130, 246, 0.28); background: rgba(59, 130, 246, 0.04);">
+    <div class="sme-exec-card" style="border: 1px solid #BFDBFE; background: #EFF6FF;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
         <span class="sme-badge sme-badge-info">{act_title}</span>
       </div>
-      <div style="font-size: 0.98rem; font-weight: 700; margin: 3px 0 2px 0;">{act_headline}</div>
-      <div style="font-size: 0.79rem; opacity: 0.82; line-height: 1.4;">{act_desc}</div>
+      <div style="font-size: 0.98rem; font-weight: 700; margin: 3px 0 2px 0; color: #1E3A8A;">{act_headline}</div>
+      <div style="font-size: 0.79rem; line-height: 1.4; color: #1E40AF;">{act_desc}</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -602,13 +692,13 @@ if st.session_state.get("active_copilot_q"):
     q_col, d_col = st.columns([11, 1])
     with q_col:
         st.markdown(f"""
-        <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 12px 16px; margin: 4px 0 10px 0;">
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 12px 16px; margin: 4px 0 10px 0;">
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="font-weight: 600; font-size: 0.84rem; color: #3B82F6;">{active_q}</span>
-            <span style="font-size: 0.72rem; color: #10B981; font-weight: 500;">{source_tag}</span>
+            <span style="font-weight: 600; font-size: 0.84rem; color: #1D4ED8;">{active_q}</span>
+            <span style="font-size: 0.72rem; color: #065F46; font-weight: 600;">{source_tag}</span>
           </div>
-          <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500; line-height: 1.5;">{ans.text}</p>
-          {f'<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(37,99,235,0.2); font-size: 0.84rem; color: #1E40AF;">{hindi_summary}</div>' if hindi_summary else ''}
+          <p style="margin: 6px 0 2px 0; font-size: 0.88rem; font-weight: 500; line-height: 1.5; color: #0F1E2E;">{ans.text}</p>
+          {f'<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #93C5FD; font-size: 0.84rem; color: #1E40AF;">{hindi_summary}</div>' if hindi_summary else ''}
         </div>
         """, unsafe_allow_html=True)
     with d_col:
@@ -1062,7 +1152,7 @@ if tab_queue is not None:
                       {'<span class="sme-badge sme-badge-danger" style="margin-left: 6px;">🔍 2% Weekly Audit Sample</span>' if is_audit else ''}
                       <h4 style="margin: 6px 0 2px 0;">{q_item['amount']} · {q_item['date']}</h4>
                       <p style="font-size: 0.82rem; opacity: 0.8; margin-bottom: 4px;">{q_item['narration']}</p>
-                      <p style="font-size: 0.82rem; color: #10B981; margin-bottom: 0;"><b>Matched:</b> {q_item['suggested documents'] or 'None'}</p>
+                      <p style="font-size: 0.82rem; color: #065F46; font-weight: 500; margin-bottom: 0;"><b>Matched:</b> {q_item['suggested documents'] or 'None'}</p>
                     </div>
                   </div>
                 </div>

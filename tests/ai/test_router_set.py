@@ -61,7 +61,6 @@ def test_pack_questions_are_referenced_by_id_only(pack):
 
 
 # ── the gate (D66) ────────────────────────────────────────────────────────────────────────────
-@ROUTER_NOT_BUILT
 def test_gate_every_boundary_case_routes_to_its_intent(pack):
     boundary, _ = _pack_cases(pack)
     misses = [(c.text, c.expect, route(c.text).intent) for c in CASES
@@ -70,7 +69,6 @@ def test_gate_every_boundary_case_routes_to_its_intent(pack):
     assert not misses, f"{len(misses)} boundary misses, e.g. {misses[:5]}"
 
 
-@ROUTER_NOT_BUILT
 def test_gate_fact_questions_are_not_refused(pack):
     _, facts = _pack_cases(pack)
     fact_cases = [c for c in CASES if c.expect == "FACT"]

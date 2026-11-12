@@ -26,12 +26,12 @@ from .names import PartyIndex, extract, norm
 AUTO, SUGGEST, ASK, NO_DOC = "AUTO", "SUGGEST", "ASK", "NO_DOC"
 _CHQ = re.compile(r"^CHQ (DEP|RET) - (\d+)")
 
-# Decision 60 (Strict AUTO rule): only rule classes with 0 training errors qualify for AUTO
+# Decision 60 (Strict AUTO rule): upper bound error must be <= 1%
+# ("SME-3", "EXACT_BILL") removed (193 lines, upper error bound 1.95% > 1%)
 _AUTO_QUALIFIED = {
-    ("SME-1", "EXACT"),
-    ("SME-2", "DAILY_UPI"),
-    ("SME-2", "MDR_NET"),
-    ("SME-3", "EXACT_BILL"),
+    ("SME-1", "EXACT"),      # distributor EXACT (sample size: 1,173)
+    ("SME-2", "DAILY_UPI"),  # clinic DAILY_UPI (sample size: 5,991)
+    ("SME-2", "MDR_NET"),    # clinic MDR_NET (sample size: 469)
 }
 _AUTO_MAX_AMOUNT = 100_000.0  # ₹1 Lakh materiality ceiling (D60)
 

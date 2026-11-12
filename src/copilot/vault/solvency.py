@@ -43,7 +43,7 @@ def compute_total_solvency(
     cc_limit = _extract_credit_limit(pack, biz)
     cc_drawn = abs(bank_bal) if (bank_bal < 0 and cc_limit > 0) else 0.0
 
-    # 2. Sovereign Vault Physical Cash (Galla)
+    # 2. Vault Physical Cash (Galla)
     latest_galla = vault.get_latest_galla(biz)
     galla_cash = latest_galla.counted_cash if latest_galla else 0.0
 

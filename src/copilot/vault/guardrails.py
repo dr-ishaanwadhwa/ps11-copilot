@@ -131,8 +131,7 @@ def check_sft_deposit_threshold(
             status="WARNING",
             citation="Income-tax Rules, 2026 Rule 237 (Form 165)",
             message=(
-                f"Annual cash deposits reach ₹{new_ytd:,.0f} (80% of the {label} SFT limit). "
-                f"You have ₹{headroom:,.0f} of headroom before automated AIS reporting triggers."
+                f"Annual cash deposits reach ₹{new_ytd:,.0f} (80% of the {label} SFT limit)."
             ),
             lawful_remedy="Keep daily counter cash reconciliation slips ready to substantiate sources."
         )
@@ -152,8 +151,7 @@ def audit_capital_infusion(
     is_gift_from_relative: bool = False
 ) -> dict:
     """
-    Evaluates whether a planned cash deposit meets the 'Three Golden Pillars'
-    required to withstand Section 102/195 (old 68/115BBE) scrutiny.
+    Evaluates whether a planned cash deposit meets documentation requirements.
     """
     score = 0
     substantiated_sources = []

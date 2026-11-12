@@ -1,4 +1,4 @@
-"""Sovereign Vault local database and pilot seed engine.
+"""Vault local database and pilot seed engine.
 
 Maintains on-device records for:
 - Galla entries (cash drawer daily balancing).
@@ -102,7 +102,7 @@ class VaultDB:
         }
 
     def seed_from_pack(self, pack: Pack):
-        """Populate realistic Sovereign Vault historical data from the PS-11 data pack."""
+        """Populate realistic vault historical data from the PS-11 data pack."""
         # 1. SME-2 (Clinic) cash bridge seeding from pack.collections
         # Total in pack: ₹3,250,744 taken, ₹2,911,700 banked, ₹332,400 petty cash, ₹6,644 drift [A9]
         if hasattr(pack, "collections") and not pack.collections.empty:

@@ -1,4 +1,4 @@
-"""Sovereign Vault Package: Local-first dual-plane cash operating system."""
+"""Vault Package: Local-first dual-plane cash operating system."""
 from .db import VaultDB
 from .guardrails import (
     audit_capital_infusion,
@@ -8,6 +8,7 @@ from .guardrails import (
     check_single_receipt_cash,
 )
 from .models import GallaEntry, KhataAccount, RokadEntry, TotalSolvency
+from .notice import PARTIAL_VIEW_NOTICE, render_partial_view_notice
 from .solvency import compute_total_solvency, format_solvency_report
 from .chase import format_whatsapp_reminder
 
@@ -25,4 +26,6 @@ __all__ = [
     "check_sft_deposit_threshold",
     "audit_capital_infusion",
     "format_whatsapp_reminder",
+    "PARTIAL_VIEW_NOTICE",
+    "render_partial_view_notice",
 ]

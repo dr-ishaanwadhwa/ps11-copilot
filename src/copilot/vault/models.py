@@ -1,4 +1,4 @@
-"""Data models for the Sovereign Vault plane (local-first on-device ledger).
+"""Data models for the cash book plane (local-first on-device ledger).
 
 In accordance with the Dual-Plane Architecture:
 - Tracks physical Galla cash, daily Rokad in/out, and informal Pending Khata.

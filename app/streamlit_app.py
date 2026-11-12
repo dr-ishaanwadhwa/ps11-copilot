@@ -4,9 +4,10 @@
 
 Read-only & Local-First:
 - Public Plane: Bank statements, GST invoices, Tally bill-wise allocations.
-- Sovereign Vault Plane: On-device Galla cash, Rokad, and informal Pending Khata.
-- Role-based Accountant Presentation Mode for CA reviews and tax inspections.
+- Cash Book: On-device Galla cash, Rokad, and informal Pending Khata.
+- Role-based access with staff lock and formal books view.
 """
+import os
 import pandas as pd
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder
@@ -23,6 +24,7 @@ from copilot.match.engine import ASK, SUGGEST
 from copilot.receivables import by_customer, open_items, overdue
 from copilot.score import score_matches, summary
 from copilot.vault import (
+    PARTIAL_VIEW_NOTICE,
     VaultDB,
     audit_capital_infusion,
     check_cash_expense,
@@ -31,12 +33,13 @@ from copilot.vault import (
     compute_total_solvency,
     format_solvency_report,
     format_whatsapp_reminder,
+    render_partial_view_notice,
 )
 
 st.set_page_config(page_title="Cash Copilot · Dual-Plane MVP", layout="wide")
 
 
-@st.cache_resource(show_spinner="Reading the data pack, matching every line, and booting Sovereign Vault…")
+@st.cache_resource(show_spinner="Reading the data pack, matching every line, and booting Cash Book…")
 def boot():
     pack = load_pack()
     matches = match_all(pack)
@@ -48,35 +51,47 @@ def boot():
 
 pack, matches, copilot, vault = boot()
 
-# Sidebar: Business & Mode Selection
+# Sidebar: Business & Role Selection
 biz = st.sidebar.selectbox("Business", list(config.BUSINESSES), format_func=lambda b: config.BUSINESSES[b])
 st.sidebar.caption("Sample data pack · as of 30 Sep 2026 · read-only")
 st.sidebar.markdown("---")
 
-st.sidebar.subheader("Presentation & Privacy Mode")
-mode = st.sidebar.radio(
-    "Active Workspace",
-    ["Owner View (Dual-Plane Solvency)", "Accountant Presentation Mode"],
-    help="Accountant Mode locks the Sovereign Vault and displays strictly audited formal books (Bank, GST, Tally bills)."
+st.sidebar.subheader("User Role")
+role = st.sidebar.radio(
+    "Who is using the app?",
+    ["Owner", "Counter staff", "Accountant (CA)"],
+    help="Role-based access: Owner sees all books; Counter staff requires PIN for cash book; Accountant view respects owner sharing setting."
 )
 
-is_accountant_mode = (mode == "Accountant Presentation Mode")
+if "share_cash_book" not in st.session_state:
+    st.session_state["share_cash_book"] = True
 
-if is_accountant_mode:
-    st.info("🔒 **Accountant Presentation Mode Active:** Private Sovereign Vault is locked behind owner biometric/PIN. "
-            "Only formal, audited records (Bank statements, GST invoices, and Tally bills) are displayed.")
-    tab_home, tab_forecast, tab_queue, tab_recv, tab_scores = st.tabs(
-        ["Bank & Books", "90-Day Forecast", "Review queue", "Receivables", "Scores"]
-    )
-else:
-    st.success("🛡️ **Sovereign Vault Active:** Local-first on-device ledger enabled. "
-               "True solvency combines verified bank headroom with physical counter cash. Zero cloud sync.")
-    tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
-        ["True Solvency", "Galla & Cash Vault", "90-Day Forecast", "Review queue", "Receivables", "Ask", "Scores"]
+if role == "Owner":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Accountant Settings")
+    st.sidebar.checkbox(
+        "Share my cash book with my accountant",
+        key="share_cash_book",
+        help="When unchecked, the Accountant (CA) role sees formal books only."
     )
 
-# ── TAB: HOME / TRUE SOLVENCY ────────────────────────────────────────────────
+share_cash_book = st.session_state.get("share_cash_book", True)
+
+is_owner = (role == "Owner")
+is_counter_staff = (role == "Counter staff")
+is_accountant = (role == "Accountant (CA)")
+
+showing_partial_view = is_counter_staff or (is_accountant and not share_cash_book)
+
+tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
+    ["Cash Position", "Cash Book", "90-Day Forecast", "Review queue", "Receivables", "Ask", "Scores"]
+)
+
+# ── TAB: HOME / CASH POSITION ────────────────────────────────────────────────
 with tab_home:
+    if showing_partial_view:
+        render_partial_view_notice()
+
     rep = import_report(pack)
     st.subheader("Your data, checked")
     c = st.columns(4)
@@ -89,15 +104,15 @@ with tab_home:
     limit = copilot.credit_limit(biz)
     items = open_items(pack, biz)
 
-    if is_accountant_mode:
+    if showing_partial_view:
         # Standard Formal Books View
-        st.subheader("Audited Cash Position (Bank Alone)")
+        st.subheader("Formal Cash Position (Bank Alone)")
         c = st.columns(3)
         c[0].metric("Bank balance (30 Sep 2026)", inr(bal))
         if limit:
             c[1].metric("CC limit headroom", inr(bal + limit), help=f"Sanctioned limit {inr(limit)}")
         c[2].metric("Formal receivables", inr(items.outstanding.sum()), f"{len(overdue(items))} invoices > 60 days late", delta_color="off")
-        st.caption("Formal audited books only. Private cash and informal khata balances are hidden in this mode.")
+        st.caption("Formal books only. Cash drawer and informal khata balances are not included.")
     else:
         # Dual-Plane Total Solvency View
         solvency = compute_total_solvency(pack, vault, biz)
@@ -119,11 +134,40 @@ with tab_home:
 
         st.caption(f"Unified calculation as of {solv_rep['as_of']}: (Bank Headroom) + (Galla Cash) + (Khata Inflows) − (30-Day Commitments {inr(solvency.total_commitments)}).")
 
-# ── TAB: GALLA & CASH VAULT (Owner Mode Only) ────────────────────────────────
-if not is_accountant_mode:
-    with tab_vault:
-        st.subheader("Sovereign Vault: Physical Cash & Informal Khata")
-        st.caption("100% on-device local storage. Never synced to cloud servers or visible in CA tax exports.")
+# ── TAB: CASH BOOK ───────────────────────────────────────────────────────────
+with tab_vault:
+    if showing_partial_view:
+        render_partial_view_notice()
+
+    owner_pin = os.environ.get("COPILOT_OWNER_PIN")
+    pin_is_default = owner_pin is None
+    expected_pin = owner_pin if owner_pin is not None else "0000"
+
+    can_view_cash_book = False
+    if is_owner:
+        can_view_cash_book = True
+    elif is_accountant:
+        if share_cash_book:
+            can_view_cash_book = True
+        else:
+            st.info("The owner has not shared the cash book with the accountant.")
+    elif is_counter_staff:
+        st.markdown("### 🔒 Cash Book Locked")
+        st.write("Owner PIN is required to view the cash book.")
+        pin_prompt_label = "Demo PIN: 0000" if pin_is_default else "Enter owner PIN"
+        staff_pin = st.text_input("Enter Owner PIN to unlock", type="password", help=pin_prompt_label)
+        if staff_pin:
+            if staff_pin == expected_pin:
+                can_view_cash_book = True
+            else:
+                st.error("Incorrect PIN.")
+        else:
+            if pin_is_default:
+                st.info("Demo PIN: 0000")
+
+    if can_view_cash_book:
+        st.subheader("Cash Book: Physical Cash & Informal Khata")
+        st.caption("100% on-device local storage.")
 
         col_galla, col_audit = st.columns([1, 1])
 
@@ -146,17 +190,17 @@ if not is_accountant_mode:
                     f_banked = st.number_input("Cash Banked into Account (₹)", value=20000.0, step=1000.0)
                     f_counted = st.number_input("Physical Count at Close (₹)", value=12500.0, step=500.0)
                     f_notes = st.text_input("Notes", value="Routine daily close")
-                    submitted = st.form_submit_button("Record in Sovereign Vault")
+                    submitted = st.form_submit_button("Record in Cash Book")
                     if submitted:
-                        st.success("Recorded locally in Sovereign Vault. Balance updated.")
+                        st.success("Recorded locally in Cash Book. Balance updated.")
 
         with col_audit:
             st.markdown("### 🏛️ SFT & Pre-Deposit Capital Infusion Checker")
-            st.caption("Rule 237 / Form 165 SFT monitoring to avoid 84% Section 115BBE / Sec 102 deemed-income additions.")
+            st.caption("Rule 237 / Form 165 SFT monitoring.")
 
             dep_amt = st.number_input("Planned Cash Deposit Amount (₹)", value=500000.0, step=50000.0)
             dep_acct = st.selectbox("Destination Account", ["CURRENT", "SAVINGS"])
-            
+
             sft_res = check_sft_deposit_threshold(dep_amt, current_ytd_cash=2800000.0, account_type=dep_acct)
             if sft_res.status == "WARNING":
                 st.warning(f"⚠️ **{sft_res.citation}:** {sft_res.message}")
@@ -168,12 +212,12 @@ if not is_accountant_mode:
                 has_prior_bank_withdrawal=True,
                 has_retail_collection_chits=True
             )
-            st.markdown(f"**Source Readiness Tier:** `{readiness['readiness_tier']}` ({readiness['score_percent']}% documented)")
+            st.markdown(f"**Source Readiness:** `{readiness['readiness_tier']}` ({readiness['score_percent']}% documented)")
             st.caption(f"{readiness['recommendation']}")
 
         st.markdown("---")
-        st.markdown("### 📱 Pending Khata & Confidential Reminders (Section 18 Limitation)")
-        st.caption("Generate client-side WhatsApp deep-links without uploading customer phone books to cloud servers.")
+        st.markdown("### 📱 Pending Khata & Reminders")
+        st.caption("Generate client-side WhatsApp deep-links.")
 
         khata_data = vault.get_khata_summary(biz)
         if khata_data["accounts"]:
@@ -191,6 +235,9 @@ if not is_accountant_mode:
 
 # ── TAB: 90-DAY CASH FORECAST (FR-FC-1, FR-FC-2) ─────────────────────────────
 with tab_forecast:
+    if showing_partial_view:
+        render_partial_view_notice()
+
     st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
     st.caption("Bottom-up daily simulation: open invoice payment delays, recurring commitments, and statutory Sunday rolls. Never an LLM guess.")
 
@@ -238,6 +285,9 @@ with tab_forecast:
 
 # ── TAB: REVIEW QUEUE ────────────────────────────────────────────────────────
 with tab_queue:
+    if showing_partial_view:
+        render_partial_view_notice()
+
     st.subheader("Receipts that need you")
     st.caption("Everything else was matched by one rule to exactly one set of documents under strict Decision 60.")
     bank = pack.bank.set_index("txn_id")
@@ -278,35 +328,43 @@ with tab_queue:
 
 # ── TAB: RECEIVABLES ─────────────────────────────────────────────────────────
 with tab_recv:
+    if showing_partial_view:
+        render_partial_view_notice()
+
     items = open_items(pack, biz)
     st.subheader("Who owes you (Formal Receivables)")
     st.dataframe(by_customer(items).assign(outstanding=lambda d: d.outstanding.map(inr)), hide_index=True)
     st.caption("TDS-short invoices count as paid in full, with TDS receivable recorded separately (brief T3).")
 
-# ── TAB: ASK (Owner Mode Only) ───────────────────────────────────────────────
-if not is_accountant_mode:
-    with tab_ask:
-        st.subheader("Ask")
-        examples = [
-            "Who owes me the most right now?",
-            "Can I pay salaries on 1 October 2026?",
-            "Should I take a loan to cover next month's shortfall?",
-            "Send a reminder to everyone who owes me money."
-        ]
-        pick = st.radio("Try an example", examples, index=None)
-        q = st.text_input("Your question", value=pick or "")
-        if q:
-            # Passes physical Galla cash to the answer generator for true liquidity context
-            current_galla = vault.get_latest_galla(biz)
-            galla_amt = current_galla.counted_cash if current_galla else 0.0
-            a = copilot.ask(biz, q, galla_cash=galla_amt)
-            (st.warning if a.intent not in ("FACT",) else st.success)(a.text)
-            if a.sources:
-                with st.expander(f"Sources ({len(a.sources)} rows)"):
-                    st.write(", ".join(a.sources[:60]))
+# ── TAB: ASK ─────────────────────────────────────────────────────────────────
+with tab_ask:
+    if showing_partial_view:
+        render_partial_view_notice()
+
+    st.subheader("Ask")
+    examples = [
+        "Who owes me the most right now?",
+        "Can I pay salaries on 1 October 2026?",
+        "Should I take a loan to cover next month's shortfall?",
+        "Send a reminder to everyone who owes me money."
+    ]
+    pick = st.radio("Try an example", examples, index=None)
+    q = st.text_input("Your question", value=pick or "")
+    if q:
+        # Passes physical Galla cash to the answer generator for true liquidity context
+        current_galla = vault.get_latest_galla(biz)
+        galla_amt = current_galla.counted_cash if current_galla else 0.0
+        a = copilot.ask(biz, q, galla_cash=galla_amt)
+        (st.warning if a.intent not in ("FACT",) else st.success)(a.text)
+        if a.sources:
+            with st.expander(f"Sources ({len(a.sources)} rows)"):
+                st.write(", ".join(a.sources[:60]))
 
 # ── TAB: SCORES ──────────────────────────────────────────────────────────────
 with tab_scores:
+    if showing_partial_view:
+        render_partial_view_notice()
+
     st.subheader("Scored against the answer keys")
     df = score_matches(pack, matches)
     st.dataframe(summary(df), hide_index=True)

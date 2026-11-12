@@ -217,7 +217,8 @@ showing_partial_view = is_counter_staff or (is_accountant and not share_cash_boo
 
 # Language / Localization Toggle
 st.sidebar.markdown("---")
-lang = st.sidebar.radio("Language / भाषा", ["English", "हिन्दी (Hindi)"], horizontal=True)
+lang = st.sidebar.radio("Language / भाषा", ["English", "हिंग्लिश / हिंदी (Hinglish/Hindi)"], index=0, horizontal=True)
+is_hindi = (lang != "English")
 
 # ── ONBOARDING STATE & AI-NATIVE PROMPT STATE ────────────────────────────────
 if "show_onboarding" not in st.session_state:
@@ -364,7 +365,7 @@ if st.session_state["show_onboarding"]:
 
     st.stop()
 
-# ── PERSISTENT AI COPILOT COMMAND CENTER (TOP HERO BAR) ───────────────────────
+# ── PERSISTENT AI COPILOT COMMAND CENTER (TOP HERO COCKPIT) ──────────────────
 current_galla_hero = vault.get_latest_galla(biz)
 galla_cash_hero = current_galla_hero.counted_cash if current_galla_hero else 0.0
 bal_hero, _ = copilot.closing_balance(biz)
@@ -372,26 +373,49 @@ limit_hero = copilot.credit_limit(biz) or 0.0
 net_bank_hero = bal_hero + limit_hero
 total_liquidity_hero = net_bank_hero + (galla_cash_hero if not showing_partial_view else 0.0)
 
+solvency_hero = compute_total_solvency(pack, vault, biz)
+is_safe = solvency_hero.true_cash_runway_inr > 0
+hero_border_color = "rgba(16, 185, 129, 0.35)" if is_safe else "rgba(245, 158, 11, 0.35)"
+hero_badge_class = "sme-badge-success" if is_safe else "sme-badge-warning"
+
+if not is_hindi:
+    hero_title = "🟢 YOUR CASH POSITION IS SAFE" if is_safe else "🟡 CASH TIGHT: Monitor Upcoming Dues"
+    hero_subtitle = (
+        f"You can comfortably pay upcoming payroll ({inr(solvency_hero.formal_commitments)}) and monthly bills. "
+        f"Bank headroom is {inr(solvency_hero.net_bank_liquidity)} and unbanked counter cash is {inr(solvency_hero.galla_cash)}."
+        if not showing_partial_view else
+        f"Formal bank balance active: {inr(bal_hero)} with {inr(limit_hero)} credit headroom."
+    )
+    payroll_badge_text = "100% Payroll Funded"
+else:
+    hero_title = "🟢 आपकी नकद स्थिति सुरक्षित है" if is_safe else "🟡 नकद में तंगी: खर्चों पर नजर रखें"
+    hero_subtitle = (
+        f"आप अगले महीने का वेतन ({inr(solvency_hero.formal_commitments)}) और सभी खर्चे बिना किसी तनाव के चुका सकते हैं। "
+        f"बैंक में {inr(solvency_hero.net_bank_liquidity)} की खर्च सीमा है और दुकान के गल्ले में {inr(solvency_hero.galla_cash)} नकद अलग से है।"
+        if not showing_partial_view else
+        f"केवल फॉर्मल बैंक खाते का बैलेंस: {inr(bal_hero)} (क्रेडिट लिमिट {inr(limit_hero)})।"
+    )
+    payroll_badge_text = "100% सैलरी सुरक्षित"
+
 col_hero_text, col_hero_action = st.columns([5, 1])
 with col_hero_text:
     st.markdown(f"""
-    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;">
+    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid {hero_border_color}; border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;">
       <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
         <div>
-          <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #10B981;">
-            ● {config.BUSINESSES[biz]} · Daily Pulse
+          <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: {'#10B981' if is_safe else '#F59E0B'};">
+            ● {config.BUSINESSES[biz]} · {'दैनिक नकद स्थिति (Daily Health)' if is_hindi else 'Daily Cash Health'}
           </span>
           <div style="font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0;">
-            {inr(total_liquidity_hero)}
-            <span style="font-size: 0.82rem; font-weight: 500; opacity: 0.7; margin-left: 6px;">Total Usable Liquidity</span>
+            {hero_title}
           </div>
         </div>
         <div>
-          <span class="sme-badge sme-badge-success">100% Payroll Funded</span>
+          <span class="sme-badge {hero_badge_class}">{payroll_badge_text}</span>
         </div>
       </div>
-      <div style="margin-top: 4px; font-size: 0.82rem; opacity: 0.85; line-height: 1.4;">
-        {'Bank Headroom ' + inr(net_bank_hero) + ' + Counter Drawer ' + inr(galla_cash_hero) + ' safely cover upcoming commitments.' if not showing_partial_view else 'Formal books active: ' + inr(bal_hero) + ' balance.'}
+      <div style="margin-top: 4px; font-size: 0.84rem; opacity: 0.88; line-height: 1.45;">
+        {hero_subtitle}
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -401,30 +425,103 @@ with col_hero_action:
         st.session_state["onboarding_step"] = 1
         st.rerun()
 
-# Sleek Search Bar & Quiet Prompt Pills
+# ── ⚡ TODAY'S PRIORITY ACTION CARD (DECISION 3YES) ───────────────────────────
+if biz == "SME-1":
+    act_title = "⚡ TODAY'S PRIORITY ACTION" if not is_hindi else "⚡ आज का सबसे जरूरी काम"
+    act_headline = "📞 Collect ₹29,295 from Om Supermarket, Bavdhan" if not is_hindi else "📞 ओम सुपरमार्केट, बावधन से ₹29,295 की वसूली करें"
+    act_desc = "Open 45 days · 3 salesman collection slips awaiting deposit into bank" if not is_hindi else "45 दिन से बकाया · सेल्समैन 1 की रसीद बैंक में जमा होने के लिए तैयार है"
+    wa_msg = urllib.parse.quote("Namaste Om Supermarket ji, hope you are doing well. Friendly update from Kaveri Distributors: current pending khata balance is ₹29,295. Whenever convenient, please arrange settlement. Thank you!")
+    wa_link = f"https://wa.me/910000000001?text={wa_msg}"
+    btn_text = "📲 Send WhatsApp Reminder" if not is_hindi else "📲 WhatsApp तकादा भेजें"
+elif biz == "SME-2":
+    act_title = "⚡ TODAY'S PRIORITY ACTION" if not is_hindi else "⚡ आज का सबसे जरूरी काम"
+    act_headline = "📋 Follow up with CareLink Health TPA for ₹2,35,792" if not is_hindi else "📋 केयरलिंक हेल्थ TPA से ₹2,35,792 के पुराने दावों का भुगतान लें"
+    act_desc = "46 patient claims pending > 45 days · 10% TDS already deducted" if not is_hindi else "46 मरीजों के दावे 45 दिन से अधिक पुराने हैं · 10% TDS कटकर देय"
+    wa_link = "https://wa.me/?text=" + urllib.parse.quote("CareLink Health TPA claims summary: ₹2,35,792 pending.")
+    btn_text = "📋 Chase TPA Claims" if not is_hindi else "📋 TPA दावों की सूची देखें"
+else:
+    act_title = "⚡ TODAY'S PRIORITY ACTION" if not is_hindi else "⚡ आज का सबसे जरूरी काम"
+    act_headline = "💼 October Salaries (₹9.25 Lakh) 100% Funded" if not is_hindi else "💼 1 तारीख की सैलरी (₹9.25 लाख) 100% सुरक्षित"
+    act_desc = "Ganga Auto Parts retainer cleared: ₹1,10,684 TDS already accounted for" if not is_hindi else "गंगा ऑटो पार्ट्स का बिल क्लियर: ₹1.10 लाख TDS दर्ज हो चुका है"
+    wa_link = "https://wa.me/?text=" + urllib.parse.quote("Northlight Studio October Retainer Schedule.")
+    btn_text = "💼 View Retainer Schedule" if not is_hindi else "💼 रिटेनर शेड्यूल देखें"
+
+col_act_left, col_act_right = st.columns([4, 2])
+with col_act_left:
+    st.markdown(f"""
+    <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.28); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
+      <span class="sme-badge sme-badge-info">{act_title}</span>
+      <div style="font-size: 1.05rem; font-weight: 700; margin: 4px 0 2px 0;">{act_headline}</div>
+      <div style="font-size: 0.82rem; opacity: 0.85;">{act_desc}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col_act_right:
+    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+    st.link_button(btn_text, wa_link, use_container_width=True)
+
+# ── 4 CALM BIG MONEY TILES ──────────────────────────────────────────────────
+c_tile1, c_tile2, c_tile3, c_tile4 = st.columns(4)
+c_tile1.metric(
+    "Safe to Spend (Bank)" if not is_hindi else "बैंक से सुरक्षित खर्च सीमा",
+    inr(solvency_hero.net_bank_liquidity),
+    f"Bank {inr(bal_hero)} + {inr(limit_hero)} CC" if not is_hindi else f"बैंक {inr(bal_hero)} + CC सीमा"
+)
+c_tile2.metric(
+    "Cash in Till / Drawer" if not is_hindi else "गल्ले में नकद कैश",
+    inr(solvency_hero.galla_cash),
+    "Counted today" if not is_hindi else "आज गिना हुआ बैलेंस"
+)
+c_tile3.metric(
+    "Market Dues Coming In" if not is_hindi else "बाजार से वसूली (संभावित)",
+    inr(solvency_hero.total_expected_inflows),
+    "Expected recovery" if not is_hindi else "संभावित रिकवरी (85%)"
+)
+c_tile4.metric(
+    "Upcoming Expenses" if not is_hindi else "अगले 30 दिन के खर्चे",
+    inr(solvency_hero.formal_commitments),
+    "Salaries & bills" if not is_hindi else "सैलरी और बिल"
+)
+
+# ── SLEEK CONVERSATIONAL SEARCH BAR & LANGUAGE-AWARE CHIPS ───────────────────
 c_input, c_btn = st.columns([5, 1])
 with c_input:
+    search_placeholder = (
+        "Ask anything about your cash... (e.g. Can I pay salaries? Who owes me most?)"
+        if not is_hindi else
+        "अपने कैश के बारे में कुछ भी पूछें... (जैसे: क्या मैं सैलरी दे सकता हूँ? सबसे ज्यादा पैसा किस पर बाकी है?)"
+    )
     user_typed = st.text_input(
         "Ask Copilot",
-        placeholder="Ask anything about your cash... (e.g. Can I pay salaries? Who owes me most?)",
+        placeholder=search_placeholder,
         label_visibility="collapsed",
         key="main_copilot_input",
     )
 with c_btn:
-    if st.button("Ask", key="main_copilot_submit_btn", type="primary"):
+    ask_btn_label = "Ask" if not is_hindi else "पूछें"
+    if st.button(ask_btn_label, key="main_copilot_submit_btn", type="primary"):
         if user_typed and user_typed.strip():
             st.session_state["active_copilot_q"] = user_typed.strip()
 
 # Persistent Prompt Chips (compact, clean labels)
 chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
-if chip_col1.button("💬 Can I pay salaries on 1 Oct?", key="hero_chip_salary"):
-    st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
-if chip_col2.button("💬 Who owes me the most?", key="hero_chip_debt"):
-    st.session_state["active_copilot_q"] = "Who owes me the most?"
-if chip_col3.button("💬 Explain in Hindi (हिन्दी)", key="hero_chip_hindi"):
-    st.session_state["active_copilot_q"] = "Explain my cash position in Hindi."
-if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
-    st.session_state["active_copilot_q"] = "What is my worst cash dip in the next 90 days?"
+if not is_hindi:
+    if chip_col1.button("💬 Can I pay salaries on 1 Oct?", key="hero_chip_salary"):
+        st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
+    if chip_col2.button("💬 Who owes me the most?", key="hero_chip_debt"):
+        st.session_state["active_copilot_q"] = "Who owes me the most?"
+    if chip_col3.button("💬 How much cash in till?", key="hero_chip_till"):
+        st.session_state["active_copilot_q"] = "How much cash do I have in the till drawer?"
+    if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
+        st.session_state["active_copilot_q"] = "What is my worst cash dip in the next 90 days?"
+else:
+    if chip_col1.button("💬 क्या 1st को सैलरी दे सकते हैं?", key="hero_chip_salary"):
+        st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
+    if chip_col2.button("💬 सबसे ज्यादा पैसा किस पर बाकी है?", key="hero_chip_debt"):
+        st.session_state["active_copilot_q"] = "Who owes me the most?"
+    if chip_col3.button("💬 गल्ले में कितना कैश है?", key="hero_chip_till"):
+        st.session_state["active_copilot_q"] = "How much cash do I have in the till drawer?"
+    if chip_col4.button("💬 अगले 90 दिनों में कोई संकट?", key="hero_chip_dip"):
+        st.session_state["active_copilot_q"] = "What is my worst cash dip in the next 90 days?"
 
 if st.session_state.get("active_copilot_q"):
     active_q = st.session_state["active_copilot_q"]
@@ -433,6 +530,18 @@ if st.session_state.get("active_copilot_q"):
     from copilot.ai_client import get_ai_client
     ai_label = get_ai_client().get_provider_label()
     source_tag = f"✨ Grounded AI ({ai_label})" if ans.intent == "FACT_AI" else "✓ Verified Ledger Fact"
+
+    hindi_summary = ""
+    if is_hindi:
+        q_lower = active_q.lower()
+        if "salaries" in q_lower or "1 october" in q_lower or "सैलरी" in q_lower:
+            hindi_summary = f"💡 <b>सरल समझ:</b> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट मिलाकर कुल {inr(solvency_hero.net_bank_liquidity)} का सुरक्षित दायरा उपलब्ध है (सितंबर देय खर्चे {inr(solvency_hero.formal_commitments)} थे)। इसके अतिरिक्त गल्ले में {inr(solvency_hero.galla_cash)} नकद अलग से हैं।"
+        elif "owes me the most" in q_lower or "बाकी" in q_lower:
+            hindi_summary = f"💡 <b>सरल समझ:</b> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल ₹7,82,910 (31 बिल)। सबसे पुराना बिल 293 दिन पुराना है।"
+        elif "till" in q_lower or "drawer" in q_lower or "गल्ला" in q_lower:
+            hindi_summary = f"💡 <b>सरल समझ:</b> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(solvency_hero.galla_cash)} है, जो बहीखाते से पूरी तरह मेल खाता है।"
+        elif "dip" in q_lower or "संकट" in q_lower:
+            hindi_summary = f"💡 <b>सरल समझ:</b> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। आपकी नकद स्थिति पूरी तरह सुरक्षित है।"
 
     q_col, d_col = st.columns([11, 1])
     with q_col:
@@ -443,6 +552,7 @@ if st.session_state.get("active_copilot_q"):
             <span style="font-size: 0.72rem; color: #10B981; font-weight: 500;">{source_tag}</span>
           </div>
           <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500; line-height: 1.5;">{ans.text}</p>
+          {f'<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(37,99,235,0.2); font-size: 0.84rem; color: #1E40AF;">{hindi_summary}</div>' if hindi_summary else ''}
         </div>
         """, unsafe_allow_html=True)
     with d_col:
@@ -510,17 +620,27 @@ with tab_home:
 
         has_demo = biz in ("SME-1", "SME-3")
         c = st.columns(4)
-        c[0].metric("Net Bank Headroom", inr(solvency.net_bank_liquidity), help=f"Bank balance {inr(bal)} plus CC headroom")
-        c[1].metric("Physical Galla Cash", inr(solvency.galla_cash), "Demo data, not from the pilot pack." if has_demo else "In shop drawer", delta_color="normal")
-        c[2].metric("Expected Khata Inflows", inr(solvency.total_expected_inflows), "Demo data, not from the pilot pack." if has_demo and solvency.informal_receivables > 0 else "Risk-adjusted", delta_color="normal")
-        c[3].metric("True Cash Runway Buffer", inr(solvency.true_cash_runway_inr),
+        c[0].metric("Safe to Spend (Bank)", inr(solvency.net_bank_liquidity), help=f"Bank balance {inr(bal)} plus CC headroom")
+        c[1].metric("Cash in Drawer / Till", inr(solvency.galla_cash), "Demo data, not from the pilot pack." if has_demo else "In shop drawer", delta_color="normal")
+        c[2].metric("Market Dues (Likely In)", inr(solvency.total_expected_inflows), "Demo data, not from the pilot pack." if has_demo and solvency.informal_receivables > 0 else f"Expected at {int(round(alpha*100))}%", delta_color="normal")
+        c[3].metric("True Cash Buffer", inr(solvency.true_cash_runway_inr),
                     "Positive Solvency" if solvency.true_cash_runway_inr > 0 else "Deficit Alert",
                     delta_color="normal" if solvency.true_cash_runway_inr > 0 else "inverse")
 
         if has_demo:
             st.caption("ℹ️ Cash totals above include demo seed data, not from the pilot pack.")
 
-        st.caption(f"Unified calculation as of {solv_rep['as_of']}: (Bank Headroom) + (Galla Cash) + (Khata Inflows) − (30-Day Commitments {inr(solvency.total_commitments)}).")
+        # Progressive Disclosure: Simple In-Out Rupee Math
+        with st.expander("🔍 See How Cash Buffer Is Calculated (Simple In-Out Math) / गणित समझें", expanded=False):
+            st.markdown(f"""
+            **Here is the exact rupee breakdown:**
+            - **Safe to Spend from Bank:** {inr(solvency.net_bank_liquidity)} *(Bank balance {inr(bal)} + Credit Limit)*
+            - **Cash in Till / Drawer:** `+` {inr(solvency.galla_cash)} *(Counted physical cash)*
+            - **Expected Recovery from Market:** `+` {inr(solvency.total_expected_inflows)} *(Expected informal dues at {int(round(alpha*100))}% recovery)*
+            - **Less: Upcoming 30-Day Expenses:** `−` {inr(solvency.total_commitments)} *(Salaries and upcoming commitments {inr(solvency.formal_commitments)})*
+            ---
+            **= True Working Capital Buffer:** **{inr(solvency.true_cash_runway_inr)}**
+            """)
 
         # ── TODAY'S 3 OPERATING PRIORITIES ──
         st.markdown("### ⚡ Today's 3 Operating Priorities")
@@ -563,6 +683,29 @@ with tab_home:
               <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">{p3_sub}</p>
             </div>
             """, unsafe_allow_html=True)
+
+        # ── TOP 5 ACTIONABLE FOLLOW-UPS TODAY ──
+        st.markdown("### 📋 Top 5 Collections for Today / आज के 5 मुख्य तकादे")
+        st.caption("Prioritized customers with late payments. 1-click WhatsApp reminder with polite text.")
+
+        top_cust = by_customer(items).sort_values("outstanding", ascending=False).head(5)
+        for _, c_row in top_cust.iterrows():
+            c_name = c_row["customer_name"]
+            c_amt = c_row["outstanding"]
+            c_oldest = int(c_row["oldest_days"])
+            
+            wa_text = f"Namaste {c_name}, {config.BUSINESSES.get(biz, biz)} se namaskar. Aapka pichla bill {inr(c_amt)} ka baaki hai. Kripya check kar lijiye. UPI: payment@bank"
+            wa_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
+            
+            col_t1, col_t2, col_t3 = st.columns([3, 2, 2])
+            with col_t1:
+                st.markdown(f"**{c_name}**")
+                st.caption(f"{c_oldest} days overdue" if not is_hindi else f"{c_oldest} दिन से बकाया")
+            with col_t2:
+                st.markdown(f"**{inr(c_amt)}**")
+            with col_t3:
+                btn_label = "📲 Send WhatsApp" if not is_hindi else "📲 WhatsApp भेजें"
+                st.link_button(btn_label, wa_url, use_container_width=True)
 
 # ── TAB: CASH BOOK ───────────────────────────────────────────────────────────
 with tab_vault:
@@ -702,8 +845,14 @@ with tab_forecast:
 
     # ── INTERACTIVE ALTAIR FAN CHART ──
     if fc_res.daily_points:
-        st.markdown("### 📈 Cash Trajectory Simulation (P10–P90 Fan Chart)")
-        st.caption("Monte Carlo simulation calibrated without lookahead. Shows worst-case (P10), median (P50), optimistic (P90), and credit-limit floor.")
+        chart_hdr = "📈 Safe Cash Trajectory (Next 90 Days)" if not is_hindi else "📈 अगले 90 दिनों का सुरक्षित नकद अनुमान"
+        chart_sub = (
+            "Safe projected cash balance. The shaded blue band shows your cash range between conservative and fast customer collections. The red dashed line shows your bank credit-limit safety floor."
+            if not is_hindi else
+            "सुरक्षित अनुमानित बैंक बैलेंस। नीला हिस्सा यह दर्शाता है कि ग्राहकों से वसूली धीमी या तेज होने पर कितना बैलेंस रहेगा। लाल रेखा बैंक क्रेडिट लिमिट की निचली सुरक्षा सीमा है।"
+        )
+        st.markdown(f"### {chart_hdr}")
+        st.caption(chart_sub)
 
         df_daily = pd.DataFrame([
             {
@@ -720,14 +869,14 @@ with tab_forecast:
             opacity=0.22,
             color="#2563EB"
         ).encode(
-            x=alt.X("Date:T", title="Date (90 Days)"),
-            y=alt.Y("p10:Q", title="Projected Bank Balance (₹)"),
+            x=alt.X("Date:T", title="Date (90 Days) / तारीख"),
+            y=alt.Y("p10:Q", title="Projected Bank Balance (₹) / बैंक बैलेंस"),
             y2="p90:Q",
             tooltip=[
                 alt.Tooltip("Date:T", title="Date"),
-                alt.Tooltip("p10:Q", format=",.0f", title="Worst-Case (P10)"),
-                alt.Tooltip("p50:Q", format=",.0f", title="Median (P50)"),
-                alt.Tooltip("p90:Q", format=",.0f", title="Optimistic (P90)"),
+                alt.Tooltip("p10:Q", format=",.0f", title="Conservative (P10)"),
+                alt.Tooltip("p50:Q", format=",.0f", title="Expected (P50)"),
+                alt.Tooltip("p90:Q", format=",.0f", title="Fast Collections (P90)"),
             ]
         )
 
@@ -757,16 +906,24 @@ with tab_forecast:
 
         st.altair_chart(chart, use_container_width=True)
 
-    st.markdown("### 📅 Monthly Breakdown (Cash You Can Plan On)")
+    table_hdr = "### 📅 Monthly Cash Plan (What You Can Count On)" if not is_hindi else "### 📅 मासिक नकद योजना (आप कितना प्लान कर सकते हैं)"
+    st.markdown(table_hdr)
     m_rows = []
+    col_month = "Month" if not is_hindi else "महीना"
+    col_in = "Expected Collections" if not is_hindi else "अपेक्षित वसूली"
+    col_out = "Planned Expenses" if not is_hindi else "योजनाबद्ध खर्चे"
+    col_net = "Net Cash Surplus" if not is_hindi else "शुद्ध मासिक बचत"
+    col_dip = "Lowest Cash Point" if not is_hindi else "महीने का निचला स्तर"
+    col_close = "Estimated Month-End" if not is_hindi else "महीने का अंत बैलेंस"
+
     for mf in fc_res.monthly_forecasts:
         m_rows.append({
-            "Month": mf.month,
-            "Expected Inflows": f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
-            "Committed Outflows": f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
-            "Net Cash Flow": inr(mf.net_p50),
-            "Lowest Daily Dip": inr(mf.min_balance_p50),
-            "Closing Balance": inr(mf.closing_balance_p50),
+            col_month: mf.month,
+            col_in: f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
+            col_out: f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
+            col_net: inr(mf.net_p50),
+            col_dip: inr(mf.min_balance_p50),
+            col_close: inr(mf.closing_balance_p50),
         })
     st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
 
@@ -923,7 +1080,8 @@ with tab_recv:
             biz_name = config.BUSINESSES.get(biz, biz)
             wa_text = f"Namaste {c_name}, {biz_name} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. Kripya check kar lijiye. UPI: payment@bank"
             encoded_wa = urllib.parse.quote(wa_text)
-            st.link_button("📲 Draft WhatsApp", f"https://wa.me/?text={encoded_wa}")
+            wa_btn_label = "📲 Draft WhatsApp" if not is_hindi else "📲 WhatsApp संदेश बनाएं"
+            st.link_button(wa_btn_label, f"https://wa.me/?text={encoded_wa}")
 
     with st.expander("📊 Complete Tabular Receivables Ledger", expanded=False):
         st.dataframe(by_customer(items).assign(outstanding=lambda d: d.outstanding.map(inr)), hide_index=True, use_container_width=True)

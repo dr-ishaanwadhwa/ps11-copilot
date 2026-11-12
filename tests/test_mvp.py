@@ -94,8 +94,16 @@ def test_t1_who_owes_most(copilot, biz, customer, amount, n):
     ("SME-3", 925_550, 2_549_825, 2_549_825),
 ])
 def test_t7_can_pay_salaries(copilot, biz, salary, closing, headroom):
-    a = copilot.can_pay_salaries(biz).numbers
-    assert (round(a["salary"]), a["closing_balance"], a["headroom"], a["yes"]) == (salary, closing, headroom, True)
+    a0 = copilot.can_pay_salaries(biz, galla_cash=0.0)
+    a50 = copilot.can_pay_salaries(biz, galla_cash=50_000.0)
+
+    for a in (a0.numbers, a50.numbers):
+        assert (round(a["salary"]), a["closing_balance"], a["headroom"], a["yes"]) == (salary, closing, headroom, True)
+
+    assert a0.numbers["galla_cash"] == 0
+    assert a50.numbers["galla_cash"] == 50_000
+    assert "drawer today" not in a0.text
+    assert "You also counted ₹50,000 in the drawer today; it is not included above." in a50.text
 
 
 # ── boundaries (FR-BD-1; T8, T10 and the 16 boundary questions) ───────────

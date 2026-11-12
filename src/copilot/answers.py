@@ -62,18 +62,17 @@ class Copilot:
         bal, bal_row = self.closing_balance(biz, on - pd.Timedelta(days=1))
         limit = self.credit_limit(biz)
         available = bal + limit
-        total_with_galla = available + galla_cash
-        yes = total_with_galla >= salary
+        yes = available >= salary
         limit_txt = (f", leaving {inr(available)} of headroom within the {inr(limit)} cash-credit limit"
                      if limit else "")
-        galla_txt = f". Plus you hold {inr(galla_cash)} in physical Galla cash, providing {inr(total_with_galla)} total liquidity" if galla_cash > 0 else ""
+        galla_sentence = f" You also counted {inr(galla_cash)} in the drawer today; it is not included above." if galla_cash > 0 else ""
         text = (f"{'Yes' if yes else 'Not from current liquidity alone'}. Salaries were {inr(salary)} in "
                 f"{pd.Timestamp(month + '-01'):%B}. The closing balance on {on - pd.Timedelta(days=1):%d %b %Y} "
-                f"is {inr(bal)}{limit_txt}{galla_txt}. Receipts expected and other payments due in the first week: "
+                f"is {inr(bal)}{limit_txt}.{galla_sentence} Receipts expected and other payments due in the first week: "
                 f"[forecast, not in v1].")
         return Answer(text, "FACT", [bal_row] + sal_rows,
                       {"salary": salary, "closing_balance": round(bal), "headroom": round(available),
-                       "galla_cash": round(galla_cash), "total_liquidity": round(total_with_galla), "yes": yes})
+                       "galla_cash": round(galla_cash), "yes": yes})
 
     def ask(self, biz: str, question: str, galla_cash: float = 0.0) -> Answer:
         r = route(question)

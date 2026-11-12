@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from ..load import Pack
-from .models import GallaEntry, KhataAccount, RokadEntry
+from .models import Collection, GallaEntry, KhataAccount, RokadEntry
 
 
 class VaultDB:
@@ -29,9 +29,19 @@ class VaultDB:
         self.galla_records: Dict[str, List[GallaEntry]] = {"SME-1": [], "SME-2": [], "SME-3": []}
         self.rokad_records: Dict[str, List[RokadEntry]] = {"SME-1": [], "SME-2": [], "SME-3": []}
         self.khata_records: Dict[str, Dict[str, KhataAccount]] = {"SME-1": {}, "SME-2": {}, "SME-3": {}}
+        self.collection_records: Dict[str, List[Collection]] = {"SME-1": [], "SME-2": [], "SME-3": []}
 
     def _init_tables(self):
         with self.conn:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS collections (
+                    business_id TEXT,
+                    date TEXT,
+                    shop TEXT,
+                    amount REAL,
+                    salesman TEXT
+                )
+            """)
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS galla_entries (
                     business_id TEXT,
@@ -76,6 +86,30 @@ class VaultDB:
                 (entry.business_id, str(entry.date), entry.opening_cash, entry.cash_in,
                  entry.cash_out, entry.cash_banked, entry.counted_cash, entry.notes)
             )
+
+    def record_collection(self, entry: Collection):
+        self.collection_records.setdefault(entry.business_id, []).append(entry)
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO collections VALUES (?, ?, ?, ?, ?)",
+                (entry.business_id, str(entry.date), entry.shop, entry.amount, entry.salesman)
+            )
+
+    def get_collections_since(
+        self,
+        biz: str,
+        since_date: Optional[pd.Timestamp] = None,
+        up_to_date: Optional[pd.Timestamp] = None,
+    ) -> List[Collection]:
+        records = self.collection_records.get(biz, [])
+        res = []
+        for c in records:
+            if since_date is not None and c.date <= since_date:
+                continue
+            if up_to_date is not None and c.date > up_to_date:
+                continue
+            res.append(c)
+        return res
 
     def record_rokad(self, entry: RokadEntry):
         self.rokad_records[entry.business_id].append(entry)

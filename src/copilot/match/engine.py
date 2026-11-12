@@ -97,9 +97,17 @@ def find_subsets(items: list[Doc], target: float, max_size: int, slack: float = 
 
 
 class Matcher:
-    def __init__(self, pack: Pack, audit_ledger: AuditLedger | None = None):
+    def __init__(
+        self,
+        pack: Pack,
+        audit_ledger: AuditLedger | None = None,
+        vault: Any | None = None,
+        collections: list[Any] | None = None,
+    ):
         self.pack = pack
         self.audit_ledger = audit_ledger if audit_ledger is not None else AuditLedger()
+        self.vault = vault
+        self._collections: list[Any] = list(collections or [])
         self.docs: dict[str, dict[str, list[Doc]]] = defaultdict(lambda: defaultdict(list))  # biz -> party -> docs
         self.by_id: dict[str, Doc] = {}
         self.dc: dict[str, pd.DataFrame] = {}
@@ -108,6 +116,25 @@ class Matcher:
         self.handle_memory: dict[str, str] = self._load_confirmed_handles()  # UPI handle -> party, learned ONLY from confirmed matches (D60)
         self.last_cash_deposit: dict[str, pd.Timestamp] = {}
         self._build()
+
+    def record_collection(self, col: Any) -> None:
+        self._collections.append(col)
+        if self.vault and hasattr(self.vault, "record_collection"):
+            self.vault.record_collection(col)
+
+    def _get_collections(self, biz: str, since: pd.Timestamp | None, up_to: pd.Timestamp) -> list[Any]:
+        vault_cols = self.vault.get_collections_since(biz, since, up_to) if (self.vault and hasattr(self.vault, "get_collections_since")) else []
+        extra_cols = [
+            c for c in self._collections
+            if getattr(c, "business_id", None) == biz
+            and (since is None or c.date > since)
+            and c.date <= up_to
+        ]
+        all_cols = list(vault_cols)
+        for c in extra_cols:
+            if c not in all_cols:
+                all_cols.append(c)
+        return all_cols
 
     # ── documents ───────────────────────────────────────────────────────────
     def _add(self, biz: str, d: Doc) -> None:
@@ -195,6 +222,27 @@ class Matcher:
         if r.channel == "CASH":
             if biz == "SME-2":
                 return None
+            if biz == "SME-1":
+                start = self.last_cash_deposit.get("SME-1")
+                self.last_cash_deposit["SME-1"] = r.txn_date
+                colls = self._get_collections("SME-1", start, r.txn_date)
+                total_col = sum(c.amount for c in colls)
+                if colls and abs(total_col - amt) <= 1.0:
+                    shops = list(dict.fromkeys(c.shop for c in colls))
+                    pool = []
+                    for s in shops:
+                        parties = self.party_idx["SME-1"]["in"].resolve(s)
+                        pool.extend(self._open("SME-1", parties if parties else [s], ("inv",), r.txn_date, cap=50))
+                    pool.sort(key=lambda x: (x.date, x.id))
+                    max_size = max(10, len(colls) + 2)
+                    sols, done = find_subsets(pool, amt, max_size=max_size)
+                    if not sols:
+                        sols, done = find_subsets(pool, amt, max_size=max_size, slack=config.ROUND_OFF_MAX)
+                    if sols and len(sols) == 1 and done:
+                        docs = [(d.id, d.remaining) for d in sols[0]]
+                        note = f"cash deposit matched to {len(colls)} collection slips across {len(shops)} shops (D55)"
+                        m = Match(r.txn_id, "SME-1", SUGGEST, "CASH_DEPOSIT", docs, note=note)
+                        return self._finish(m, None, True, r, None)
             return Match(r.txn_id, biz, ASK, "CASH_DEPOSIT",
                          note="cash deposit covering several shops: needs the salesman's collection slips")
 
@@ -349,8 +397,13 @@ class Matcher:
             pass
 
 
-def match_all(pack: Pack, audit_ledger: AuditLedger | None = None) -> dict[str, Match]:
-    mt = Matcher(pack, audit_ledger=audit_ledger)
+def match_all(
+    pack: Pack,
+    audit_ledger: AuditLedger | None = None,
+    vault: Any | None = None,
+    collections: list[Any] | None = None,
+) -> dict[str, Match]:
+    mt = Matcher(pack, audit_ledger=audit_ledger, vault=vault, collections=collections)
     out: dict[str, Match] = {}
     for r in pack.bank.sort_values(["txn_date", "seq"]).itertuples():
         m = mt.match(r)

@@ -1,9 +1,12 @@
 """Unit tests for Matcher under Decision 60 (Tasks 4.1, 4.2, 4.3)."""
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
+import pandas as pd
 from copilot import config
 from copilot.match.audit import AuditLedger, select_audit_sample
 from copilot.match.engine import AUTO, SUGGEST, Matcher, match_all
+from copilot.vault.models import Collection
 
 
 def test_handle_memory_learns_only_from_confirm_payer(pack, monkeypatch):
@@ -77,3 +80,53 @@ def test_select_audit_sample(pack):
     sample2 = select_audit_sample(matches, pack.bank, week, rate=0.02)
     assert sample1 == sample2
     assert len(sample1) > 0
+
+
+def test_cash_collections_feed_deposit_matching(pack):
+    """Test 5.3 (D55): 3 synthetic collection records feed a cash deposit match as SUGGEST."""
+    mt = Matcher(pack)
+
+    # Pick 3 open invoices across distinct shops for SME-1
+    invs = []
+    for party, docs in mt.docs["SME-1"].items():
+        for d in docs:
+            if d.remaining > 0:
+                invs.append(d)
+                break
+        if len(invs) == 3:
+            break
+
+    assert len(invs) == 3
+    dep_amt = sum(d.remaining for d in invs)
+    dep_date = max(d.date for d in invs) + pd.Timedelta(days=5)
+
+    # Record 3 synthetic collections on the day prior to deposit
+    for i, d in enumerate(invs):
+        col = Collection(
+            business_id="SME-1",
+            date=dep_date - pd.Timedelta(days=1),
+            shop=d.party,
+            amount=d.remaining,
+            salesman=f"Salesman {i + 1}",
+        )
+        mt.record_collection(col)
+
+    # Synthetic bank cash deposit row
+    row = SimpleNamespace(
+        txn_id="TXN-TEST-DEPOSIT-COLL",
+        business_id="SME-1",
+        channel="CASH",
+        amount=dep_amt,
+        txn_date=dep_date,
+        narration="CASH DEPOSIT BY SELF - CDM HADAPSAR",
+        seq=1,
+    )
+
+    m = mt.match(row)
+    assert m is not None
+    # Must propose SUGGEST, never AUTO
+    assert m.tier == SUGGEST
+    assert m.rule == "CASH_DEPOSIT"
+    # Matches the 3 shops' invoices
+    matched_ids = {doc_id for doc_id, _ in m.docs}
+    assert matched_ids == {d.id for d in invs}

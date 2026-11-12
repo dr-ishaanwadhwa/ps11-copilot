@@ -44,6 +44,16 @@ class GallaEntry:
 
 
 @dataclass
+class Collection:
+    """Salesman collection slip entry for cash collections (Task 5.3, D55)."""
+    business_id: str
+    date: pd.Timestamp
+    shop: str
+    amount: float
+    salesman: str = ""
+
+
+@dataclass
 class RokadEntry:
     """Individual cash-in / cash-out entry in the daily cash book."""
     entry_id: str

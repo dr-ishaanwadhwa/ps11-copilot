@@ -26,6 +26,7 @@ from copilot.receivables import by_customer, open_items, overdue
 from copilot.score import score_matches, summary
 from copilot.vault import (
     PARTIAL_VIEW_NOTICE,
+    Collection,
     VaultDB,
     cash_deposit_reporting_facts,
     check_cash_expense,
@@ -215,6 +216,25 @@ with tab_vault:
                     submitted = st.form_submit_button("Record in Cash Book")
                     if submitted:
                         st.success("Recorded locally in Cash Book. Balance updated.")
+
+            with st.expander("Collections today (Day-Close)", expanded=False):
+                st.caption("Salesman collection slips for cash deposit matching (D55)")
+                with st.form("collections_today_form"):
+                    col_date = st.date_input("Collection Date", value=pd.Timestamp("2026-09-30"))
+                    salesman = st.text_input("Salesman", value="Ramesh K.")
+                    st.write("Enter shop takings:")
+                    s1 = st.text_input("Shop 1", value="Laxmi Kirana Stores")
+                    a1 = st.number_input("Amount 1 (₹)", value=15000.0, step=500.0)
+                    s2 = st.text_input("Shop 2 (optional)", value="")
+                    a2 = st.number_input("Amount 2 (₹)", value=0.0, step=500.0)
+                    s3 = st.text_input("Shop 3 (optional)", value="")
+                    a3 = st.number_input("Amount 3 (₹)", value=0.0, step=500.0)
+                    col_sub = st.form_submit_button("Record Collections")
+                    if col_sub:
+                        for s, a in [(s1, a1), (s2, a2), (s3, a3)]:
+                            if s.strip() and a > 0:
+                                vault.record_collection(Collection(biz, pd.Timestamp(col_date), s.strip(), a, salesman))
+                        st.success("Collections recorded in local vault.")
 
         with col_audit:
             st.markdown("### 🏛️ Cash deposits this year")

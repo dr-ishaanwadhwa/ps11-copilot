@@ -26,6 +26,15 @@ from .names import PartyIndex, extract, norm
 AUTO, SUGGEST, ASK, NO_DOC = "AUTO", "SUGGEST", "ASK", "NO_DOC"
 _CHQ = re.compile(r"^CHQ (DEP|RET) - (\d+)")
 
+# Decision 60 (Strict AUTO rule): only rule classes with 0 training errors qualify for AUTO
+_AUTO_QUALIFIED = {
+    ("SME-1", "EXACT"),
+    ("SME-2", "DAILY_UPI"),
+    ("SME-2", "MDR_NET"),
+    ("SME-3", "EXACT_BILL"),
+}
+_AUTO_MAX_AMOUNT = 100_000.0  # ₹1 Lakh materiality ceiling (D60)
+
 
 @dataclass
 class Match:
@@ -164,9 +173,9 @@ class Matcher:
                 for doc_id, applied in dep.docs:
                     if doc_id in self.by_id:
                         self.by_id[doc_id].remaining += applied
-                dep.rule, dep.tier = "BOUNCED", AUTO
+                dep.rule, dep.tier = "BOUNCED", SUGGEST
                 dep.docs = [(d, 0.0) for d, _ in dep.docs]
-                return Match(r.txn_id, biz, AUTO, "BOUNCED", list(dep.docs), "cheque returned; invoices reopened")
+                return Match(r.txn_id, biz, SUGGEST, "BOUNCED", list(dep.docs), "cheque returned; invoices reopened")
             return None
 
         if any(o and o in norm(nar) for o in self.owner_names.get(biz, [])) or "CAPITAL" in nar.upper():
@@ -244,8 +253,8 @@ class Matcher:
                       note="" if unique else "more than one set of invoices fits: pick one")
             return self._finish(m, handle, known, r, chq, roundoff_doc=docs[-1][0] if slack_used else None)
         if pool and amt < pool[0].remaining:
-            m = Match(r.txn_id, biz, SUGGEST, "PART_PAYMENT", [(pool[0].id, amt)], payer=pool[0].party,
-                      note=f"part payment: ₹{pool[0].remaining - amt:,.0f} stays open on the oldest invoice")
+            m = Match(r.txn_id, biz, SUGGEST, "ON_ACCOUNT", [], payer=pool[0].party,
+                      note=f"part payment: ₹{amt:,.0f} credited on account to {pool[0].party}; accountant to allocate")
             return self._finish(m, handle, known, r, chq)
         return Match(r.txn_id, biz, ASK, "NO_RULE", payer=parties[0], note="payer known; no rule explains the amount")
 
@@ -254,12 +263,14 @@ class Matcher:
         day = r.txn_date.normalize()
         if r.channel == "UPI":
             if day in dc.index:
-                return Match(r.txn_id, "SME-2", AUTO, "DAILY_UPI", [(dc.loc[day, "dc_id"], amt)])
+                m = Match(r.txn_id, "SME-2", AUTO, "DAILY_UPI", [(dc.loc[day, "dc_id"], amt)])
+                return self._finish(m, None, True, r, None)
         if r.channel == "POS_SETTLEMENT":
             hits = [(d, dc.loc[d, "dc_id"]) for d in [day - pd.Timedelta(days=k) for k in (1, 2, 3)]
                     if d in dc.index and abs(dc.loc[d, "card_net_settled"] - amt) < 0.01]
             if len(hits) == 1:
-                return Match(r.txn_id, "SME-2", AUTO, "MDR_NET", [(hits[0][1], amt)], note="card takings net of MDR")
+                m = Match(r.txn_id, "SME-2", AUTO, "MDR_NET", [(hits[0][1], amt)], note="card takings net of MDR")
+                return self._finish(m, None, True, r, None)
         if r.channel == "CASH":
             start = self.last_cash_deposit.get("SME-2", day - pd.Timedelta(days=7))
             window = dc[(dc.index > start) & (dc.index <= day)]
@@ -269,7 +280,8 @@ class Matcher:
                 docs = list(zip(window["dc_id"], window["cash_collected"]))
                 tier = AUTO if abs(total - amt) < 1 else SUGGEST
                 note = "" if tier == AUTO else f"₹{total - amt:,.0f} of cash taken since the last deposit is not in this deposit: to check"
-                return Match(r.txn_id, "SME-2", tier, "CASH_DEPOSIT", docs, note)
+                m = Match(r.txn_id, "SME-2", tier, "CASH_DEPOSIT", docs, note)
+                return self._finish(m, None, True, r, None)
         return None
 
     def _payment(self, r, biz, amt, name) -> Match | None:
@@ -279,15 +291,28 @@ class Matcher:
         pool = self._open(biz, parties, ("bill",), r.txn_date + pd.Timedelta(days=3))
         exact = [d for d in pool if abs(d.remaining - amt) < 0.01]
         if len(exact) == 1:
-            return self._apply(Match(r.txn_id, biz, AUTO, "EXACT_BILL", [(exact[0].id, amt)], payer=exact[0].party))
+            m = Match(r.txn_id, biz, AUTO, "EXACT_BILL", [(exact[0].id, amt)], payer=exact[0].party)
+            return self._finish(m, None, True, r, None)
         sols, done = find_subsets(pool, amt, 6)
         if sols:
             unique = len(sols) == 1 and done
-            return self._apply(Match(r.txn_id, biz, AUTO if unique else SUGGEST, "CLUBBED_BILLS",
-                                     [(d.id, d.remaining) for d in sols[0]], payer=sols[0][0].party))
+            m = Match(r.txn_id, biz, AUTO if unique else SUGGEST, "CLUBBED_BILLS",
+                      [(d.id, d.remaining) for d in sols[0]], payer=sols[0][0].party)
+            return self._finish(m, None, True, r, None)
         return Match(r.txn_id, biz, ASK, "NO_BILL", payer=parties[0], note="supplier known; no open bill fits")
 
     def _finish(self, m: Match, handle, known, r, chq, roundoff_doc=None) -> Match:
+        amt = abs(r.amount)
+        if m.tier == AUTO:
+            if (m.business_id, m.rule) not in _AUTO_QUALIFIED:
+                m.tier = SUGGEST
+                m.note = ((m.note + " · " if m.note else "") +
+                          f"strict rule (D60): {m.rule} requires human confirmation")
+            elif amt >= _AUTO_MAX_AMOUNT:
+                m.tier = SUGGEST
+                m.note = ((m.note + " · " if m.note else "") +
+                          f"amount >= ₹1 Lakh (₹{amt:,.0f}): requires human confirmation")
+
         if m.tier == AUTO and handle and m.payer:
             self.handle_memory.setdefault(handle, m.payer)
         if chq:

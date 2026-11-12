@@ -87,7 +87,8 @@ def test_statutory_guardrails():
     blocked_rec = check_single_receipt_cash(250_000.0, party_name="Apex Retailers")
     assert not blocked_rec.is_safe and blocked_rec.status == "BLOCKED"
     assert "Sec 186" in blocked_rec.citation
-    assert "100%" in blocked_rec.message
+    assert "(to be confirmed by a CA)" in blocked_rec.citation
+    assert "This may attract a penalty; your CA can confirm." in blocked_rec.message
 
     # 2. Section 36(4) (old 40A(3)) - cash expense limits
     safe_exp = check_cash_expense(8_000.0)
@@ -95,7 +96,8 @@ def test_statutory_guardrails():
 
     warn_exp = check_cash_expense(15_000.0, is_transport=False)
     assert not warn_exp.is_safe and warn_exp.status == "WARNING"
-    assert "100% of this expense will be disallowed" in warn_exp.message
+    assert "(to be confirmed by a CA)" in warn_exp.citation
+    assert "This may attract a penalty; your CA can confirm." in warn_exp.message
 
     # Transport goods carriage ceiling (₹35,000)
     safe_trans = check_cash_expense(25_000.0, is_transport=True)
@@ -104,6 +106,8 @@ def test_statutory_guardrails():
     # 3. Section 185 / 188 - cash loans/deposits
     blocked_loan = check_cash_loan(50_000.0, direction="BORROW")
     assert not blocked_loan.is_safe and blocked_loan.status == "BLOCKED"
+    assert "(to be confirmed by a CA)" in blocked_loan.citation
+    assert "This may attract a penalty; your CA can confirm." in blocked_loan.message
 
     # 4. SFT Rule 237 facts (D68)
     sft_info = cash_deposit_reporting_facts(600_000.0, account_type="CURRENT")

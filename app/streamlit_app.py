@@ -180,11 +180,23 @@ showing_partial_view = is_counter_staff or (is_accountant and not share_cash_boo
 st.sidebar.markdown("---")
 lang = st.sidebar.radio("Language / भाषा", ["English", "हिन्दी (Hindi)"], horizontal=True)
 
-# Onboarding Tour Button in Sidebar
-if st.sidebar.button("⚡ Onboarding Tour & Consent", help="Launch the 3-step Account Aggregator consent, live data scan, and AI baseline confirmation"):
-    st.session_state["show_onboarding"] = True
+# ── ONBOARDING STATE & AI-NATIVE PROMPT STATE ────────────────────────────────
+if "show_onboarding" not in st.session_state:
+    st.session_state["show_onboarding"] = False
+if "onboarding_step" not in st.session_state:
     st.session_state["onboarding_step"] = 1
-    st.rerun()
+if "active_copilot_q" not in st.session_state:
+    st.session_state["active_copilot_q"] = None
+
+# Navigation View Selector in Sidebar (Highly Visible Radio)
+st.sidebar.markdown("---")
+view_mode = st.sidebar.radio(
+    "Navigation / दृश्य",
+    ["☀️ Operating Cockpit", "⚡ 3-Step Setup & Consent Tour"],
+    index=1 if st.session_state.get("show_onboarding") else 0,
+    help="Switch between daily cash operations and the 3-step guided setup tour."
+)
+st.session_state["show_onboarding"] = (view_mode == "⚡ 3-Step Setup & Consent Tour")
 
 # Technical / ETL Verification Drawer in Sidebar
 with st.sidebar.expander("🛠️ Data Integrity & Verification Ledger", expanded=False):
@@ -322,56 +334,62 @@ if st.session_state["show_onboarding"]:
     st.stop()
 
 # ── PERSISTENT AI COPILOT COMMAND CENTER (TOP HERO BAR) ───────────────────────
-if not showing_partial_view:
-    current_galla_hero = vault.get_latest_galla(biz)
-    galla_cash_hero = current_galla_hero.counted_cash if current_galla_hero else 0.0
-    bal_hero, _ = copilot.closing_balance(biz)
-    limit_hero = copilot.credit_limit(biz) or 0.0
-    net_bank_hero = bal_hero + limit_hero
-    total_liquidity_hero = net_bank_hero + galla_cash_hero
+current_galla_hero = vault.get_latest_galla(biz)
+galla_cash_hero = current_galla_hero.counted_cash if current_galla_hero else 0.0
+bal_hero, _ = copilot.closing_balance(biz)
+limit_hero = copilot.credit_limit(biz) or 0.0
+net_bank_hero = bal_hero + limit_hero
+total_liquidity_hero = net_bank_hero + (galla_cash_hero if not showing_partial_view else 0.0)
 
+col_hero_text, col_hero_action = st.columns([5, 1])
+with col_hero_text:
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%); border: 1px solid rgba(37, 99, 235, 0.28); border-radius: 16px; padding: 18px 22px; margin-bottom: 18px;">
+    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%); border: 1px solid rgba(37, 99, 235, 0.28); border-radius: 16px; padding: 18px 22px; margin-bottom: 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 1.3rem;">🤖</span>
           <span style="font-size: 1.05rem; font-weight: 700; color: #3B82F6;">Copilot Command Center</span>
-          <span class="sme-badge sme-badge-success">Proactive Morning Debrief</span>
+          <span class="sme-badge sme-badge-success">Proactive Daily Debrief</span>
         </div>
         <span style="font-size: 0.78rem; opacity: 0.8;">English & हिन्दी · Zero Learning Curve</span>
       </div>
       <div style="margin-top: 10px; font-size: 0.88rem; line-height: 1.5;">
-        <b>Namaste Prakash!</b> Total usable liquidity today is <b style="color: #10B981;">{inr(total_liquidity_hero)}</b> (Bank Headroom {inr(net_bank_hero)} + Galla {inr(galla_cash_hero)}).<br/>
-        • <b>1 Oct Salaries (₹3.80L):</b> 100% funded with {inr(net_bank_hero)} headroom safely clear of your CC limit.<br/>
-        • <b>19 Kiranas Overdue >45d:</b> ₹32.1L total. Salesman Ramesh collected ₹25,000 yesterday; not banked yet (excluded from chase).
+        <b>Namaste {config.BUSINESSES[biz].split()[0]}!</b> {'Total usable liquidity today is <b style="color: #10B981;">' + inr(total_liquidity_hero) + '</b> (Bank Headroom ' + inr(net_bank_hero) + ' + Galla ' + inr(galla_cash_hero) + ').' if not showing_partial_view else 'Formal books active: <b style="color: #3B82F6;">' + inr(bal_hero) + '</b> balance.'}<br/>
+        • <b>1 Oct Salaries (₹3.80L):</b> 100% funded with {inr(net_bank_hero)} headroom safely clear of credit limits.<br/>
+        • <b>19 Kiranas Overdue >45d:</b> ₹32.1L total. Salesman collections ready to bank.
       </div>
     </div>
     """, unsafe_allow_html=True)
+with col_hero_action:
+    if st.button("⚡ Setup Tour", key="hero_top_setup_tour_btn", help="Launch the 3-step Account Aggregator consent, live data scan, and AI baseline setup"):
+        st.session_state["show_onboarding"] = True
+        st.session_state["onboarding_step"] = 1
+        st.rerun()
 
-    # Persistent Prompt Chips
-    chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
-    if chip_col1.button("💬 Can I pay salaries on 1 Oct?", key="hero_chip_salary"):
-        st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
-    if chip_col2.button("💬 Who owes me the most?", key="hero_chip_debt"):
-        st.session_state["active_copilot_q"] = "Who owes me the most?"
-    if chip_col3.button("💬 Explain in Hindi (हिन्दी)", key="hero_chip_hindi"):
-        st.session_state["active_copilot_q"] = "Explain my cash position in Hindi."
-    if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
-        st.session_state["active_copilot_q"] = "What is my worst cash dip in the next 90 days?"
+# Persistent Prompt Chips
+chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
+if chip_col1.button("💬 Can I pay salaries on 1 Oct?", key="hero_chip_salary"):
+    st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
+if chip_col2.button("💬 Who owes me the most?", key="hero_chip_debt"):
+    st.session_state["active_copilot_q"] = "Who owes me the most?"
+if chip_col3.button("💬 Explain in Hindi (हिन्दी)", key="hero_chip_hindi"):
+    st.session_state["active_copilot_q"] = "Explain my cash position in Hindi."
+if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
+    st.session_state["active_copilot_q"] = "What is my worst cash dip in the next 90 days?"
 
-    if st.session_state.get("active_copilot_q"):
-        active_q = st.session_state["active_copilot_q"]
-        ans = copilot.ask(biz, active_q, galla_cash=galla_cash_hero)
-        st.markdown(f"""
-        <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <b style="color: #3B82F6; font-size: 0.88rem;">Q: {active_q}</b>
-            <span style="font-size: 0.75rem; color: #10B981; font-weight: 600;">✓ 100% Grounded in Data</span>
-          </div>
-          <p style="margin: 8px 0 4px 0; font-size: 0.88rem; font-weight: 500;">{ans.text}</p>
-          <div style="font-size: 0.75rem; opacity: 0.75;">Sources: HDFC Bank Statements · Cash Drawer Log</div>
-        </div>
-        """, unsafe_allow_html=True)
+if st.session_state.get("active_copilot_q"):
+    active_q = st.session_state["active_copilot_q"]
+    ans = copilot.ask(biz, active_q, galla_cash=galla_cash_hero)
+    st.markdown(f"""
+    <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <b style="color: #3B82F6; font-size: 0.88rem;">Q: {active_q}</b>
+        <span style="font-size: 0.75rem; color: #10B981; font-weight: 600;">✓ 100% Grounded in Data</span>
+      </div>
+      <p style="margin: 8px 0 4px 0; font-size: 0.88rem; font-weight: 500;">{ans.text}</p>
+      <div style="font-size: 0.75rem; opacity: 0.75;">Sources: Bank Statements · Cash Drawer Log</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 tab_home, tab_vault, tab_forecast, tab_queue, tab_recv, tab_ask, tab_scores = st.tabs(
     ["Cash Position", "Cash Book", "90-Day Forecast", "Review queue", "Receivables", "Ask", "Scores"]

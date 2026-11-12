@@ -2,9 +2,9 @@
 from .db import VaultDB
 from .guardrails import (
     audit_capital_infusion,
+    cash_deposit_reporting_facts,
     check_cash_expense,
     check_cash_loan,
-    check_sft_deposit_threshold,
     check_single_receipt_cash,
 )
 from .models import GallaEntry, KhataAccount, RokadEntry, TotalSolvency
@@ -23,7 +23,7 @@ __all__ = [
     "check_single_receipt_cash",
     "check_cash_expense",
     "check_cash_loan",
-    "check_sft_deposit_threshold",
+    "cash_deposit_reporting_facts",
     "audit_capital_infusion",
     "format_whatsapp_reminder",
     "PARTIAL_VIEW_NOTICE",

@@ -7,9 +7,9 @@ from copilot.vault import (
     KhataAccount,
     VaultDB,
     audit_capital_infusion,
+    cash_deposit_reporting_facts,
     check_cash_expense,
     check_cash_loan,
-    check_sft_deposit_threshold,
     check_single_receipt_cash,
     compute_total_solvency,
     format_solvency_report,
@@ -105,10 +105,10 @@ def test_statutory_guardrails():
     blocked_loan = check_cash_loan(50_000.0, direction="BORROW")
     assert not blocked_loan.is_safe and blocked_loan.status == "BLOCKED"
 
-    # 4. SFT Rule 237 / Form 165
-    sft_alert = check_sft_deposit_threshold(600_000.0, current_ytd_cash=4_600_000.0, account_type="CURRENT")
-    assert not sft_alert.is_safe and sft_alert.status == "WARNING"
-    assert "Rule 237" in sft_alert.citation
+    # 4. SFT Rule 237 facts (D68)
+    sft_info = cash_deposit_reporting_facts(600_000.0, account_type="CURRENT")
+    assert sft_info.is_safe and sft_info.status == "INFO"
+    assert "Rule 237" in sft_info.citation
 
 
 def test_capital_infusion_readiness():

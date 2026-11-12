@@ -90,6 +90,10 @@ class VaultDB:
         records = self.galla_records.get(biz, [])
         return records[-1] if records else None
 
+    def get_ytd_cash_deposits(self, biz: str) -> float:
+        """Total cash banked (deposited) recorded in the vault for this business."""
+        return sum(g.cash_banked for g in self.galla_records.get(biz, []))
+
     def get_khata_summary(self, biz: str) -> dict:
         accounts = list(self.khata_records.get(biz, {}).values())
         receivables = sum(a.balance_due for a in accounts if a.balance_due > 0)

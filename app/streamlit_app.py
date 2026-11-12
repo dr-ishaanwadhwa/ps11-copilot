@@ -27,8 +27,8 @@ from copilot.vault import (
     PARTIAL_VIEW_NOTICE,
     VaultDB,
     audit_capital_infusion,
+    cash_deposit_reporting_facts,
     check_cash_expense,
-    check_sft_deposit_threshold,
     check_single_receipt_cash,
     compute_total_solvency,
     format_solvency_report,
@@ -195,20 +195,17 @@ with tab_vault:
                         st.success("Recorded locally in Cash Book. Balance updated.")
 
         with col_audit:
-            st.markdown("### 🏛️ SFT & Pre-Deposit Capital Infusion Checker")
-            st.caption("Rule 237 / Form 165 SFT monitoring.")
+            st.markdown("### 🏛️ Cash deposits this year")
+            ytd_deposits = vault.get_ytd_cash_deposits(biz)
+            is_seeded = (biz in ("SME-1", "SME-3")) or (ytd_deposits > 0)
+            badge = " `Demo data, not from the pilot pack.`" if is_seeded else ""
+            st.markdown(f"**Recorded deposits YTD:** {inr(ytd_deposits)}{badge}")
 
-            dep_amt = st.number_input("Planned Cash Deposit Amount (₹)", value=500000.0, step=50000.0)
-            dep_acct = st.selectbox("Destination Account", ["CURRENT", "SAVINGS"])
-
-            sft_res = check_sft_deposit_threshold(dep_amt, current_ytd_cash=2800000.0, account_type=dep_acct)
-            if sft_res.status == "WARNING":
-                st.warning(f"⚠️ **{sft_res.citation}:** {sft_res.message}")
-            else:
-                st.success(f"✓ {sft_res.message}")
+            facts_res = cash_deposit_reporting_facts(ytd_deposits)
+            st.info(f"ℹ️ **{facts_res.citation}:**\n\n{facts_res.message}")
 
             readiness = audit_capital_infusion(
-                dep_amt,
+                ytd_deposits,
                 has_prior_bank_withdrawal=True,
                 has_retail_collection_chits=True
             )

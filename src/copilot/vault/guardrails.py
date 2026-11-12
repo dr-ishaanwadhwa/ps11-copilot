@@ -16,11 +16,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ..fmt import inr
+
 
 @dataclass
 class ComplianceResult:
     is_safe: bool
-    status: Literal["SAFE", "WARNING", "BLOCKED"]
+    status: Literal["SAFE", "WARNING", "BLOCKED", "INFO"]
     citation: str
     message: str
     lawful_remedy: str = ""
@@ -98,48 +100,25 @@ def check_cash_loan(amount: float, direction: str = "BORROW") -> ComplianceResul
     )
 
 
-# Rule 237 / Rule 159 / Form 165: Annual Statement of Financial Transactions (SFT) cash deposit alerts
-def check_sft_deposit_threshold(
-    deposit_amount: float,
-    current_ytd_cash: float,
+# Rule 237: Annual Statement of Financial Transactions (SFT) cash deposit facts (D68)
+def cash_deposit_reporting_facts(
+    ytd_cash_deposits: float,
     account_type: str = "CURRENT",
     has_pan: bool = True
 ) -> ComplianceResult:
-    new_ytd = current_ytd_cash + deposit_amount
-    limit = 5_000_000.0 if account_type == "CURRENT" else (1_000_000.0 if has_pan else 500_000.0)
-    label = "Current Account (₹50 Lakh)" if account_type == "CURRENT" else ("Savings Account (₹10 Lakh)" if has_pan else "Savings Account without PAN (₹5 Lakh)")
-
-    if new_ytd >= limit:
-        return ComplianceResult(
-            is_safe=False,
-            status="WARNING",
-            citation="Income-tax Rules, 2026 Rule 237 & Rule 159 (Form 165 SFT Reporting)",
-            message=(
-                f"This cash deposit of ₹{deposit_amount:,.0f} pushes your annual aggregate cash deposits to "
-                f"₹{new_ytd:,.0f}, crossing the {label} SFT surveillance threshold. Your bank will report this "
-                f"directly into your Annual Information Statement (AIS)."
-            ),
-            lawful_remedy=(
-                "Ensure verifiable source records exist before banking (prior withdrawal slips, declared B2C cash sales, "
-                "or formal partner capital). Unsubstantiated credits risk 30%–84% tax under Section 195/102."
-            )
-        )
-    elif new_ytd >= limit * 0.80:
-        headroom = limit - new_ytd
-        return ComplianceResult(
-            is_safe=True,
-            status="WARNING",
-            citation="Income-tax Rules, 2026 Rule 237 (Form 165)",
-            message=(
-                f"Annual cash deposits reach ₹{new_ytd:,.0f} (80% of the {label} SFT limit)."
-            ),
-            lawful_remedy="Keep daily counter cash reconciliation slips ready to substantiate sources."
-        )
+    """Facts about bank reporting of cash deposits. No countdown, no remaining amount, no advice."""
+    msg = (
+        f"Cash deposited this financial year: {inr(ytd_cash_deposits)}. "
+        "Banks report yearly cash deposits of ₹10 lakh or more in savings accounts "
+        "(₹5 lakh without PAN) and ₹50 lakh or more in current accounts to the tax department. "
+        "Keep records of where deposited cash came from. Your CA can advise."
+    )
     return ComplianceResult(
         is_safe=True,
-        status="SAFE",
-        citation="Income-tax Rules, 2026 Rule 237",
-        message=f"Annual cash deposits of ₹{new_ytd:,.0f} are within normal SFT parameters (Limit: ₹{limit:,.0f})."
+        status="INFO",
+        citation="Income-tax Rules 2026, Rule 237 (to be confirmed by a CA)",
+        message=msg,
+        lawful_remedy="",
     )
 
 

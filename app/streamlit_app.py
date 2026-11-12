@@ -19,6 +19,7 @@ import urllib.parse
 import altair as alt
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from st_aggrid import AgGrid, GridOptionsBuilder
 
 from copilot import config
@@ -31,8 +32,10 @@ from copilot.load import load_pack
 from copilot.match import match_all
 from copilot.match.audit import select_audit_sample
 from copilot.match.engine import ASK, SUGGEST
-from copilot.receivables import by_customer, open_items, overdue
+from copilot.receivables import by_customer, daily_recovery_candidates, open_items, overdue
 from copilot.score import score_matches, summary
+from copilot.gemini import ocr_collection_slip, transcribe_audio
+from copilot.ingest import parse_bank_statement, parse_tally_xml
 from copilot.vault import (
     Collection,
     VaultDB,
@@ -429,6 +432,152 @@ def answer_galla() -> float:
     return g.counted_cash if g else 0.0
 
 
+def render_audio_briefing(text: str) -> None:
+    """Render a 1-click Web Speech synthesis audio player for the morning briefing."""
+    js_text = text.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
+    play_lbl = "Listen" if not is_hi() else "सुनें"
+    stop_lbl = "Stop" if not is_hi() else "रोकें"
+    title_lbl = "30-sec Daily Audio Briefing" if not is_hi() else "दैनिक नकद ब्रिफिंग (30 सेकंड)"
+    sub_lbl = "(AI voice summary of today's cash)" if not is_hi() else "(आज की नकद स्थिति का संक्षिप्त सारांश)"
+    lang = "hi-IN" if is_hi() else "en-IN"
+
+    html_code = f"""
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#F4F6FB;border:1px solid #D9E2F2;border-radius:8px;padding:8px 14px;font-family:'IBM Plex Sans', -apple-system, sans-serif;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🎙️</span>
+        <span style="font-size:13px;font-weight:600;color:#17191C;">{title_lbl}</span>
+        <span style="font-size:12px;color:#555E68;">{sub_lbl}</span>
+      </div>
+      <button id="speakBtn" onclick="togglePlay()" style="background:#24509A;color:white;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <span id="btnIcon">▶️</span> <span id="btnTxt">{play_lbl}</span>
+      </button>
+    </div>
+    <script>
+      let isPlaying = false;
+      const text = "{js_text}";
+      function togglePlay() {{
+        if (!('speechSynthesis' in window)) {{
+          alert('Speech synthesis is not supported in this browser.');
+          return;
+        }}
+        if (isPlaying) {{
+          window.speechSynthesis.cancel();
+          isPlaying = false;
+          document.getElementById('btnTxt').innerText = "{play_lbl}";
+          document.getElementById('btnIcon').innerText = "▶️";
+        }} else {{
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = "{lang}";
+          u.rate = 1.0;
+          u.onend = function() {{
+            isPlaying = false;
+            document.getElementById('btnTxt').innerText = "{play_lbl}";
+            document.getElementById('btnIcon').innerText = "▶️";
+          }};
+          u.onerror = function() {{
+            isPlaying = false;
+            document.getElementById('btnTxt').innerText = "{play_lbl}";
+            document.getElementById('btnIcon').innerText = "▶️";
+          }};
+          window.speechSynthesis.speak(u);
+          isPlaying = true;
+          document.getElementById('btnTxt').innerText = "{stop_lbl}";
+          document.getElementById('btnIcon').innerText = "⏹️";
+        }}
+      }}
+    </script>
+    """
+    components.html(html_code, height=52)
+
+
+@st.dialog("Daily Recovery Sheet")
+def daily_print_dialog():
+    items = open_items(pack, biz)
+    late = daily_recovery_candidates(pack, biz, min_days=45)
+    total_due = late.outstanding.sum() if not late.empty else 0.0
+
+    st.caption(t("Print or export for godown manager & field salesmen daily collection rounds.",
+                 "गोदाम प्रबंधक और फील्ड सेल्समैन के दैनिक वसूली राउंड के लिए प्रिंट या निर्यात करें।"))
+
+    if late.empty:
+        st.info(t("No customers are overdue past 45 days.", "45 दिन से अधिक का कोई बकाया नहीं है।"))
+        return
+
+    c_btn1, c_btn2 = st.columns([1, 1])
+    csv_data = late[["customer_name", "outstanding", "oldest_days", "invoices"]].copy()
+    csv_data.columns = ["Shop Name", "Outstanding (INR)", "Oldest Days", "Invoices"]
+    csv_data["Visited"] = ""
+    csv_data["Amount Collected"] = ""
+    csv_data["Remarks"] = ""
+    c_btn1.download_button(
+        label=t("📥 Download CSV", "📥 CSV डाउनलोड करें"),
+        data=csv_data.to_csv(index=False),
+        file_name=f"recovery_sheet_{biz}_{config.AS_OF:%Y%m%d}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+    table_rows = ""
+    for idx, (_, r) in enumerate(late.iterrows(), 1):
+        table_rows += (
+            f'<tr style="border-bottom:1px solid #ECECE8;">'
+            f'<td style="padding:6px;text-align:left;">{idx}</td>'
+            f'<td style="padding:6px;font-weight:600;color:#17191C;">{esc(r["customer_name"])}</td>'
+            f'<td style="padding:6px;text-align:right;font-weight:600;color:#17191C;">{inr(r["outstanding"])}</td>'
+            f'<td style="padding:6px;text-align:center;color:#8A5300;">{int(r["oldest_days"])}d</td>'
+            f'<td style="padding:6px;text-align:center;"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #555E68;border-radius:2px;"></span></td>'
+            f'<td style="padding:6px;border-bottom:1px dashed #CCC;width:90px;"></td>'
+            f'<td style="padding:6px;border-bottom:1px dashed #CCC;"></td>'
+            f'</tr>'
+        )
+
+    html_sheet = f"""
+    <div id="printSheet" style="background:#FFF;padding:16px;font-family:'IBM Plex Sans', -apple-system, sans-serif;border:1px solid #E2E2DC;border-radius:8px;margin-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #17191C;padding-bottom:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#17191C;">{esc(BIZ_NAME)}</div>
+          <div style="font-size:13px;font-weight:600;color:#24509A;">DAILY RECOVERY & CHASING SHEET (गोदाम / फील्ड वसूली शीट)</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:600;color:#17191C;">Date: {config.AS_OF:%d %b %Y}</div>
+          <div style="font-size:11px;color:#555E68;">Overdue (45+ Days): {len(late)} shops · Total: {inr(total_due)}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;text-align:right;">
+        <button onclick="window.print()" style="background:#24509A;color:white;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+          🖨️ Print Sheet / PDF
+        </button>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;">
+        <thead>
+          <tr style="background:#F4F4F1;border-bottom:1px solid #17191C;">
+            <th style="padding:6px;text-align:left;width:30px;">#</th>
+            <th style="padding:6px;text-align:left;">Retailer / Shop</th>
+            <th style="padding:6px;text-align:right;width:95px;">Due (₹)</th>
+            <th style="padding:6px;text-align:center;width:55px;">Age</th>
+            <th style="padding:6px;text-align:center;width:50px;">Visit</th>
+            <th style="padding:6px;text-align:left;width:90px;">Recvd (₹)</th>
+            <th style="padding:6px;text-align:left;">Salesman Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table_rows}
+        </tbody>
+      </table>
+
+      <div style="display:flex;justify-content:space-between;gap:20px;margin-top:24px;padding-top:16px;border-top:1px solid #17191C;font-size:11px;">
+        <div><b>Salesman Sign:</b> ___________________</div>
+        <div><b>Godown Manager Sign:</b> ___________________</div>
+        <div><b>Cashier Sign:</b> ___________________</div>
+      </div>
+    </div>
+    """
+    components.html(html_sheet, height=450, scrolling=True)
+
+
 # ── PAGE: OVERVIEW ───────────────────────────────────────────────────────────
 def page_overview():
     page_header(t("Overview", "अवलोकन"), t(f"Namaste, {BIZ_NAME}. Your position on {config.AS_OF:%d %b %Y}.",
@@ -439,6 +588,11 @@ def page_overview():
 
     if showing_partial_view:
         render_partial_view_notice()
+        if is_hi():
+            p_text = f"नमस्ते {BIZ_NAME}। बैंक बैलेंस {inr(bal)} है। कुल इनवॉइस बकाया {inr(items.outstanding.sum())} है।"
+        else:
+            p_text = f"Good morning, {BIZ_NAME}. Bank balance is {inr(bal)}. Formal receivables total {inr(items.outstanding.sum())}."
+        render_audio_briefing(p_text)
         H(f'<div class="cc-label">{t("Formal cash position, bank alone", "औपचारिक बैंक नकद स्थिति")}</div>')
         parts = [tile(t(f"Bank balance, {config.AS_OF:%d %b %Y}", f"बैंक बैलेंस, {config.AS_OF:%d %b %Y}"), inr(bal))]
         if limit:
@@ -488,6 +642,22 @@ def page_overview():
         runway = solvency.true_cash_runway_inr
         total_liquid = solvency.net_bank_liquidity + solvency.galla_cash
         unused_limit = max(0.0, solvency.cc_limit - solvency.cc_drawn)
+        sal = copilot.can_pay_salaries(biz, galla_cash=answer_galla())
+        cust = by_customer(items)
+        late = cust[cust.oldest_days >= 45]
+
+        if is_hi():
+            b_sal = "1 अक्टूबर की सैलरी सुरक्षित है।" if sal.numbers["yes"] else "1 अक्टूबर की सैलरी के लिए योजना जरूरी है।"
+            b_late = f"बाजार में {len(late)} दुकानों पर कुल {inr(late.outstanding.sum())} बकाया है।" if len(late) else "बाजार उधारी सामान्य है।"
+            briefing_text = (f"शुभ प्रभात {BIZ_NAME}। आज आपके पास कुल {inr(total_liquid)} खर्च करने योग्य नकदी है। "
+                             f"30 दिन का शुद्ध नकद सुरक्षा बफर {inr(runway)} है। {b_sal} {b_late} आपका दिन शुभ हो।")
+        else:
+            b_sal = "October 1 salaries are covered." if sal.numbers["yes"] else "October 1 salaries need cash planning."
+            b_late = f"You have {len(late)} shops with 45+ day dues totaling {inr(late.outstanding.sum())}." if len(late) else "All receivables are within credit cycles."
+            briefing_text = (f"Good morning, {BIZ_NAME}. Today you have {inr(total_liquid)} usable cash. "
+                             f"Your 30-day own-cash buffer is {inr(runway)}. {b_sal} {b_late} Have a productive day.")
+
+        render_audio_briefing(briefing_text)
 
         with hero_box:
             if solvency.cc_limit > 0:
@@ -590,6 +760,15 @@ def page_overview():
                     t("Salesman slips let cash deposits link to the right shop invoices.",
                       "सेल्समैन की पर्चियों से कैश जमा सीधे सही दुकान के इनवॉइस से जुड़ जाता है।"),
                     t("Record slips", "पर्ची दर्ज करें"), PAGES["cash"])
+        if len(late):
+            with st.container(key="row_recovery_sheet"):
+                r_a, r_b = st.columns([5, 1.6], vertical_alignment="center")
+                with r_a:
+                    H(f'<div class="cc-row-title">{t("Daily Field Recovery Sheet (गोदाम / फील्ड वसूली शीट)", "दैनिक फील्ड वसूली शीट (गोदाम)")}</div>'
+                      f'<div class="cc-row-detail">{t(f"Print or export today\'s {len(late)} overdue retailers with checkmarks and signature lines.", f"45+ दिन पुराने {len(late)} बकायेदारों की प्रिंट शीट, चेकबॉक्स और हस्ताक्षर सहित।")}</div>')
+                with r_b:
+                    if st.button(t("Print Sheet", "शीट प्रिंट करें"), key="btn_ov_print_sheet", use_container_width=True):
+                        daily_print_dialog()
 
     st.write("")
     left, right = st.columns([2, 1], gap="large")
@@ -659,12 +838,31 @@ def day_close_dialog():
 @st.dialog("Record collection slips")
 def collections_dialog():
     H(f'<div class="cc-muted">{t("What each salesman collected from shops. Used to match cash deposits to invoices.", "दुकानों से सेल्समैन द्वारा की गई वसूली। बैंक जमा को इनवॉइस से जोड़ने के लिए उपयोगी।")}</div>')
+
+    # ── VISION OCR: CAMERA / FILE UPLOAD ──
+    slip_file = st.file_uploader(t("📷 Scan handwritten slip photo (Optional)", "📷 हाथ से लिखी पर्ची की फोटो खींचें (वैकल्पिक)"),
+                                 type=["jpg", "jpeg", "png", "webp"], key="_slip_upload_img")
+    prefill_shop = "Laxmi Kirana Stores"
+    prefill_amount = 15000.0
+    prefill_salesman = "Ramesh K."
+    if slip_file:
+        with st.spinner(t("Scanning slip with Gemini Vision…", "Gemini AI से पर्ची पढ़ी जा रही है…")):
+            ocr_data = ocr_collection_slip(slip_file.read(), mime_type=slip_file.type or "image/jpeg")
+            if ocr_data.get("shop"):
+                prefill_shop = ocr_data["shop"]
+            if ocr_data.get("amount"):
+                prefill_amount = float(ocr_data["amount"])
+            if ocr_data.get("salesman"):
+                prefill_salesman = ocr_data["salesman"]
+            st.success(t(f"Extracted: {prefill_shop} · {inr(prefill_amount)} · {prefill_salesman}",
+                         f"पहचाना गया: {prefill_shop} · {inr(prefill_amount)} · {prefill_salesman}"))
+
     with st.form("collections_today_form", border=False):
         c1, c2 = st.columns(2)
         col_date = c1.date_input(t("Collection date", "वसूली की तारीख"), value=pd.Timestamp("2026-09-30"))
-        salesman = c2.text_input(t("Salesman", "सेल्समैन का नाम"), value="Ramesh K.")
+        salesman = c2.text_input(t("Salesman", "सेल्समैन का नाम"), value=prefill_salesman)
         rows = []
-        for i, (shop, amount) in enumerate([("Laxmi Kirana Stores", 15000.0), ("", 0.0), ("", 0.0)], start=1):
+        for i, (shop, amount) in enumerate([(prefill_shop, prefill_amount), ("", 0.0), ("", 0.0)], start=1):
             a, b = st.columns([2, 1])
             rows.append((a.text_input(t(f"Shop {i}" + (" (optional)" if i > 1 else ""), f"दुकान {i}" + (" (वैकल्पिक)" if i > 1 else "")), value=shop),
                          b.number_input(t(f"Amount {i} (₹)", f"रकम {i} (₹)"), value=amount, step=500.0)))
@@ -1029,9 +1227,14 @@ def page_receivables():
     }
     head = st.container()
     def_f = t("Over 45 days", "45 दिन से पुराने")
-    choice = st.segmented_control("Chasing filter", list(filters), selection_mode="single", default=def_f, key="chase_filter",
-                                  format_func=lambda o: f"{o}  {len(filters[o])}",
-                                  label_visibility="collapsed") or def_f
+    c_f1, c_f2 = st.columns([3, 1.4], vertical_alignment="center")
+    with c_f1:
+        choice = st.segmented_control("Chasing filter", list(filters), selection_mode="single", default=def_f, key="chase_filter",
+                                      format_func=lambda o: f"{o}  {len(filters[o])}",
+                                      label_visibility="collapsed") or def_f
+    with c_f2:
+        if st.button(t("🖨️ Daily Recovery Sheet", "🖨️ दैनिक वसूली शीट"), key="btn_open_print_sheet", use_container_width=True):
+            daily_print_dialog()
     filtered_cust = filters[choice]
     with head:
         H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Who to call this week", "इस हफ्ते किन ग्राहकों से वसूली करनी है")}</div>'
@@ -1128,6 +1331,16 @@ def page_ask():
                     c1.text_input(t("Your question", "आपका सवाल"), key="ask_typed",
                                   placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
                     c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True, on_click=_submit_typed)
+
+                with st.expander(t("🎙️ Speak your question (माइक से बोलें)", "🎙️ माइक से बोलकर पूछें")):
+                    rec_audio = st.audio_input(t("Record voice question", "आवाज़ रिकॉर्ड करें"), key="mic_audio_input")
+                    if rec_audio:
+                        with st.spinner(t("Transcribing with Gemini Voice…", "आवाज़ समझी जा रही है…")):
+                            transcribed = transcribe_audio(rec_audio.read(), mime_type=rec_audio.type or "audio/wav")
+                            if transcribed:
+                                st.session_state["ask_q"] = transcribed
+                                st.session_state["ask_typed"] = transcribed
+                                st.rerun()
 
             chips = ASK_CHIPS_HI if is_hi() else ASK_CHIPS
             st.pills(t("Try one of these", "इनमें से कोई सवाल चुनें") if not PUBLIC else t("Choose a question", "सवाल चुनें"),
@@ -1301,6 +1514,30 @@ def page_setup():
                 if rep["balance_ties"]:
                     H(f'<div class="cc-row-title" style="color:#1A6E45;margin-top:16px">{svg(ICON_CHECK_CIRCLE, 18)}'
                       f'Every line ties to its running balance. Matching is ready.</div>')
+
+                with st.expander(t("📁 Upload Live Statement or Tally Prime XML", "📁 लाइव बैंक स्टेटमेंट या टैली XML अपलोड करें")):
+                    st.caption(t("Upload your real bank CSV/Excel or Tally Prime XML export to verify balance ties and open bills.",
+                                 "बैलेंस मिलान और इनवॉइस जांचने के लिए बैंक स्टेटमेंट (CSV/Excel) या टैली XML अपलोड करें।"))
+                    u_file = st.file_uploader(t("Choose statement or Tally XML", "फाइल चुनें"), type=["csv", "xlsx", "xls", "xml"], key="setup_upload_file")
+                    if u_file:
+                        fn = u_file.name.lower()
+                        if fn.endswith((".csv", ".xlsx", ".xls")):
+                            try:
+                                parse_res = parse_bank_statement(u_file.read(), u_file.name)
+                                st.success(t(f"Successfully read {parse_res['rows_read']} rows! Running balances tie: {parse_res['balance_ties']}. Total credits: {inr(parse_res['summary']['total_credits'])}, Total debits: {inr(parse_res['summary']['total_debits'])}.",
+                                             f"{parse_res['rows_read']} प्रविष्टियां सफलतापूर्वक पढ़ी गईं! बैलेंस मिलान: {parse_res['balance_ties']}। कुल जमा: {inr(parse_res['summary']['total_credits'])}, कुल निकासी: {inr(parse_res['summary']['total_debits'])}।"))
+                                st.dataframe(parse_res["df"].head(10), use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error parsing statement: {e}")
+                        elif fn.endswith(".xml"):
+                            try:
+                                t_df = parse_tally_xml(u_file.read())
+                                st.success(t(f"Successfully extracted {len(t_df)} bill-wise records from Tally Prime XML!",
+                                             f"टैली XML से {len(t_df)} बिल-वार प्रविष्टियां सफलतापूर्वक प्राप्त की गईं!"))
+                                st.dataframe(t_df.head(10), use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error parsing Tally XML: {e}")
+
                 H('<div class="cc-rule" style="margin:22px 0 14px"></div>')
                 c1, c2, _ = st.columns([1, 1, 3])
                 if c1.button("Continue", type="primary", key="onb_step2_next", use_container_width=True):

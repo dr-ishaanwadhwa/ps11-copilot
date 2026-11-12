@@ -7,7 +7,7 @@ from copilot.categorise import score_categories
 from copilot.checks import balance_breaks, import_report
 from copilot.fmt import inr
 from copilot.match.engine import AUTO, NO_DOC, Doc, find_subsets
-from copilot.receivables import open_items, overdue
+from copilot.receivables import daily_recovery_candidates, open_items, overdue
 from copilot.score import score_matches
 
 
@@ -150,4 +150,14 @@ def test_deep_copilot_with_vault(pack):
     assert a_sol.intent == "FACT"
     assert "runway buffer" in a_sol.text
     assert a_sol.numbers["runway_inr"] > 0
+
+
+def test_daily_recovery_candidates(pack):
+    """Test field chasing recovery sheet extraction for 45+ day dues."""
+    candidates = daily_recovery_candidates(pack, "SME-1", min_days=45)
+    assert not candidates.empty
+    assert len(candidates) == 19
+    assert (candidates.oldest_days >= 45).all()
+    assert candidates.outstanding.sum() > 0
+
 

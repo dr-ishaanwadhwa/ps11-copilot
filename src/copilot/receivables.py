@@ -31,3 +31,11 @@ def by_customer(items: pd.DataFrame) -> pd.DataFrame:
 
 def overdue(items: pd.DataFrame, days: int = 60) -> pd.DataFrame:
     return items[items.days_overdue > days]
+
+
+def daily_recovery_candidates(pack: Pack, business_id: str, min_days: int = 45) -> pd.DataFrame:
+    """Return customer overdue summary for field collection chasing (min_days+ overdue)."""
+    items = open_items(pack, business_id)
+    cust = by_customer(items)
+    return cust[cust.oldest_days >= min_days].copy()
+

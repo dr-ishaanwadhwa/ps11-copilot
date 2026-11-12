@@ -426,15 +426,20 @@ if chip_col4.button("💬 Worst 90-day dip?", key="hero_chip_dip"):
 if st.session_state.get("active_copilot_q"):
     active_q = st.session_state["active_copilot_q"]
     ans = copilot.ask(biz, active_q, galla_cash=galla_cash_hero)
+
+    from copilot.ai_client import get_ai_client
+    ai_label = get_ai_client().get_provider_label()
+    source_tag = f"✨ Grounded AI ({ai_label})" if ans.intent == "FACT_AI" else "✓ Verified Ledger Fact"
+
     q_col, d_col = st.columns([11, 1])
     with q_col:
         st.markdown(f"""
         <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 12px 16px; margin: 4px 0 10px 0;">
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
             <span style="font-weight: 600; font-size: 0.84rem; color: #3B82F6;">{active_q}</span>
-            <span style="font-size: 0.72rem; opacity: 0.7;">Verified Ledger Sources</span>
+            <span style="font-size: 0.72rem; color: #10B981; font-weight: 500;">{source_tag}</span>
           </div>
-          <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500;">{ans.text}</p>
+          <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500; line-height: 1.5;">{ans.text}</p>
         </div>
         """, unsafe_allow_html=True)
     with d_col:

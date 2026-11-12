@@ -3,6 +3,7 @@
 Uses claude-opus-5-5 with low effort structured output on masked queries.
 Fails closed: returns None on any connection error, rate limit, refusal, or missing key.
 """
+import os
 from typing import Literal
 import anthropic
 from pydantic import BaseModel
@@ -64,31 +65,42 @@ Illustrative examples:
 def classify(
     question: str, known_names: list[str], client: anthropic.Anthropic | None = None
 ) -> RouterDecision | None:
-    """Classify user question using Claude structured outputs on masked text (Task 3.3).
+    """Classify user question using Claude structured outputs or multi-provider AI on masked text (Task 3.3).
     
     Returns None when the model is unavailable or declines; callers must fail closed.
     """
-    try:
-        client = client or anthropic.Anthropic()
-        response = client.with_options(timeout=8.0).messages.parse(
-            model="claude-opus-5-5",
-            max_tokens=2048,
-            system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": mask(question, known_names)}],
-            output_format=RouterDecision,
-            output_config={"effort": "low"},
-        )
-    except (
-        anthropic.APIConnectionError,
-        anthropic.RateLimitError,
-        anthropic.APIStatusError,
-        anthropic.AuthenticationError,
-    ):
-        return None
-    except Exception:
-        return None
+    masked_q = mask(question, known_names)
 
-    if getattr(response, "stop_reason", None) == "refusal":
-        return None
+    # When a custom/mock client is explicitly supplied, route via Anthropic protocol
+    if client is not None or os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            anthropic_client = client or anthropic.Anthropic()
+            response = anthropic_client.with_options(timeout=8.0).messages.parse(
+                model="claude-opus-5-5",
+                max_tokens=2048,
+                system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
+                messages=[{"role": "user", "content": masked_q}],
+                output_format=RouterDecision,
+                output_config={"effort": "low"},
+            )
+            if getattr(response, "stop_reason", None) == "refusal":
+                return None
+            return getattr(response, "parsed_output", None)
+        except (
+            anthropic.APIConnectionError,
+            anthropic.RateLimitError,
+            anthropic.APIStatusError,
+            anthropic.AuthenticationError,
+        ):
+            return None
+        except Exception:
+            return None
 
-    return getattr(response, "parsed_output", None)
+    # Multi-provider fallback (Mistral / OpenRouter)
+    from .ai_client import get_ai_client
+
+    ai = get_ai_client()
+    if ai.is_configured:
+        return ai.classify_intent(masked_q)
+
+    return None

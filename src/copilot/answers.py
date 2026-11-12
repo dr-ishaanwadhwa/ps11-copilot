@@ -80,7 +80,7 @@ class Copilot:
                        "galla_cash": round(galla_cash), "yes": yes})
 
     def ask(self, biz: str, question: str, galla_cash: float = 0.0) -> Answer:
-        r = route(question)
+        r = route(question, use_llm=True)
         if r.intent != "FACT":
             facts = []
             if r.intent in ("LOAN", "JUDGE_PERSON", "SEND"):
@@ -106,4 +106,48 @@ class Copilot:
             sol = self.vault.compute_solvency(self.pack, biz)
             text = f"Your true cash runway buffer is {inr(sol.true_cash_runway_inr)} (Net bank liquidity: {inr(sol.net_bank_liquidity)}, drawer cash: {inr(sol.galla_cash)})."
             return Answer(text, "FACT", [f"SOLVENCY-{biz}"], {"runway_inr": sol.true_cash_runway_inr, "bank_liquidity": sol.net_bank_liquidity, "galla_cash": sol.galla_cash})
+
+        # Grounded AI Copilot for general SME queries
+        from .ai_client import get_ai_client
+
+        ai = get_ai_client()
+        if ai.is_configured:
+            biz_name = config.BUSINESSES.get(biz, biz)
+            bal, _ = self.closing_balance(biz)
+            limit = self.credit_limit(biz)
+            headroom = bal + limit
+            items = open_items(self.pack, biz)
+            total_recv = float(items.outstanding.sum())
+            overdue_count = len(items[items.days_open > 45])
+
+            galla_val = galla_cash
+            solvency_info = ""
+            if self.vault:
+                latest_g = self.vault.get_latest_galla(biz)
+                if latest_g and galla_val == 0.0:
+                    galla_val = latest_g.counted_cash
+                sol = self.vault.compute_solvency(self.pack, biz)
+                solvency_info = (
+                    f"- 30-Day Solvency Runway Buffer: {inr(sol.true_cash_runway_inr)}\n"
+                    f"- Expected informal khata inflows: {inr(sol.total_expected_inflows)}\n"
+                    f"- 30-Day commitments: {inr(sol.total_commitments)}\n"
+                )
+
+            facts = (
+                f"- Business: {biz_name}\n"
+                f"- Closing Bank Balance (as of {config.AS_OF:%d %b %Y}): {inr(bal)}\n"
+                f"- Sanctioned Credit Limit: {inr(limit)} (Net Headroom: {inr(headroom)})\n"
+                f"- Physical Cash in Shop Drawer (Galla): {inr(galla_val)}\n"
+                f"- Total Formal Receivables: {inr(total_recv)} across {len(items)} invoices ({overdue_count} > 45 days)\n"
+                f"{solvency_info}"
+            )
+            ai_ans = ai.generate_grounded_answer(biz_name, question, facts)
+            if ai_ans:
+                return Answer(
+                    ai_ans,
+                    "FACT_AI",
+                    sources=[f"BANK-{biz}", f"LEDGER-{biz}"],
+                    numbers={"closing_balance": bal, "headroom": headroom, "galla_cash": galla_val},
+                )
+
         return Answer("I can't answer that yet in this version. It's on the list for the next release.", "UNSUPPORTED")

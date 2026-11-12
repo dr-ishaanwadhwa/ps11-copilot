@@ -50,7 +50,7 @@ PUBLIC = os.environ.get("COPILOT_PUBLIC") == "1"
 # ── GLOBAL SME FINTECH STYLING ─────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   html, body, [class*="css"] {
       font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -59,17 +59,49 @@ st.markdown("""
   /* Indian numbering tabular figures */
   .stMetric, .metric-val, [data-testid="stMetricValue"] {
       font-variant-numeric: tabular-nums !important;
+      font-family: 'IBM Plex Sans', sans-serif !important;
+  }
+
+  /* Sleek Modern Fintech Metric Cards */
+  [data-testid="stMetric"] {
+      background: rgba(255, 255, 255, 0.02) !important;
+      border: 1px solid rgba(255, 255, 255, 0.09) !important;
+      border-radius: 12px !important;
+      padding: 12px 16px !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease !important;
+  }
+  [data-testid="stMetric"]:hover {
+      border-color: rgba(59, 130, 246, 0.35) !important;
+      background: rgba(255, 255, 255, 0.035) !important;
+  }
+  [data-testid="stMetricLabel"] {
+      font-size: 0.74rem !important;
+      font-weight: 600 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+      color: #94A3B8 !important;
+  }
+  [data-testid="stMetricValue"] {
+      font-size: 1.55rem !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.02em !important;
+      color: #F8FAFC !important;
+  }
+  [data-testid="stMetricDelta"] {
+      font-size: 0.78rem !important;
+      font-weight: 500 !important;
   }
 
   /* 44px minimum touch targets for high-frequency actions */
   button[data-testid="baseButton-secondary"],
   button[data-testid="baseButton-primary"],
   [data-testid="stLinkButton"] a {
-      min-height: 44px !important;
+      min-height: 40px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      border-radius: 10px !important;
+      border-radius: 9px !important;
       font-weight: 500 !important;
       cursor: pointer !important;
       touch-action: manipulation !important;
@@ -83,38 +115,50 @@ st.markdown("""
       outline-offset: 2px !important;
   }
 
-  /* Honor user accessibility preferences for motion */
-  @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-          scroll-behavior: auto !important;
-      }
+  /* Clean Modern Streamlit Tabs */
+  .stTabs [data-baseweb="tab-list"] {
+      gap: 6px !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      padding-bottom: 6px !important;
+      margin-top: 6px !important;
+  }
+  .stTabs [data-baseweb="tab"] {
+      height: 38px !important;
+      border-radius: 8px !important;
+      padding: 6px 14px !important;
+      font-size: 0.84rem !important;
+      font-weight: 500 !important;
+      color: #94A3B8 !important;
+      background: transparent !important;
+      border: none !important;
+      transition: all 0.15s ease !important;
+  }
+  .stTabs [data-baseweb="tab"]:hover {
+      color: #F8FAFC !important;
+      background: rgba(255, 255, 255, 0.04) !important;
+  }
+  .stTabs [aria-selected="true"] {
+      color: #FFFFFF !important;
+      background: rgba(37, 99, 235, 0.14) !important;
+      border: 1px solid rgba(37, 99, 235, 0.32) !important;
+      font-weight: 600 !important;
   }
 
-  /* SME Cards - Calm & Restful */
-  .sme-hero-card {
+  /* Executive Cards */
+  .sme-exec-card {
       background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 14px;
-      padding: 16px 20px;
-      margin-bottom: 14px;
+      border-radius: 12px;
+      padding: 12px 16px;
+      min-height: 104px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   }
 
   .sme-card {
       background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(148, 163, 184, 0.16);
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-  }
-
-  .sme-hero-headline {
-      font-size: 1.8rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 2px 0;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 11px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
   }
 
   /* Semantic badges with calm contrast */
@@ -148,6 +192,22 @@ st.markdown("""
       background: rgba(59, 130, 246, 0.1);
       color: #3B82F6;
       border: 1px solid rgba(59, 130, 246, 0.25);
+  }
+
+  /* Prompt pill buttons styling */
+  div[data-testid="stHorizontalBlock"] button[data-testid="baseButton-secondary"] {
+      border-radius: 20px !important;
+      font-size: 0.78rem !important;
+      padding: 4px 12px !important;
+      min-height: 34px !important;
+      background: rgba(255, 255, 255, 0.03) !important;
+      border: 1px solid rgba(255, 255, 255, 0.09) !important;
+      color: #CBD5E1 !important;
+  }
+  div[data-testid="stHorizontalBlock"] button[data-testid="baseButton-secondary"]:hover {
+      border-color: rgba(59, 130, 246, 0.45) !important;
+      background: rgba(59, 130, 246, 0.09) !important;
+      color: #FFFFFF !important;
   }
 </style>
 """, unsafe_allow_html=True)
@@ -421,17 +481,17 @@ else:
 col_hero_status, col_hero_action = st.columns([3, 2])
 with col_hero_status:
     st.markdown(f"""
-    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid {hero_border_color}; border-radius: 12px; padding: 12px 16px; min-height: 98px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+    <div class="sme-exec-card" style="border: 1px solid {hero_border_color};">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
         <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: {'#10B981' if is_safe else '#F59E0B'};">
-          ● {config.BUSINESSES[biz]} · {'नकद स्थिति' if is_hindi else 'Daily Cash Status'}
+          ● {config.BUSINESSES[biz]} · {'नकद स्थिति' if is_hindi else 'Daily Cash Health'}
         </span>
         <span class="sme-badge {hero_badge_class}">{payroll_badge_text}</span>
       </div>
-      <div style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0;">
+      <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin: 3px 0 4px 0;">
         {hero_title}
       </div>
-      <div style="font-size: 0.82rem; opacity: 0.85; line-height: 1.4;">
+      <div style="font-size: 0.83rem; opacity: 0.86; line-height: 1.45;">
         {hero_subtitle}
       </div>
     </div>
@@ -439,12 +499,12 @@ with col_hero_status:
 
 with col_hero_action:
     st.markdown(f"""
-    <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 12px 16px; min-height: 98px; display: flex; flex-direction: column; justify-content: space-between;">
-      <div>
-        <span class="sme-badge sme-badge-info" style="font-size: 0.68rem;">{act_title}</span>
-        <div style="font-size: 0.95rem; font-weight: 700; margin: 3px 0 1px 0;">{act_headline}</div>
-        <div style="font-size: 0.78rem; opacity: 0.82;">{act_desc}</div>
+    <div class="sme-exec-card" style="border: 1px solid rgba(59, 130, 246, 0.28); background: rgba(59, 130, 246, 0.04);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <span class="sme-badge sme-badge-info">{act_title}</span>
       </div>
+      <div style="font-size: 0.98rem; font-weight: 700; margin: 3px 0 2px 0;">{act_headline}</div>
+      <div style="font-size: 0.79rem; opacity: 0.82; line-height: 1.4;">{act_desc}</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -674,11 +734,11 @@ with tab_home:
             wa_text = f"Namaste {c_name}, {config.BUSINESSES.get(biz, biz)} se namaskar. Aapka pichla bill {inr(c_amt)} ka baaki hai. Kripya check kar lijiye. UPI: payment@bank"
             wa_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
             
-            col_t1, col_t2, col_t3 = st.columns([3, 2, 2])
+            col_t1, col_t2, col_t3 = st.columns([4, 2, 2])
             with col_t1:
-                st.markdown(f"**{c_name}** <span style='font-size:0.75rem; opacity:0.75;'>({c_oldest}d)</span>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 6px;'><b>{c_name}</b> <span class='sme-badge sme-badge-danger' style='margin-left: 6px;'>{c_oldest}d open</span></div>", unsafe_allow_html=True)
             with col_t2:
-                st.markdown(f"**{inr(c_amt)}**")
+                st.markdown(f"<div style='padding-top: 6px; font-weight: 700; font-size: 1.05rem;'>{inr(c_amt)}</div>", unsafe_allow_html=True)
             with col_t3:
                 btn_label = "📲 WhatsApp" if not is_hindi else "📲 WhatsApp"
                 st.link_button(btn_label, wa_url, use_container_width=True)

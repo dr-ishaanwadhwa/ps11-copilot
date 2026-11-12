@@ -34,19 +34,36 @@ def evaluate_warnings(
 
     # ── Trigger 1: Credit Limit Headroom (SME-1 distributor) ──────────────────────────
     if credit_limit > 0:
-        for p in daily_points:
-            headroom_p50 = credit_limit + p.balance_p50
-            headroom_p10 = credit_limit + p.balance_p10
-            is_likely = headroom_p50 < credit_headroom_floor
-            is_possible = headroom_p10 < credit_headroom_floor
-
-            if is_likely or is_possible:
-                level = "LIKELY" if is_likely else "POSSIBLE"
-                swings = _select_top_swings(candidate_swings, p.date)
+        likely_p = next((p for p in daily_points if (credit_limit + p.balance_p50) < credit_headroom_floor), None)
+        if likely_p is not None:
+            swings = _select_top_swings(candidate_swings, likely_p.date)
+            msg = _format_warning_message(
+                trigger_title="Credit limit",
+                date=likely_p.date,
+                val_str=f"headroom is projected at {inr(credit_limit + likely_p.balance_p50)}",
+                floor_str=inr(credit_headroom_floor),
+                swings=swings,
+            )
+            warnings.append(
+                WarningCard(
+                    trigger_type="CREDIT_LIMIT",
+                    trigger_name="Credit limit headroom",
+                    level="LIKELY",
+                    warning_date=likely_p.date,
+                    projected_value=credit_limit + likely_p.balance_p50,
+                    threshold=credit_headroom_floor,
+                    swing_items=swings,
+                    message=msg,
+                )
+            )
+        else:
+            possible_p = next((p for p in daily_points if (credit_limit + p.balance_p10) < credit_headroom_floor), None)
+            if possible_p is not None:
+                swings = _select_top_swings(candidate_swings, possible_p.date)
                 msg = _format_warning_message(
                     trigger_title="Credit limit",
-                    date=p.date,
-                    val_str=f"headroom is projected at {inr(headroom_p50 if is_likely else headroom_p10)}",
+                    date=possible_p.date,
+                    val_str=f"headroom is projected at {inr(credit_limit + possible_p.balance_p10)}",
                     floor_str=inr(credit_headroom_floor),
                     swings=swings,
                 )
@@ -54,15 +71,14 @@ def evaluate_warnings(
                     WarningCard(
                         trigger_type="CREDIT_LIMIT",
                         trigger_name="Credit limit headroom",
-                        level=level,
-                        warning_date=p.date,
-                        projected_value=headroom_p50 if is_likely else headroom_p10,
+                        level="POSSIBLE",
+                        warning_date=possible_p.date,
+                        projected_value=credit_limit + possible_p.balance_p10,
                         threshold=credit_headroom_floor,
                         swing_items=swings,
                         message=msg,
                     )
                 )
-                break  # Fire once for the first breach
 
     # ── Trigger 2: Salary Day Run (Every business) ────────────────────────────────────
     for sal_date in salary_dates:
@@ -99,17 +115,36 @@ def evaluate_warnings(
 
     # ── Trigger 3: Owner Floor ────────────────────────────────────────────────────────
     if owner_floor > 0:
-        for p in daily_points:
-            is_likely = p.balance_p50 < owner_floor
-            is_possible = p.balance_p10 < owner_floor
-
-            if is_likely or is_possible:
-                level = "LIKELY" if is_likely else "POSSIBLE"
-                swings = _select_top_swings(candidate_swings, p.date)
+        likely_p = next((p for p in daily_points if p.balance_p50 < owner_floor), None)
+        if likely_p is not None:
+            swings = _select_top_swings(candidate_swings, likely_p.date)
+            msg = _format_warning_message(
+                trigger_title="Owner floor",
+                date=likely_p.date,
+                val_str=f"projected balance is {inr(likely_p.balance_p50)}",
+                floor_str=inr(owner_floor),
+                swings=swings,
+            )
+            warnings.append(
+                WarningCard(
+                    trigger_type="OWNER_FLOOR",
+                    trigger_name="Owner minimum floor",
+                    level="LIKELY",
+                    warning_date=likely_p.date,
+                    projected_value=likely_p.balance_p50,
+                    threshold=owner_floor,
+                    swing_items=swings,
+                    message=msg,
+                )
+            )
+        else:
+            possible_p = next((p for p in daily_points if p.balance_p10 < owner_floor), None)
+            if possible_p is not None:
+                swings = _select_top_swings(candidate_swings, possible_p.date)
                 msg = _format_warning_message(
                     trigger_title="Owner floor",
-                    date=p.date,
-                    val_str=f"projected balance is {inr(p.balance_p50 if is_likely else p.balance_p10)}",
+                    date=possible_p.date,
+                    val_str=f"projected balance is {inr(possible_p.balance_p10)}",
                     floor_str=inr(owner_floor),
                     swings=swings,
                 )
@@ -117,15 +152,14 @@ def evaluate_warnings(
                     WarningCard(
                         trigger_type="OWNER_FLOOR",
                         trigger_name="Owner minimum floor",
-                        level=level,
-                        warning_date=p.date,
-                        projected_value=p.balance_p50 if is_likely else p.balance_p10,
+                        level="POSSIBLE",
+                        warning_date=possible_p.date,
+                        projected_value=possible_p.balance_p10,
                         threshold=owner_floor,
                         swing_items=swings,
                         message=msg,
                     )
                 )
-                break
 
     return warnings
 

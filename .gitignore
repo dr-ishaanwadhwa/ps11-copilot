@@ -18,6 +18,7 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .streamlit/secrets.toml
+scripts/out/
 *.json
 !pyproject.json
 .DS_Store

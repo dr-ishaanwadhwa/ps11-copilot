@@ -1,9 +1,17 @@
-# The PS-11 data pack and any client data never go in git (PRD NFR-PRIV; data handling, guide s.8)
+# Spreadsheets, CSV, Word and PDFs are blocked by default
 *.xlsx
 *.xls
 *.csv
 *.pdf
-data/
+*.docx
+*.doc
+
+# Allow only the three PS-11 data pack workbooks under data/ (D72)
+!data/
+!data/PS-11_bank_statements.xlsx
+!data/PS-11_invoices_and_reconciliation.xlsx
+!data/PS-11_copilot_evaluation.xlsx
+
 # local
 .venv/
 __pycache__/

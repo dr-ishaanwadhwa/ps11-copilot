@@ -1,10 +1,10 @@
-"""Paths and fixed dates. The data pack lives outside the repo (never committed)."""
+"""Paths and fixed dates. Default data directory is the repo's data/ folder (D72)."""
 import os
 from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_DATA_DIR = Path.home() / "Projects/ps11-research/PS-11 SME Cash-Flow Copilot/Data"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DATA_DIR = Path(os.environ.get("COPILOT_DATA", DEFAULT_DATA_DIR))
 
 BANK_XLSX = "PS-11_bank_statements.xlsx"

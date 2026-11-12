@@ -397,38 +397,10 @@ else:
     )
     payroll_badge_text = "100% सैलरी सुरक्षित"
 
-col_hero_text, col_hero_action = st.columns([5, 1])
-with col_hero_text:
-    st.markdown(f"""
-    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid {hero_border_color}; border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
-        <div>
-          <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: {'#10B981' if is_safe else '#F59E0B'};">
-            ● {config.BUSINESSES[biz]} · {'दैनिक नकद स्थिति (Daily Health)' if is_hindi else 'Daily Cash Health'}
-          </span>
-          <div style="font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0;">
-            {hero_title}
-          </div>
-        </div>
-        <div>
-          <span class="sme-badge {hero_badge_class}">{payroll_badge_text}</span>
-        </div>
-      </div>
-      <div style="margin-top: 4px; font-size: 0.84rem; opacity: 0.88; line-height: 1.45;">
-        {hero_subtitle}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-with col_hero_action:
-    if st.button("⚡ Setup Tour", key="hero_top_setup_tour_btn", help="Launch the 3-step Account Aggregator consent, live data scan, and AI baseline setup"):
-        st.session_state["show_onboarding"] = True
-        st.session_state["onboarding_step"] = 1
-        st.rerun()
-
-# ── ⚡ TODAY'S PRIORITY ACTION CARD (DECISION 3YES) ───────────────────────────
+# ── ⚡ UNIFIED EXECUTIVE COCKPIT HERO & PRIORITY ACTION ─────────────────────────
 if biz == "SME-1":
     act_title = "⚡ TODAY'S PRIORITY ACTION" if not is_hindi else "⚡ आज का सबसे जरूरी काम"
-    act_headline = "📞 Collect ₹29,295 from Om Supermarket, Bavdhan" if not is_hindi else "📞 ओम सुपरमार्केट, बावधन से ₹29,295 की वसूली करें"
+    act_headline = "📞 Collect ₹29,295 from Om Supermarket" if not is_hindi else "📞 ओम सुपरमार्केट से ₹29,295 की वसूली करें"
     act_desc = "Open 45 days · 3 salesman collection slips awaiting deposit into bank" if not is_hindi else "45 दिन से बकाया · सेल्समैन 1 की रसीद बैंक में जमा होने के लिए तैयार है"
     wa_msg = urllib.parse.quote("Namaste Om Supermarket ji, hope you are doing well. Friendly update from Kaveri Distributors: current pending khata balance is ₹29,295. Whenever convenient, please arrange settlement. Thank you!")
     wa_link = f"https://wa.me/910000000001?text={wa_msg}"
@@ -446,17 +418,36 @@ else:
     wa_link = "https://wa.me/?text=" + urllib.parse.quote("Northlight Studio October Retainer Schedule.")
     btn_text = "💼 View Retainer Schedule" if not is_hindi else "💼 रिटेनर शेड्यूल देखें"
 
-col_act_left, col_act_right = st.columns([4, 2])
-with col_act_left:
+col_hero_status, col_hero_action = st.columns([3, 2])
+with col_hero_status:
     st.markdown(f"""
-    <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.28); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;">
-      <span class="sme-badge sme-badge-info">{act_title}</span>
-      <div style="font-size: 1.05rem; font-weight: 700; margin: 4px 0 2px 0;">{act_headline}</div>
-      <div style="font-size: 0.82rem; opacity: 0.85;">{act_desc}</div>
+    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid {hero_border_color}; border-radius: 12px; padding: 12px 16px; min-height: 98px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: {'#10B981' if is_safe else '#F59E0B'};">
+          ● {config.BUSINESSES[biz]} · {'नकद स्थिति' if is_hindi else 'Daily Cash Status'}
+        </span>
+        <span class="sme-badge {hero_badge_class}">{payroll_badge_text}</span>
+      </div>
+      <div style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0;">
+        {hero_title}
+      </div>
+      <div style="font-size: 0.82rem; opacity: 0.85; line-height: 1.4;">
+        {hero_subtitle}
+      </div>
     </div>
     """, unsafe_allow_html=True)
-with col_act_right:
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+with col_hero_action:
+    st.markdown(f"""
+    <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 12px 16px; min-height: 98px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <span class="sme-badge sme-badge-info" style="font-size: 0.68rem;">{act_title}</span>
+        <div style="font-size: 0.95rem; font-weight: 700; margin: 3px 0 1px 0;">{act_headline}</div>
+        <div style="font-size: 0.78rem; opacity: 0.82;">{act_desc}</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     st.link_button(btn_text, wa_link, use_container_width=True)
 
 # ── 4 CALM BIG MONEY TILES ──────────────────────────────────────────────────
@@ -615,20 +606,6 @@ with tab_home:
 
         if solvency.is_false_insolvency:
             st.warning(f"⚠️ **{solv_rep['headline']}**")
-        else:
-            st.info(f"💡 **{solv_rep['headline']}**")
-
-        has_demo = biz in ("SME-1", "SME-3")
-        c = st.columns(4)
-        c[0].metric("Safe to Spend (Bank)", inr(solvency.net_bank_liquidity), help=f"Bank balance {inr(bal)} plus CC headroom")
-        c[1].metric("Cash in Drawer / Till", inr(solvency.galla_cash), "Demo data, not from the pilot pack." if has_demo else "In shop drawer", delta_color="normal")
-        c[2].metric("Market Dues (Likely In)", inr(solvency.total_expected_inflows), "Demo data, not from the pilot pack." if has_demo and solvency.informal_receivables > 0 else f"Expected at {int(round(alpha*100))}%", delta_color="normal")
-        c[3].metric("True Cash Buffer", inr(solvency.true_cash_runway_inr),
-                    "Positive Solvency" if solvency.true_cash_runway_inr > 0 else "Deficit Alert",
-                    delta_color="normal" if solvency.true_cash_runway_inr > 0 else "inverse")
-
-        if has_demo:
-            st.caption("ℹ️ Cash totals above include demo seed data, not from the pilot pack.")
 
         # Progressive Disclosure: Simple In-Out Rupee Math
         with st.expander("🔍 See How Cash Buffer Is Calculated (Simple In-Out Math) / गणित समझें", expanded=False):
@@ -643,7 +620,7 @@ with tab_home:
             """)
 
         # ── TODAY'S 3 OPERATING PRIORITIES ──
-        st.markdown("### ⚡ Today's 3 Operating Priorities")
+        st.markdown("##### ⚡ Today's 3 Operating Priorities / आज की 3 मुख्य प्राथमिकताएं")
         p_cols = st.columns(3)
 
         if biz == "SME-2":
@@ -685,7 +662,7 @@ with tab_home:
             """, unsafe_allow_html=True)
 
         # ── TOP 5 ACTIONABLE FOLLOW-UPS TODAY ──
-        st.markdown("### 📋 Top 5 Collections for Today / आज के 5 मुख्य तकादे")
+        st.markdown("##### 📋 Top 5 Collections for Today / आज के 5 मुख्य तकादे")
         st.caption("Prioritized customers with late payments. 1-click WhatsApp reminder with polite text.")
 
         top_cust = by_customer(items).sort_values("outstanding", ascending=False).head(5)
@@ -699,12 +676,11 @@ with tab_home:
             
             col_t1, col_t2, col_t3 = st.columns([3, 2, 2])
             with col_t1:
-                st.markdown(f"**{c_name}**")
-                st.caption(f"{c_oldest} days overdue" if not is_hindi else f"{c_oldest} दिन से बकाया")
+                st.markdown(f"**{c_name}** <span style='font-size:0.75rem; opacity:0.75;'>({c_oldest}d)</span>", unsafe_allow_html=True)
             with col_t2:
                 st.markdown(f"**{inr(c_amt)}**")
             with col_t3:
-                btn_label = "📲 Send WhatsApp" if not is_hindi else "📲 WhatsApp भेजें"
+                btn_label = "📲 WhatsApp" if not is_hindi else "📲 WhatsApp"
                 st.link_button(btn_label, wa_url, use_container_width=True)
 
 # ── TAB: CASH BOOK ───────────────────────────────────────────────────────────

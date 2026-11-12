@@ -17,7 +17,7 @@ from copilot.answers import Copilot
 from copilot.categorise import score_categories
 from copilot.checks import import_report
 from copilot.fmt import inr
-from copilot.forecast import evaluate_holdout, simulate_forecast
+from copilot.forecast import as_of, evaluate_holdout, simulate_forecast
 from copilot.load import load_pack
 from copilot.match import match_all
 from copilot.match.engine import ASK, SUGGEST
@@ -236,7 +236,49 @@ with tab_forecast:
         render_partial_view_notice()
 
     st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
-    st.info("The 90-day forecast is being rebuilt. Scores will be shown once they're measured honestly.")
+
+    view = as_of(pack, config.HOLDOUT_START)
+    fc_res = simulate_forecast(view, biz)
+
+    # Shortfall Warning Cards (D50, D40)
+    if fc_res.warnings:
+        st.markdown("### ⚠️ Early Shortfall Warnings")
+        for w in fc_res.warnings:
+            (st.warning if w.level == "LIKELY" else st.info)(f"**[{w.level}]** {w.message}")
+    else:
+        st.success("✓ **No Projected Shortfalls:** Cash balance remains safely above credit limits, salary days, and owner floor throughout the 90-day window.")
+
+    st.markdown("### 📅 Monthly Breakdown (Cash You Can Plan On)")
+    m_rows = []
+    for mf in fc_res.monthly_forecasts:
+        m_rows.append({
+            "Month": mf.month,
+            "Expected Inflows": f"{inr(mf.inflows_p50)}  ({inr(mf.inflows_p10)} – {inr(mf.inflows_p90)})",
+            "Committed Outflows": f"{inr(mf.outflows_p50)}  ({inr(mf.outflows_p10)} – {inr(mf.outflows_p90)})",
+            "Net Cash Flow": inr(mf.net_p50),
+            "Lowest Daily Dip": inr(mf.min_balance_p50),
+            "Closing Balance": inr(mf.closing_balance_p50),
+        })
+    st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
+
+    with st.expander("📊 Benchmark & Accuracy Metrics (Holdout Scored against cash_actuals)", expanded=False):
+        holdout_res = evaluate_holdout(pack)
+        mape_label = f"Model MAPE: `{holdout_res.mape:.2%}` on frozen holdout"
+        if holdout_res.mape > 0.182:
+            mape_label += " (worse than the simple 3-month average; kill metric (D31))"
+        elif holdout_res.mape > 0.10:
+            mape_label += " (target ≤ 10%)"
+        else:
+            mape_label += " (target ≤ 10%)"
+
+        st.markdown(f"""
+        - **{mape_label}** (naive 3-month baseline: `{holdout_res.naive_mape:.2%}`).
+        - **Agency Inflows MAPE:** `{holdout_res.agency_inflow_mape:.2%}` (naive baseline: `{holdout_res.naive_agency_inflow_mape:.2%}`).
+        - **Paired Bootstrap Improvement (naive − model):** `{holdout_res.bootstrap_diff_mean:+.2%}` (95% CI: `[{holdout_res.bootstrap_diff_ci[0]:+.2%}, {holdout_res.bootstrap_diff_ci[1]:+.2%}]`).
+        - **Holdout P10–P90 Coverage:** `{holdout_res.coverage_p10_p90:.1%}` of actuals fell inside the forecast interval.
+        - **Holdout Likely Warnings:** `{holdout_res.false_alarms.get(biz, 0)}` for this business.
+        """)
+        st.caption("Scored on the Jul–Sep 2026 holdout; data pack only.")
 
 # ── TAB: REVIEW QUEUE ────────────────────────────────────────────────────────
 with tab_queue:

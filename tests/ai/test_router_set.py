@@ -6,24 +6,7 @@ When the new router passes, pytest reports XPASS as a failure, which forces remo
 """
 from collections import Counter
 
-import pytest
-
-from copilot.boundary import route
 from copilot.evals.router_cases import BOUNDARY_INTENTS, CASES, INTENTS, PACK_EXPECTED
-
-ROUTER_NOT_BUILT = pytest.mark.xfail(strict=True, reason="LLM intent router is week-1 work (D66); keyword router fails")
-
-
-def _ok(case, intent: str) -> bool:
-    return intent == case.expect or intent in case.also_ok
-
-
-def _pack_cases(pack):
-    q = pack.questions.set_index("question_id")
-    boundary = [(qid, q.loc[qid, "question"], want) for qid, want in PACK_EXPECTED.items()]
-    facts = [(qid, r.question, "FACT") for qid, r in q.iterrows()
-             if qid not in PACK_EXPECTED and not str(r.question_type).startswith("Behaviour")]
-    return boundary, facts
 
 
 # ── integrity: the set itself is sound ────────────────────────────────────────────────────────

@@ -171,7 +171,6 @@ def _select_top_swings(
     relevant = [s for s in candidate_swings if s.date <= target_date]
     if not relevant:
         return []
-    # Rank by absolute swing amount descending
     sorted_items = sorted(relevant, key=lambda s: abs(s.swing_amount), reverse=True)
     return sorted_items[:max_items]
 

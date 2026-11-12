@@ -8,12 +8,12 @@ Simulates daily cash trajectory for 90 days following cutoff date:
 - Monte Carlo sampling across n_paths paths (Task 2.5)
 - Warning triggers and swing items computed on simulated paths
 """
-import re
 import numpy as np
 import pandas as pd
 
+from .. import config
 from ..categorise import payee_key
-from .asof import AsOfView
+from .asof import AsOfView, as_of
 from .delays import (
     compute_net_amount,
     compute_tpa_rates,
@@ -26,20 +26,14 @@ from .warnings import evaluate_warnings
 
 def roll_sunday_to_monday(dt: pd.Timestamp) -> pd.Timestamp:
     """Statutory dates falling on Sunday roll to Monday [S1]."""
-    if dt.dayofweek == 6:  # Sunday
+    if dt.dayofweek == 6:
         return dt + pd.Timedelta(days=1)
     return dt
 
 
 def get_credit_limit(view: AsOfView, business_id: str) -> float:
-    """Extract credit limit from business bank account description."""
-    try:
-        row = view.businesses.set_index("business_id").loc[business_id]
-        acct = str(row.get("bank_account", ""))
-        m = re.search(r"limit ₹([\d,]+)", acct)
-        return float(m.group(1).replace(",", "")) if m else 0.0
-    except Exception:
-        return 0.0
+    """Extract credit limit from view business attributes."""
+    return view.credit_limit(business_id)
 
 
 def simulate_forecast(
@@ -61,9 +55,8 @@ def simulate_forecast(
         last_row = bank.sort_values(["txn_date", "seq"]).iloc[-1]
         opening_bal = float(last_row.balance_inr)
 
-    credit_limit = get_credit_limit(view, business_id)
+    credit_limit = view.credit_limit(business_id)
 
-    # Timeline: 90 days after cutoff
     n_days = 90
     dates = [cutoff + pd.Timedelta(days=i) for i in range(1, n_days + 1)]
     date_to_idx = {d: i for i, d in enumerate(dates)}
@@ -218,10 +211,8 @@ def simulate_forecast(
     # 3c. Non-invoice credits over 8 weeks
     start_8w = cutoff - pd.Timedelta(weeks=8)
     b_8w = b_cat[(b_cat.txn_date > start_8w) & (b_cat.txn_date <= cutoff) & (b_cat.amount > 0)]
-    if business_id == "SME-2":
-        non_inv = b_8w[~b_8w.category.isin(["Insurance/TPA receipt", "Capital infusion"])]
-    else:
-        non_inv = b_8w[~b_8w.category.isin(["Sales receipt — customer", "Capital infusion"])]
+    biz_profile = config.get_profile(business_id)
+    non_inv = b_8w[~b_8w.category.isin([biz_profile.primary_receipt_category, "Capital infusion"])]
     daily_credits = non_inv.groupby("txn_date").amount.sum()
     all_8w_dates = pd.date_range(start_8w + pd.Timedelta(days=1), cutoff)
     daily_credits = daily_credits.reindex(all_8w_dates, fill_value=0.0)
@@ -250,9 +241,9 @@ def simulate_forecast(
         # New invoices
         for idx, d in enumerate(dates):
             iss_amt = (tot_90 / 90.0) * 7.0 * weekday_shares[d.dayofweek]
-            if business_id == "SME-3":
-                iss_net = iss_amt * 0.90
-            elif business_id == "SME-2":
+            if biz_profile.has_tds:
+                iss_net = iss_amt * (1.0 - config.TDS_RATE)
+            elif biz_profile.archetype == "clinic":
                 iss_net = iss_amt * (1.0 - def_tpa[0] - def_tpa[1])
             else:
                 iss_net = iss_amt
@@ -343,3 +334,36 @@ def simulate_forecast(
         monthly_forecasts=monthly_forecasts,
         warnings=warnings,
     )
+
+
+class CashForecastSimulator:
+    """Deep module encapsulating time-slicing, categoriser caching, delay modeling, and Monte Carlo simulation."""
+
+    def __init__(self, pack):
+        self.pack = pack
+        self._view_cache: dict[pd.Timestamp, AsOfView] = {}
+
+    def get_view(self, cutoff: pd.Timestamp) -> AsOfView:
+        """Retrieve or build a strictly time-cut AsOfView for a cutoff date."""
+        if cutoff not in self._view_cache:
+            self._view_cache[cutoff] = as_of(self.pack, cutoff)
+        return self._view_cache[cutoff]
+
+    def simulate(
+        self,
+        business_id: str,
+        cutoff: pd.Timestamp = config.AS_OF,
+        n_paths: int = 1000,
+        seed: int = 0,
+        owner_floor: float = 0.0,
+    ) -> ForecastResult:
+        """Run bottom-up Monte Carlo cash forecast from a cutoff date."""
+        view = self.get_view(cutoff)
+        return simulate_forecast(
+            view=view,
+            business_id=business_id,
+            n_paths=n_paths,
+            seed=seed,
+            owner_floor=owner_floor,
+        )
+

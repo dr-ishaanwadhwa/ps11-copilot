@@ -8,39 +8,19 @@ Handles:
 - New post-cutoff invoice issuance and arrival modeling
 - Non-invoice recurring receipts (clinic daily patient collections, cash deposits)
 """
-from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-
-@dataclass
-class DelayProfile:
-    customer_name: str
-    count: int
-    delays: np.ndarray
-
-
-@dataclass
-class OpenInvoiceForecast:
-    invoice_no: str
-    customer_name: str
-    invoice_date: pd.Timestamp
-    due_date: pd.Timestamp
-    gross_amount: float
-    net_receipt: float
-    expected_p50_date: pd.Timestamp
-    expected_p10_date: pd.Timestamp
-    expected_p90_date: pd.Timestamp
-    tds_deducted: float
-    row_id: str
+from .. import config
 
 
 def compute_tpa_rates(
     invoices_df: pd.DataFrame, cutoff: pd.Timestamp
 ) -> tuple[dict[str, tuple[float, float]], tuple[float, float]]:
     """Compute historical amount-weighted disallowance and TDS rates per TPA from settled claims."""
+    clinic_ids = [b for b, p in config.BUSINESS_PROFILES.items() if p.archetype == "clinic"]
     paid = invoices_df[
-        (invoices_df.business_id == "SME-2")
+        invoices_df.business_id.isin(clinic_ids)
         & (invoices_df.invoice_date <= cutoff)
         & invoices_df.last_payment_date.notna()
         & (invoices_df.last_payment_date <= cutoff)
@@ -129,13 +109,14 @@ def compute_net_amount(
     """Compute expected net receipt for an open invoice or claim."""
     total = float(row.get("invoice_total", 0.0) or 0.0)
     taxable = float(row.get("taxable_value", 0.0) or 0.0)
+    profile = config.get_profile(business_id)
 
-    if business_id == "SME-3":
+    if profile.has_tds:
         # Agency: 10% TDS on taxable value when applicable [R3]
         tds_app = bool(row.get("tds_applicable", True))
-        tds = taxable * 0.10 if tds_app else 0.0
+        tds = taxable * config.TDS_RATE if tds_app else 0.0
         return max(0.0, total - tds)
-    elif business_id == "SME-2":
+    elif profile.archetype == "clinic":
         # Clinic: net of historical disallowance and TDS rates
         cust = str(row.get("customer_name", ""))
         dis_rate, tds_rate = tpa_rates.get(cust, default_tpa_rates)

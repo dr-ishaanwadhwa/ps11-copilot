@@ -136,3 +136,19 @@ def test_8_determinism(pack):
         assert m1.inflows_p50 == m2.inflows_p50
         assert m1.outflows_p50 == m2.outflows_p50
         assert m1.closing_balance_p50 == m2.closing_balance_p50
+
+
+def test_deep_forecast_simulator(pack):
+    """Test the deepened CashForecastSimulator interface."""
+    from copilot.forecast import CashForecastSimulator
+
+    simulator = CashForecastSimulator(pack)
+    fc = simulator.simulate("SME-1", cutoff=pd.Timestamp("2026-06-30"), n_paths=100, seed=42)
+
+    assert fc.business_id == "SME-1"
+    assert len(fc.daily_points) == 90
+    assert len(fc.monthly_forecasts) >= 3
+    # Second call uses cached AsOfView
+    fc2 = simulator.simulate("SME-1", cutoff=pd.Timestamp("2026-06-30"), n_paths=100, seed=42)
+    assert fc.monthly_forecasts[0].inflows_p50 == fc2.monthly_forecasts[0].inflows_p50
+

@@ -1,10 +1,7 @@
 """Partial view notices for role-based access control (D68)."""
+from .models import PARTIAL_VIEW_NOTICE
 
-PARTIAL_VIEW_NOTICE = "Formal books only. The owner's cash memo is not included in this view."
 
-
-def render_partial_view_notice():
-    """Render the standard notice banner when viewing formal books without cash memo."""
-    import streamlit as st
-
-    st.info(PARTIAL_VIEW_NOTICE)
+def render_partial_view_notice() -> str:
+    """Return the standard notice banner text when viewing formal books without cash memo."""
+    return PARTIAL_VIEW_NOTICE

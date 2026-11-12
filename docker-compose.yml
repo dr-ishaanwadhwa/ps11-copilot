@@ -1,0 +1,14 @@
+services:
+  ps11-copilot:
+    build: .
+    container_name: ps11-copilot
+    env_file: .env
+    restart: unless-stopped
+    expose:
+      - "8501"
+    networks:
+      - eka_default
+
+networks:
+  eka_default:
+    external: true

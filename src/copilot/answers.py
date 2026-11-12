@@ -3,8 +3,8 @@
 v1 answers the brief's live tests T1 (who owes me most) and T7 (can I pay salaries), and routes every
 boundary question first (T8, T10 and the other 14). All 67 questions are P1.
 """
-import re
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 
@@ -20,25 +20,26 @@ from .receivables import by_customer, open_items
 class Answer:
     text: str
     intent: str
-    sources: list[str] = field(default_factory=list)   # txn_ids / document ids behind the numbers
-    numbers: dict = field(default_factory=dict)        # raw values, for tests and the Hindi renderer (P1)
+    sources: list[str] = field(default_factory=list)
+    numbers: dict = field(default_factory=dict)
 
 
 class Copilot:
-    def __init__(self, pack: Pack):
+    def __init__(self, pack: Pack, vault: Any = None, cat_df: Any = None):
         self.pack = pack
-        self.cat = Categoriser(pack).apply(pack.bank)
+        self.vault = vault
+        if cat_df is not None:
+            self.cat = cat_df
+        else:
+            self.cat = Categoriser(pack).apply(pack.bank)
 
-    # ── facts ───────────────────────────────────────────────────────────────
     def closing_balance(self, biz: str, on: pd.Timestamp = config.AS_OF) -> tuple[float, str]:
         b = self.pack.bank[(self.pack.bank.business_id == biz) & (self.pack.bank.txn_date <= on)]
         last = b.sort_values(["txn_date", "seq"]).iloc[-1]
         return float(last.balance_inr), last.txn_id
 
     def credit_limit(self, biz: str) -> float:
-        acct = str(self.pack.businesses.set_index("business_id").loc[biz, "bank_account"])
-        m = re.search(r"limit ₹([\d,]+)", acct)
-        return float(m.group(1).replace(",", "")) if m else 0.0
+        return self.pack.credit_limit(biz)
 
     def salary_run(self, biz: str, month: str) -> tuple[float, list[str]]:
         c = self.cat
@@ -75,7 +76,7 @@ class Copilot:
                        "galla_cash": round(galla_cash), "yes": yes})
 
     def ask(self, biz: str, question: str, galla_cash: float = 0.0) -> Answer:
-        r = route(question)
+        r = route(question, use_llm=True)
         if r.intent != "FACT":
             facts = []
             if r.intent in ("LOAN", "JUDGE_PERSON", "SEND"):
@@ -86,5 +87,63 @@ class Copilot:
         if "owe" in q and "most" in q:
             return self.who_owes_most(biz)
         if "salar" in q and ("pay" in q or "afford" in q):
-            return self.can_pay_salaries(biz, galla_cash=galla_cash)
+            effective_galla = galla_cash
+            if effective_galla == 0.0 and self.vault:
+                latest = self.vault.get_latest_galla(biz)
+                if latest:
+                    effective_galla = latest.counted_cash
+            return self.can_pay_salaries(biz, galla_cash=effective_galla)
+        if ("cash" in q or "galla" in q or "till" in q) and ("drawer" in q or "hand" in q or "counted" in q or "have" in q) and self.vault:
+            latest = self.vault.get_latest_galla(biz)
+            if latest:
+                text = f"You counted {inr(latest.counted_cash)} in the drawer on {latest.date:%d %b %Y} (Status: {latest.status_label})."
+                return Answer(text, "FACT", [f"GALLA-{latest.date:%Y%m%d}"], {"counted_cash": latest.counted_cash, "status": latest.status_label})
+        if ("solvency" in q or "runway" in q or "buffer" in q) and self.vault:
+            sol = self.vault.compute_solvency(self.pack, biz)
+            text = f"Your true cash runway buffer is {inr(sol.true_cash_runway_inr)} (Net bank liquidity: {inr(sol.net_bank_liquidity)}, drawer cash: {inr(sol.galla_cash)})."
+            return Answer(text, "FACT", [f"SOLVENCY-{biz}"], {"runway_inr": sol.true_cash_runway_inr, "bank_liquidity": sol.net_bank_liquidity, "galla_cash": sol.galla_cash})
+
+        # Grounded AI Copilot for general SME queries
+        from .ai_client import get_ai_client
+
+        ai = get_ai_client()
+        if ai.is_configured:
+            biz_name = config.BUSINESSES.get(biz, biz)
+            bal, _ = self.closing_balance(biz)
+            limit = self.credit_limit(biz)
+            headroom = bal + limit
+            items = open_items(self.pack, biz)
+            total_recv = float(items.outstanding.sum())
+            overdue_count = len(items[items.days_open > 45])
+
+            galla_val = galla_cash
+            solvency_info = ""
+            if self.vault:
+                latest_g = self.vault.get_latest_galla(biz)
+                if latest_g and galla_val == 0.0:
+                    galla_val = latest_g.counted_cash
+                sol = self.vault.compute_solvency(self.pack, biz)
+                solvency_info = (
+                    f"- 30-Day Solvency Runway Buffer: {inr(sol.true_cash_runway_inr)}\n"
+                    f"- Expected informal khata inflows: {inr(sol.total_expected_inflows)}\n"
+                    f"- 30-Day commitments: {inr(sol.total_commitments)}\n"
+                )
+
+            facts = (
+                f"- Business: {biz_name}\n"
+                f"- Closing Bank Balance (as of {config.AS_OF:%d %b %Y}): {inr(bal)}\n"
+                f"- Sanctioned Credit Limit: {inr(limit)} (Net Headroom: {inr(headroom)})\n"
+                f"- Physical Cash in Shop Drawer (Galla): {inr(galla_val)}\n"
+                f"- Total Formal Receivables: {inr(total_recv)} across {len(items)} invoices ({overdue_count} > 45 days)\n"
+                f"{solvency_info}"
+            )
+            ai_ans = ai.generate_grounded_answer(biz_name, question, facts)
+            if ai_ans:
+                return Answer(
+                    ai_ans,
+                    "FACT_AI",
+                    sources=[f"BANK-{biz}", f"LEDGER-{biz}"],
+                    numbers={"closing_balance": bal, "headroom": headroom, "galla_cash": galla_val},
+                )
+
         return Answer("I can't answer that yet in this version. It's on the list for the next release.", "UNSUPPORTED")

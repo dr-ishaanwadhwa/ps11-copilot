@@ -13,6 +13,8 @@ The answer key (`reconciliation_truth`) is never read here; it is used only in `
 """
 from __future__ import annotations
 
+import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -23,6 +25,8 @@ from .. import config
 from ..load import Pack
 from .audit import AuditLedger
 from .names import PartyIndex, extract, norm
+
+logger = logging.getLogger(__name__)
 
 AUTO, SUGGEST, ASK, NO_DOC = "AUTO", "SUGGEST", "ASK", "NO_DOC"
 _CHQ = re.compile(r"^CHQ (DEP|RET) - (\d+)")
@@ -43,9 +47,10 @@ class Match:
     business_id: str
     tier: str
     rule: str
-    docs: list[tuple[str, float]] = field(default_factory=list)   # (document_id, amount applied)
+    docs: list[tuple[str, float]] = field(default_factory=list)
     note: str = ""
     payer: str | None = None
+    payer_date: pd.Timestamp | None = None
 
 
 @dataclass
@@ -145,11 +150,12 @@ class Matcher:
         inv = self.pack.invoices.drop_duplicates("invoice_no")
         start = self.pack.bank.groupby("business_id")["txn_date"].min()
         for r in inv.itertuples():
-            if r.business_id == "SME-2":            # clinic: TPA claims, net of TDS and disallowance (remittance advice)
+            profile = config.get_profile(r.business_id)
+            if profile.archetype == "clinic":            # clinic: TPA claims, net of TDS and disallowance (remittance advice)
                 net = r.invoice_total - r.tds_deducted_by_customer - r.disallowed_amount
                 d = Doc(r.invoice_no, "claim", r.customer_name, r.invoice_date, net, r.due_date)
             else:
-                tds = config.TDS_RATE * r.taxable_value if (r.business_id == "SME-3" and r.tds_applicable) else 0.0
+                tds = config.TDS_RATE * r.taxable_value if (profile.has_tds and r.tds_applicable) else 0.0
                 d = Doc(r.invoice_no, "inv", r.customer_name, r.invoice_date, r.invoice_total - tds, r.due_date)
             # Opening receivables: an invoice settled before the bank data starts is not open on day one
             if pd.notna(r.last_payment_date) and r.last_payment_date < start[r.business_id]:
@@ -162,7 +168,9 @@ class Matcher:
                 lst.sort(key=lambda x: (x.date, x.id))
         c = self.pack.collections.copy()
         c["dc_id"] = "DC-" + c["date"].dt.strftime("%Y-%m-%d")
-        self.dc["SME-2"] = c.set_index("date")
+        for b, prof in config.BUSINESS_PROFILES.items():
+            if prof.archetype == "clinic":
+                self.dc[b] = c.set_index("date")
         for r in self.pack.businesses.itertuples():
             self.owner_names[r.business_id] = [norm(r.owner_or_partner)]
         self.party_idx = {
@@ -215,44 +223,45 @@ class Matcher:
         return self._payment(r, biz, amt, name)
 
     def _receipt(self, r, biz, amt, name, handle, chq) -> Match | None:
-        if biz == "SME-2":
+        profile = config.get_profile(biz)
+        if profile.archetype == "clinic":
             m = self._clinic_receipt(r, amt)
             if m:
                 return m
         if r.channel == "CASH":
-            if biz == "SME-2":
+            if profile.archetype == "clinic":
                 return None
-            if biz == "SME-1":
-                start = self.last_cash_deposit.get("SME-1")
-                self.last_cash_deposit["SME-1"] = r.txn_date
-                colls = self._get_collections("SME-1", start, r.txn_date)
+            if profile.archetype == "distributor":
+                start = self.last_cash_deposit.get(biz)
+                self.last_cash_deposit[biz] = r.txn_date
+                colls = self._get_collections(biz, start, r.txn_date)
                 total_col = sum(c.amount for c in colls)
                 if colls and abs(total_col - amt) <= 1.0:
                     shops = list(dict.fromkeys(c.shop for c in colls))
                     pool = []
                     for s in shops:
-                        parties = self.party_idx["SME-1"]["in"].resolve(s)
-                        pool.extend(self._open("SME-1", parties if parties else [s], ("inv",), r.txn_date, cap=50))
+                        parties = self.party_idx[biz]["in"].resolve(s)
+                        pool.extend(self._open(biz, parties if parties else [s], profile.doc_kinds, r.txn_date, cap=50))
                     pool.sort(key=lambda x: (x.date, x.id))
                     max_size = max(10, len(colls) + 2)
                     sols, done = find_subsets(pool, amt, max_size=max_size)
-                    if not sols:
+                    if not sols and profile.has_round_off:
                         sols, done = find_subsets(pool, amt, max_size=max_size, slack=config.ROUND_OFF_MAX)
                     if sols and len(sols) == 1 and done:
                         docs = [(d.id, d.remaining) for d in sols[0]]
                         note = f"cash deposit matched to {len(colls)} collection slips across {len(shops)} shops (D55)"
-                        m = Match(r.txn_id, "SME-1", SUGGEST, "CASH_DEPOSIT", docs, note=note)
+                        m = Match(r.txn_id, biz, SUGGEST, "CASH_DEPOSIT", docs, note=note)
                         return self._finish(m, None, True, r, None)
             return Match(r.txn_id, biz, ASK, "CASH_DEPOSIT",
                          note="cash deposit covering several shops: needs the salesman's collection slips")
 
-        kinds = ("claim",) if biz == "SME-2" else ("inv",)
+        kinds = profile.doc_kinds
         parties = self.party_idx[biz]["in"].resolve(name)
         if not parties and handle and handle in self.handle_memory:
             parties = [self.handle_memory[handle]]
         # "known" means exactly one party: two shops with the same name in different areas is not known
         known = len(parties) == 1
-        if biz == "SME-2" and parties:
+        if profile.archetype == "clinic" and parties:
             # TPAs settle 30–75 days after the claim (guide s.1); older claims are pending or rejected, not due
             lo, hi = r.txn_date - pd.Timedelta(days=80), r.txn_date - pd.Timedelta(days=20)
             pool = [d for d in self._open(biz, parties, kinds, r.txn_date, cap=400) if lo <= d.date <= hi][:40]
@@ -269,7 +278,7 @@ class Matcher:
             m = Match(r.txn_id, biz, AUTO if named else SUGGEST, "EXACT", [(exact[0].id, amt)], payer=exact[0].party,
                       note="" if named else "payer inferred from the amount only: confirm")
             return self._finish(m, handle, named, r, chq)
-        if biz == "SME-1":
+        if profile.has_round_off:
             ro = [d for d in pool if 0 < d.remaining - amt <= config.ROUND_OFF_MAX]
             if len(ro) == 1 and not exact:
                 m = Match(r.txn_id, biz, AUTO if named else SUGGEST, "ROUND_OFF", [(ro[0].id, amt)], payer=ro[0].party,
@@ -284,11 +293,11 @@ class Matcher:
         if not parties:
             return Match(r.txn_id, biz, ASK, "WHO_PAID", note="payer not recognised and no single document fits")
 
-        max_size = 13 if biz == "SME-2" else 6
+        max_size = profile.max_batch_size
         sols, done = find_subsets(pool, amt, max_size)
-        rule = "TPA_BATCH" if biz == "SME-2" else "CLUBBED"
+        rule = profile.batch_rule_name
         slack_used = False
-        if not sols and biz == "SME-1":
+        if not sols and profile.has_round_off:
             sols, done = find_subsets(pool, amt, max_size, slack=config.ROUND_OFF_MAX)
             slack_used = bool(sols)
         if sols:
@@ -309,28 +318,31 @@ class Matcher:
         return Match(r.txn_id, biz, ASK, "NO_RULE", payer=parties[0], note="payer known; no rule explains the amount")
 
     def _clinic_receipt(self, r, amt) -> Match | None:
-        dc = self.dc["SME-2"]
+        biz = r.business_id
+        dc = self.dc.get(biz)
+        if dc is None:
+            return None
         day = r.txn_date.normalize()
         if r.channel == "UPI":
             if day in dc.index:
-                m = Match(r.txn_id, "SME-2", AUTO, "DAILY_UPI", [(dc.loc[day, "dc_id"], amt)])
+                m = Match(r.txn_id, biz, AUTO, "DAILY_UPI", [(dc.loc[day, "dc_id"], amt)])
                 return self._finish(m, None, True, r, None)
         if r.channel == "POS_SETTLEMENT":
             hits = [(d, dc.loc[d, "dc_id"]) for d in [day - pd.Timedelta(days=k) for k in (1, 2, 3)]
                     if d in dc.index and abs(dc.loc[d, "card_net_settled"] - amt) < 0.01]
             if len(hits) == 1:
-                m = Match(r.txn_id, "SME-2", AUTO, "MDR_NET", [(hits[0][1], amt)], note="card takings net of MDR")
+                m = Match(r.txn_id, biz, AUTO, "MDR_NET", [(hits[0][1], amt)], note="card takings net of MDR")
                 return self._finish(m, None, True, r, None)
         if r.channel == "CASH":
-            start = self.last_cash_deposit.get("SME-2", day - pd.Timedelta(days=7))
+            start = self.last_cash_deposit.get(biz, day - pd.Timedelta(days=7))
             window = dc[(dc.index > start) & (dc.index <= day)]
-            self.last_cash_deposit["SME-2"] = day
+            self.last_cash_deposit[biz] = day
             if len(window):
                 total = window["cash_collected"].sum()
                 docs = list(zip(window["dc_id"], window["cash_collected"]))
                 tier = AUTO if abs(total - amt) < 1 else SUGGEST
                 note = "" if tier == AUTO else f"₹{total - amt:,.0f} of cash taken since the last deposit is not in this deposit: to check"
-                m = Match(r.txn_id, "SME-2", tier, "CASH_DEPOSIT", docs, note)
+                m = Match(r.txn_id, biz, tier, "CASH_DEPOSIT", docs, note)
                 return self._finish(m, None, True, r, None)
         return None
 
@@ -369,7 +381,7 @@ class Matcher:
                           f"amount >= ₹1 Lakh (₹{amt:,.0f}): requires human confirmation")
 
         if chq:
-            m.payer_date = r.txn_date   # type: ignore[attr-defined]
+            m.payer_date = r.txn_date
             self.cheques[chq.group(2)] = m
         return self._apply(m, roundoff_doc)
 
@@ -377,10 +389,10 @@ class Matcher:
         path = config.STATE_DIR / "confirmed_handles.json"
         if path.exists():
             try:
-                import json
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug("Failed loading confirmed handles from %s: %s", path, exc)
                 return {}
         return {}
 
@@ -390,11 +402,10 @@ class Matcher:
         config.STATE_DIR.mkdir(parents=True, exist_ok=True)
         path = config.STATE_DIR / "confirmed_handles.json"
         try:
-            import json
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.handle_memory, f, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.debug("Failed saving confirmed handles to %s: %s", path, exc)
 
 
 def match_all(

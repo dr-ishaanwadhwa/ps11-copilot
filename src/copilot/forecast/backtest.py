@@ -16,7 +16,7 @@ import pandas as pd
 
 from ..load import Pack
 from .asof import as_of
-from .engine import get_credit_limit, simulate_forecast
+from .engine import simulate_forecast
 from .models import ForecastResult
 
 
@@ -205,7 +205,7 @@ def replay_lead_times(pack: Pack, cache_path: Path | None = None) -> pd.DataFram
     b1 = pack.bank[pack.bank.business_id == "SME-1"].sort_values(["txn_date", "seq"])
     daily_b1 = b1.groupby("txn_date")["balance_inr"].last()
     sample_view = as_of(pack, b1.txn_date.min())
-    limit = get_credit_limit(sample_view, "SME-1")
+    limit = sample_view.credit_limit("SME-1")
     breach_days = daily_b1[daily_b1 < (250000.0 - limit)].index.tolist()
 
     runs: list[list[pd.Timestamp]] = []

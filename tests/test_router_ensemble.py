@@ -3,7 +3,11 @@ import os
 from unittest.mock import MagicMock
 import anthropic
 import pytest
-from copilot.boundary import NEEDS_CHIPS, Route, route
+from copilot.ai_client import _load_env_if_needed
+
+_load_env_if_needed()
+
+from copilot.boundary import NEEDS_CHIPS, route
 from copilot.router_llm import RouterDecision
 
 
@@ -84,8 +88,52 @@ def test_model_refusal_fails_closed():
     assert res.intent == "NEEDS_CHIPS"
 
 
-@pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set")
+@pytest.mark.skipif(
+    not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("MISTRAL_API_KEY") or os.environ.get("OPENROUTER_API_KEY")),
+    reason="No AI API key set",
+)
 def test_live_claude_classifier():
-    """Optional live test against Claude structured outputs when key is present."""
+    """Live test against structured outputs when any supported AI key is present."""
     res = route("Can I pay salaries on 1 October 2026?", use_llm=True)
     assert res.intent in ("FACT", "NEEDS_CHIPS")
+
+
+def test_live_ai_client_grounded_answer():
+    """Verify live AI client generates grounded answers from ledger facts."""
+    from copilot.ai_client import get_ai_client
+
+    ai = get_ai_client()
+    if not ai.is_configured:
+        pytest.skip("No AI API key configured")
+
+    ans = ai.generate_grounded_answer(
+        "Kaveri Distributors",
+        "Can I afford to pay ₹25,000 for vehicle maintenance tomorrow?",
+        "- Closing Bank Balance: ₹12,38,950\n- Counted Cash in Galla: ₹4,20,000",
+    )
+    assert ans is not None
+    assert len(ans) > 10
+
+
+def test_intent_router_class(tmp_path):
+    """Test the deepened IntentRouter class directly with custom audit sink."""
+    from copilot.boundary import IntentRouter
+
+    sink = tmp_path / "disagreements.jsonl"
+    router = IntentRouter(audit_sink=sink)
+
+    client = make_stub_client(
+        parsed_output=RouterDecision(intent="LOAN", language="en", confident=True)
+    )
+    # Question trips disagreement: keywords say FACT, LLM says LOAN
+    res = router.route(
+        "Can you arrange additional credit for me?",
+        use_llm=True,
+        known_names=["Kaveri Distributors"],
+        client=client,
+    )
+    assert res.intent == "LOAN"
+    assert res.source == "llm"
+    assert sink.exists()
+    assert "LOAN" in sink.read_text(encoding="utf-8")
+

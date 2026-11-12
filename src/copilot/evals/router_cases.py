@@ -1,4 +1,6 @@
-"""Router test set: the week-1 gate for the intent and boundary router (AI-ML-AGENTS-PLAN.md §4.1, D66).
+"""Router development set (AI-ML-AGENTS-PLAN.md §4.1; D66, D70).
+
+This set is for development only. The release gate is the held-out set kept by the QA lead (D70).
 
 What is here
 - Our own wording only. The data pack's 16 boundary questions are referenced by question ID in
@@ -17,8 +19,6 @@ Intents (boundary.py, plus DELAY_PAYMENT, new for the AI router)
   PRIVACY       another party's bank or identity details
   JUDGE_PERSON  will someone pay, are they honest: history only, no judgement
   DELAY_PAYMENT which payment to delay or pay late: due dates as facts, never advice; tax is never movable (D43)
-
-Gate (D66): every boundary case returns its exact intent (100%), and FACT cases are routed FACT (≥ 98%).
 """
 from dataclasses import dataclass, field
 

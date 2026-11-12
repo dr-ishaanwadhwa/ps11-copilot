@@ -268,7 +268,7 @@ with tab_vault:
                 c2.markdown(f"**Balance:** {inr(acc.balance_due)}")
                 if rem["limitation_warning"]:
                     c2.caption(rem["limitation_warning"])
-                c3.link_button("📲 Send WhatsApp Draft", rem["wa_link"])
+                c3.link_button("📲 Open draft in WhatsApp", rem["wa_link"])
         else:
             st.info("No informal khata records for this business.")
 

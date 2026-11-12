@@ -155,4 +155,5 @@ def test_confidential_chasing_and_limitation_act():
     )
     rem_stale = format_whatsapp_reminder(acc_stale, "Kaveri Distributors")
     assert rem_stale["limitation_warning"] is not None
-    assert "Section 18 of the Limitation Act" in rem_stale["limitation_warning"]
+    assert "This balance is over 30 months old." in rem_stale["limitation_warning"]
+    assert "your CA or lawyer can confirm" in rem_stale["limitation_warning"]

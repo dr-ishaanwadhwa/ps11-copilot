@@ -46,8 +46,7 @@ def format_whatsapp_reminder(account: KhataAccount, business_name: str, upi_hand
         "draft_message": text,
         "wa_link": wa_url,
         "limitation_warning": (
-            "Account is older than 30 months. A reply confirming this balance acts as an electronic acknowledgment "
-            "under Section 18 of the Limitation Act, renewing the 3-year legal recovery period."
+            "This balance is over 30 months old. A written acknowledgement from the customer may keep it recoverable; your CA or lawyer can confirm."
             if account.is_limitation_alert else None
         )
     }

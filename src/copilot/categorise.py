@@ -19,6 +19,14 @@ _DIGITS = re.compile(r"\d+")
 _WORK_REMARK = re.compile(r"/(copy|illustration|design|video|content|photo|animation|motion|ui|ux|brand|work|project)\b",
                           re.I)
 
+# Category names relied upon by the forecast engine (from pack.labels.true_category.unique()):
+CAT_SALARY = "Salary"
+CAT_GST = "GST payment"
+CAT_TDS = "TDS deposited"
+CAT_OWNER_DRAWINGS = "Owner drawings"
+CAT_CAPITAL_INFUSION = "Capital infusion"
+CAT_RENT = "Rent"
+
 
 def payee_key(narration: str) -> str:
     """The counterparty, not the remark: 'IMPS/GANESH PILLAI/…/design work' and '…/illustration' are one payee."""
@@ -32,9 +40,9 @@ def payee_key(narration: str) -> str:
 
 
 class Categoriser:
-    def __init__(self, pack: Pack):
+    def __init__(self, pack: Pack, train_before: pd.Timestamp = config.HOLDOUT_START):
         lab = pack.bank.merge(pack.labels[["txn_id", "true_category"]], on="txn_id")
-        train = lab[lab["txn_date"] < config.HOLDOUT_START]
+        train = lab[lab["txn_date"] < train_before]
         self.lookup: dict[tuple, str] = {}
         by_key: dict[tuple, Counter] = defaultdict(Counter)
         for r in train.itertuples():

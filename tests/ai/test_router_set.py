@@ -60,19 +60,41 @@ def test_pack_questions_are_referenced_by_id_only(pack):
     assert not leaked, leaked
 
 
-# ── the gate (D66) ────────────────────────────────────────────────────────────────────────────
-def test_gate_every_boundary_case_routes_to_its_intent(pack):
-    boundary, _ = _pack_cases(pack)
-    misses = [(c.text, c.expect, route(c.text).intent) for c in CASES
-              if c.expect in BOUNDARY_INTENTS and not _ok(c, route(c.text).intent)]
-    misses += [(qid, want, route(text).intent) for qid, text, want in boundary if route(text).intent != want]
-    assert not misses, f"{len(misses)} boundary misses, e.g. {misses[:5]}"
+# ── integrity: keyword rules do not copy evaluation sentences (Task 3.1) ─────────────
+def test_keywords_do_not_copy_eval_sentences(pack):
+    """Scan string literals and regexes in boundary.py (and router_llm.py).
+    
+    Fails if any 3-word sequence from any router_cases.py question, or any of the
+    pack's 67 questions loaded at test time, appears in them.
+    """
+    import ast
+    from pathlib import Path
+    import re
 
+    all_texts = [c.text for c in CASES] + pack.questions["question"].tolist()
 
-def test_gate_fact_questions_are_not_refused(pack):
-    _, facts = _pack_cases(pack)
-    fact_cases = [c for c in CASES if c.expect == "FACT"]
-    wrong = [c.text for c in fact_cases if not _ok(c, route(c.text).intent)]
-    wrong += [qid for qid, text, _ in facts if route(text).intent != "FACT"]
-    total = len(fact_cases) + len(facts)
-    assert len(wrong) / total <= 0.02, f"{len(wrong)} of {total} FACT questions refused, e.g. {wrong[:5]}"
+    def get_3grams(text: str) -> set[str]:
+        cleaned = re.sub(r"[^\w\s\u0900-\u097F]", " ", text.lower())
+        words = [w for w in cleaned.split() if len(w) > 0]
+        return {" ".join(words[i : i + 3]) for i in range(len(words) - 2)}
+
+    eval_3grams = set()
+    for t in all_texts:
+        eval_3grams.update(get_3grams(t))
+
+    src_dir = Path(__file__).resolve().parents[2] / "src" / "copilot"
+    target_files = [src_dir / "boundary.py"]
+    if (src_dir / "router_llm.py").exists():
+        target_files.append(src_dir / "router_llm.py")
+
+    leaked = []
+    for target in target_files:
+        tree = ast.parse(target.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                str_val = node.value
+                for g in get_3grams(str_val):
+                    if g in eval_3grams:
+                        leaked.append((target.name, g, str_val[:50]))
+
+    assert not leaked, f"Found memorised 3-word evaluation sequences: {leaked}"

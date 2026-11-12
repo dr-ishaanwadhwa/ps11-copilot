@@ -38,3 +38,17 @@ def test_deposit_facts_have_no_countdown():
         for forbidden in ["headroom", "remaining", "before", "%"]:
             assert forbidden not in msg, f"Found '{forbidden}' in message: {res.message}"
 
+
+def test_checklist_has_no_score():
+    from copilot.vault import deposit_records_checklist
+
+    res = deposit_records_checklist()
+    assert set(res.keys()) == {"documents", "referral"}
+
+    # No value contains a digit or %
+    all_texts = res["documents"] + [res["referral"]]
+    for text in all_texts:
+        assert "%" not in text, f"Found '%' in checklist text: {text}"
+        assert not any(ch.isdigit() for ch in text), f"Found digit in checklist text: {text}"
+
+

@@ -122,45 +122,13 @@ def cash_deposit_reporting_facts(
     )
 
 
-# Pre-deposit readiness audit for capital infusions (Prakash's ₹46L anomaly pattern)
-def audit_capital_infusion(
-    amount: float,
-    has_prior_bank_withdrawal: bool = False,
-    has_retail_collection_chits: bool = False,
-    is_gift_from_relative: bool = False
-) -> dict:
-    """
-    Evaluates whether a planned cash deposit meets documentation requirements.
-    """
-    score = 0
-    substantiated_sources = []
-    
-    if has_prior_bank_withdrawal:
-        score += 40
-        substantiated_sources.append("Matched to prior bank cash withdrawal (Redeposit)")
-    if has_retail_collection_chits:
-        score += 35
-        substantiated_sources.append("Supported by daily retail collection slips (Sales turnover)")
-    if is_gift_from_relative:
-        score += 25
-        substantiated_sources.append("Section 56(2)(x) relative gift declaration")
-        
-    readiness = "HIGH" if score >= 70 else ("MEDIUM" if score >= 35 else "VULNERABLE")
-    
+def deposit_records_checklist() -> dict:
+    """Documents worth keeping before depositing cash. Facts plus a CA referral; no score."""
     return {
-        "amount": amount,
-        "readiness_tier": readiness,
-        "score_percent": score,
-        "substantiated_sources": substantiated_sources,
-        "risk_explanation": (
-            "Unsubstantiated cash credits are subject to high tax rates under Section 195 "
-            "(legacy Section 115BBE: 84% effective tax and penalty; Tax Year 2026-27: 30% base + "
-            "surcharge/cess + up to 200% misreporting penalty)."
-            if readiness == "VULNERABLE" else
-            "Source documentation provides verifiable evidence to rebut Section 102 deemed income additions."
-        ),
-        "recommendation": (
-            "Consult your CA before banking this cash to ensure books document the exact source."
-            if readiness != "HIGH" else "Clear to bank with matching source trail."
-        )
+        "documents": [
+            "Bank withdrawal slips, if this cash was withdrawn earlier",
+            "Daily sales records or cash memos for the takings being deposited",
+            "The day-close cash count for each day the cash came from",
+        ],
+        "referral": "Show these to your CA before depositing large amounts.",
     }

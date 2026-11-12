@@ -6,12 +6,12 @@ from copilot.vault import (
     GallaEntry,
     KhataAccount,
     VaultDB,
-    audit_capital_infusion,
     cash_deposit_reporting_facts,
     check_cash_expense,
     check_cash_loan,
     check_single_receipt_cash,
     compute_total_solvency,
+    deposit_records_checklist,
     format_solvency_report,
     format_whatsapp_reminder,
 )
@@ -111,20 +111,10 @@ def test_statutory_guardrails():
     assert "Rule 237" in sft_info.citation
 
 
-def test_capital_infusion_readiness():
-    # Unsubstantiated cash deposit
-    vulnerable = audit_capital_infusion(500_000.0)
-    assert vulnerable["readiness_tier"] == "VULNERABLE"
-    assert vulnerable["score_percent"] == 0
-
-    # Substantiated with prior bank withdrawal and daily retail chits
-    solid = audit_capital_infusion(
-        500_000.0,
-        has_prior_bank_withdrawal=True,
-        has_retail_collection_chits=True
-    )
-    assert solid["readiness_tier"] == "HIGH"
-    assert solid["score_percent"] >= 70
+def test_capital_infusion_checklist():
+    res = deposit_records_checklist()
+    assert set(res.keys()) == {"documents", "referral"}
+    assert len(res["documents"]) == 3
 
 
 def test_confidential_chasing_and_limitation_act():

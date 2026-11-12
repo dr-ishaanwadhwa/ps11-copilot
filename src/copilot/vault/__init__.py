@@ -1,11 +1,11 @@
 """Vault Package: Local-first dual-plane cash operating system."""
 from .db import VaultDB
 from .guardrails import (
-    audit_capital_infusion,
     cash_deposit_reporting_facts,
     check_cash_expense,
     check_cash_loan,
     check_single_receipt_cash,
+    deposit_records_checklist,
 )
 from .models import GallaEntry, KhataAccount, RokadEntry, TotalSolvency
 from .notice import PARTIAL_VIEW_NOTICE, render_partial_view_notice
@@ -24,7 +24,7 @@ __all__ = [
     "check_cash_expense",
     "check_cash_loan",
     "cash_deposit_reporting_facts",
-    "audit_capital_infusion",
+    "deposit_records_checklist",
     "format_whatsapp_reminder",
     "PARTIAL_VIEW_NOTICE",
     "render_partial_view_notice",

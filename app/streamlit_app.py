@@ -26,11 +26,11 @@ from copilot.score import score_matches, summary
 from copilot.vault import (
     PARTIAL_VIEW_NOTICE,
     VaultDB,
-    audit_capital_infusion,
     cash_deposit_reporting_facts,
     check_cash_expense,
     check_single_receipt_cash,
     compute_total_solvency,
+    deposit_records_checklist,
     format_solvency_report,
     format_whatsapp_reminder,
     render_partial_view_notice,
@@ -204,13 +204,11 @@ with tab_vault:
             facts_res = cash_deposit_reporting_facts(ytd_deposits)
             st.info(f"ℹ️ **{facts_res.citation}:**\n\n{facts_res.message}")
 
-            readiness = audit_capital_infusion(
-                ytd_deposits,
-                has_prior_bank_withdrawal=True,
-                has_retail_collection_chits=True
-            )
-            st.markdown(f"**Source Readiness:** `{readiness['readiness_tier']}` ({readiness['score_percent']}% documented)")
-            st.caption(f"{readiness['recommendation']}")
+            checklist = deposit_records_checklist()
+            st.markdown("#### Records checklist before depositing cash")
+            for doc in checklist["documents"]:
+                st.markdown(f"- {doc}")
+            st.caption(checklist["referral"])
 
         st.markdown("---")
         st.markdown("### 📱 Pending Khata & Reminders")

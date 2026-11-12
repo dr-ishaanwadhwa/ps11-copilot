@@ -5,18 +5,17 @@ Provides fail-closed intent classification and ledger-grounded natural language 
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
 
 import requests
-from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:
-    from .router_llm import RouterDecision
+from .router_models import RouterDecision, SYSTEM
+
+logger = logging.getLogger(__name__)
 
 
-# Automatically ensure .env variables are loaded
 def _load_env_if_needed() -> None:
     env_file = Path(__file__).resolve().parents[2] / ".env"
     if env_file.exists():
@@ -30,13 +29,11 @@ def _load_env_if_needed() -> None:
                     os.environ[k] = v
 
 
-_load_env_if_needed()
-
-
 class AIClient:
     """Resilient multi-provider client with automatic fallback."""
 
     def __init__(self, timeout: float = 8.0):
+        _load_env_if_needed()
         self.timeout = timeout
 
     @property
@@ -66,8 +63,6 @@ class AIClient:
 
     def classify_intent(self, masked_question: str) -> RouterDecision | None:
         """Classify user query using structured output; fails closed on failure."""
-        from .router_llm import RouterDecision, SYSTEM
-
         clarification = (
             "\nSpecial clarifications:\n"
             "- Feasibility inquiries examining whether bank balances cover payroll or expenses are FACT inquiries evaluating liquidity, not commands to transfer capital (MOVE_OR_EDIT).\n"
@@ -75,7 +70,6 @@ class AIClient:
         )
         sys_prompt = SYSTEM + clarification + '\nRespond strictly with a JSON object: {"intent": "<ONE_OF_THE_10>", "language": "en"|"hi"|"hinglish"|"other", "confident": true|false}'
 
-        # 1. Try Mistral
         if self.mistral_key:
             try:
                 resp = requests.post(
@@ -99,10 +93,10 @@ class AIClient:
                 if resp.status_code == 200:
                     payload = json.loads(resp.json()["choices"][0]["message"]["content"])
                     return RouterDecision.model_validate(payload)
-            except Exception:
-                pass
+                logger.debug("Mistral returned non-200 status: %s", resp.status_code)
+            except Exception as exc:
+                logger.debug("Mistral intent classification failed: %s", exc)
 
-        # 2. Try OpenRouter fallback
         if self.openrouter_key:
             try:
                 resp = requests.post(
@@ -126,8 +120,9 @@ class AIClient:
                 if resp.status_code == 200:
                     payload = json.loads(resp.json()["choices"][0]["message"]["content"])
                     return RouterDecision.model_validate(payload)
-            except Exception:
-                pass
+                logger.debug("OpenRouter returned non-200 status: %s", resp.status_code)
+            except Exception as exc:
+                logger.debug("OpenRouter intent classification failed: %s", exc)
 
         return None
 
@@ -152,7 +147,6 @@ Strict Safety Boundaries:
 Verified Ledger Facts:
 {ledger_context}
 """
-        # 1. Try Mistral
         if self.mistral_key:
             try:
                 resp = requests.post(
@@ -176,10 +170,10 @@ Verified Ledger Facts:
                     content = resp.json()["choices"][0]["message"]["content"].strip()
                     if content:
                         return content
-            except Exception:
-                pass
+                logger.debug("Mistral answer returned non-200: %s", resp.status_code)
+            except Exception as exc:
+                logger.debug("Mistral answer generation failed: %s", exc)
 
-        # 2. Try OpenRouter fallback
         if self.openrouter_key:
             try:
                 resp = requests.post(
@@ -203,13 +197,13 @@ Verified Ledger Facts:
                     content = resp.json()["choices"][0]["message"]["content"].strip()
                     if content:
                         return content
-            except Exception:
-                pass
+                logger.debug("OpenRouter answer returned non-200: %s", resp.status_code)
+            except Exception as exc:
+                logger.debug("OpenRouter answer generation failed: %s", exc)
 
         return None
 
 
-# Global singleton
 _default_ai_client = AIClient()
 
 

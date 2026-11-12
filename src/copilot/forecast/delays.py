@@ -8,33 +8,10 @@ Handles:
 - New post-cutoff invoice issuance and arrival modeling
 - Non-invoice recurring receipts (clinic daily patient collections, cash deposits)
 """
-from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from copilot import config
-
-
-@dataclass
-class DelayProfile:
-    customer_name: str
-    count: int
-    delays: np.ndarray
-
-
-@dataclass
-class OpenInvoiceForecast:
-    invoice_no: str
-    customer_name: str
-    invoice_date: pd.Timestamp
-    due_date: pd.Timestamp
-    gross_amount: float
-    net_receipt: float
-    expected_p50_date: pd.Timestamp
-    expected_p10_date: pd.Timestamp
-    expected_p90_date: pd.Timestamp
-    tds_deducted: float
-    row_id: str
+from .. import config
 
 
 def compute_tpa_rates(

@@ -7,9 +7,11 @@ In accordance with the Dual-Plane Architecture:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import pandas as pd
 from .. import config
+
+PARTIAL_VIEW_NOTICE = "Formal books only. The owner's cash memo is not included in this view."
 
 
 @dataclass
@@ -18,10 +20,10 @@ class GallaEntry:
     business_id: str
     date: pd.Timestamp
     opening_cash: float
-    cash_in: float           # e.g., daily counter takings, direct settlements
-    cash_out: float          # e.g., hamali, freight, local cash purchases
-    cash_banked: float       # cash deposited into bank current/savings account
-    counted_cash: float      # physical cash counted in drawer at day close
+    cash_in: float
+    cash_out: float
+    cash_banked: float
+    counted_cash: float
     notes: str = ""
     is_demo: bool = False
 
@@ -59,9 +61,9 @@ class RokadEntry:
     entry_id: str
     business_id: str
     timestamp: pd.Timestamp
-    direction: str           # "IN" or "OUT"
+    direction: str
     amount: float
-    category: str            # e.g., "COUNTER_SALE", "HAMALI", "FREIGHT", "SUPPLIER_ROKDA", "PETTY_EXPENSE"
+    category: str
     counterparty: str
     note: str = ""
 
@@ -71,7 +73,7 @@ class KhataAccount:
     """Informal trade credit or pending khata ledger."""
     party_name: str
     business_id: str
-    balance_due: float       # + they owe us, - we owe them
+    balance_due: float
     last_active_date: pd.Timestamp
     months_open: int = 0
     phone: str = ""

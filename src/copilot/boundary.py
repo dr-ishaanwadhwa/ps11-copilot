@@ -4,8 +4,17 @@ Runs BEFORE any answer is built. It classifies intent from the owner's words; it
 decide whether a boundary applies. The answer still gives the facts the owner needs (brief: "Refer to
 the CA or bank, and still give the facts").
 """
+import json
+import logging
 import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .masking import mask
+from .router_llm import classify
+
+logger = logging.getLogger(__name__)
 
 READ_ONLY = "I can't do that: I'm read-only, so I never move, change or delete money or records."
 
@@ -187,13 +196,6 @@ def keyword_route(question: str) -> Route:
     return Route("FACT", None, source="keywords")
 
 
-from pathlib import Path
-import json
-from typing import Any
-from .masking import mask
-from .router_llm import classify
-
-
 class IntentRouter:
     """Deep module encapsulating fail-closed boundary detection, LLM classification, and audit logging."""
 
@@ -221,8 +223,8 @@ class IntentRouter:
             }
             with open(self.audit_sink, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.debug("Failed writing disagreement audit record: %s", exc)
 
     def route(
         self,

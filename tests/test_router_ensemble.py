@@ -7,7 +7,7 @@ from copilot.ai_client import _load_env_if_needed
 
 _load_env_if_needed()
 
-from copilot.boundary import NEEDS_CHIPS, Route, route
+from copilot.boundary import NEEDS_CHIPS, route
 from copilot.router_llm import RouterDecision
 
 

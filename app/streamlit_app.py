@@ -37,8 +37,11 @@ from copilot.vault import (
     deposit_records_checklist,
     format_solvency_report,
     format_whatsapp_reminder,
-    render_partial_view_notice,
 )
+
+
+def render_partial_view_notice():
+    st.info(PARTIAL_VIEW_NOTICE)
 
 st.set_page_config(page_title="Cash Copilot · SME Cash-Flow", layout="wide", initial_sidebar_state="expanded")
 

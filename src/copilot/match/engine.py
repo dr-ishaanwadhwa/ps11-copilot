@@ -13,6 +13,8 @@ The answer key (`reconciliation_truth`) is never read here; it is used only in `
 """
 from __future__ import annotations
 
+import json
+import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -23,6 +25,8 @@ from .. import config
 from ..load import Pack
 from .audit import AuditLedger
 from .names import PartyIndex, extract, norm
+
+logger = logging.getLogger(__name__)
 
 AUTO, SUGGEST, ASK, NO_DOC = "AUTO", "SUGGEST", "ASK", "NO_DOC"
 _CHQ = re.compile(r"^CHQ (DEP|RET) - (\d+)")
@@ -43,9 +47,10 @@ class Match:
     business_id: str
     tier: str
     rule: str
-    docs: list[tuple[str, float]] = field(default_factory=list)   # (document_id, amount applied)
+    docs: list[tuple[str, float]] = field(default_factory=list)
     note: str = ""
     payer: str | None = None
+    payer_date: pd.Timestamp | None = None
 
 
 @dataclass
@@ -376,7 +381,7 @@ class Matcher:
                           f"amount >= ₹1 Lakh (₹{amt:,.0f}): requires human confirmation")
 
         if chq:
-            m.payer_date = r.txn_date   # type: ignore[attr-defined]
+            m.payer_date = r.txn_date
             self.cheques[chq.group(2)] = m
         return self._apply(m, roundoff_doc)
 
@@ -384,10 +389,10 @@ class Matcher:
         path = config.STATE_DIR / "confirmed_handles.json"
         if path.exists():
             try:
-                import json
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug("Failed loading confirmed handles from %s: %s", path, exc)
                 return {}
         return {}
 
@@ -397,11 +402,10 @@ class Matcher:
         config.STATE_DIR.mkdir(parents=True, exist_ok=True)
         path = config.STATE_DIR / "confirmed_handles.json"
         try:
-            import json
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.handle_memory, f, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.debug("Failed saving confirmed handles to %s: %s", path, exc)
 
 
 def match_all(

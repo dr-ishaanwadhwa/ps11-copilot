@@ -8,7 +8,6 @@ Simulates daily cash trajectory for 90 days following cutoff date:
 - Monte Carlo sampling across n_paths paths (Task 2.5)
 - Warning triggers and swing items computed on simulated paths
 """
-import re
 import numpy as np
 import pandas as pd
 
@@ -27,20 +26,14 @@ from .warnings import evaluate_warnings
 
 def roll_sunday_to_monday(dt: pd.Timestamp) -> pd.Timestamp:
     """Statutory dates falling on Sunday roll to Monday [S1]."""
-    if dt.dayofweek == 6:  # Sunday
+    if dt.dayofweek == 6:
         return dt + pd.Timedelta(days=1)
     return dt
 
 
 def get_credit_limit(view: AsOfView, business_id: str) -> float:
-    """Extract credit limit from business bank account description."""
-    try:
-        row = view.businesses.set_index("business_id").loc[business_id]
-        acct = str(row.get("bank_account", ""))
-        m = re.search(r"limit ₹([\d,]+)", acct)
-        return float(m.group(1).replace(",", "")) if m else 0.0
-    except Exception:
-        return 0.0
+    """Extract credit limit from view business attributes."""
+    return view.credit_limit(business_id)
 
 
 def simulate_forecast(
@@ -62,9 +55,8 @@ def simulate_forecast(
         last_row = bank.sort_values(["txn_date", "seq"]).iloc[-1]
         opening_bal = float(last_row.balance_inr)
 
-    credit_limit = get_credit_limit(view, business_id)
+    credit_limit = view.credit_limit(business_id)
 
-    # Timeline: 90 days after cutoff
     n_days = 90
     dates = [cutoff + pd.Timedelta(days=i) for i in range(1, n_days + 1)]
     date_to_idx = {d: i for i, d in enumerate(dates)}

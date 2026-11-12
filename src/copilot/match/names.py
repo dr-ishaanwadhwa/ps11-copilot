@@ -7,12 +7,12 @@ import re
 from rapidfuzz import fuzz
 
 _PATTERNS = [
-    re.compile(r"^UPI-(?P<name>[^-]+)-(?P<handle>[^-]+@[^-]+)-"),           # UPI-NAME-handle@bank-...
-    re.compile(r"^NEFT CR-[A-Z0-9]+-(?P<name>[^-]+)-"),                     # NEFT CR-IFSC-NAME-...
-    re.compile(r"^NEFT-[A-Z0-9]+-(?P<name>[^-]+)-"),                        # NEFT-REF-NAME-...
+    re.compile(r"^UPI-(?P<name>[^-]+)-(?P<handle>[^-]+@[^-]+)-"),
+    re.compile(r"^NEFT CR-[A-Z0-9]+-(?P<name>[^-]+)-"),
+    re.compile(r"^NEFT-[A-Z0-9]+-(?P<name>[^-]+)-"),
     # NEFT/RTGS REF NAME [REF]: a bank reference always contains a digit, a name word never does
     re.compile(r"^(?:NEFT|RTGS) (?:DR |CR )?(?:[A-Z]*\d[A-Z0-9]* )?(?P<name>[A-Z][A-Z .&]+?)(?: [A-Z]{4}[A-Z0-9]{8,})?$"),
-    re.compile(r"^INF/NEFT/\d+/[A-Z]+/(?P<name>[^/]+)/"),                   # INF/NEFT/ref/BANK/NAME/...
+    re.compile(r"^INF/NEFT/\d+/[A-Z]+/(?P<name>[^/]+)/"),
     re.compile(r"^IMPS/(?P<name>[^/]+)/"),
     re.compile(r"^(?:NACH|BBPS)[-/ ](?P<name>[^-/]+)"),
 ]

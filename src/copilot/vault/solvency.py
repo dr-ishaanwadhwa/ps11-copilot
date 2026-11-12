@@ -9,24 +9,11 @@ True Cash Runway Buffer:
 """
 from __future__ import annotations
 
-import re
 import pandas as pd
 from .. import config
 from ..load import Pack
 from .db import VaultDB
 from .models import TotalSolvency
-
-
-def _extract_credit_limit(pack: Pack, biz: str) -> float:
-    if not hasattr(pack, "businesses") or pack.businesses.empty:
-        return 0.0
-    df = pack.businesses.set_index("business_id")
-    if biz in df.index:
-        acct = str(df.loc[biz, "bank_account"])
-        m = re.search(r"limit ₹([\d,]+)", acct)
-        if m:
-            return float(m.group(1).replace(",", ""))
-    return 0.0
 
 
 def compute_total_solvency(
@@ -37,31 +24,23 @@ def compute_total_solvency(
     haircut_alpha: float = config.KHATA_COLLECTION_ASSUMPTION,
 ) -> TotalSolvency:
     """Computes the unified dual-plane liquidity analysis for an SME."""
-    # 1. Formal Bank Balances
     b = pack.bank[(pack.bank.business_id == biz) & (pack.bank.txn_date <= as_of)]
     last_bank = b.sort_values(["txn_date", "seq"]).iloc[-1]
     bank_bal = float(last_bank.balance_inr)
     
-    cc_limit = _extract_credit_limit(pack, biz)
+    cc_limit = pack.credit_limit(biz)
     cc_drawn = abs(bank_bal) if (bank_bal < 0 and cc_limit > 0) else 0.0
 
-    # 2. Vault Physical Cash (Galla)
     latest_galla = vault.get_latest_galla(biz)
     galla_cash = latest_galla.counted_cash if latest_galla else 0.0
 
-    # 3. Informal Pending Khata
     khata = vault.get_khata_summary(biz)
     informal_recv = khata["receivables"]
     informal_pay = khata["payables"]
 
-    # 4. Formal Commitments (Estimated Next Month Salary + Open Bills)
-    # Estimate monthly salary from past debits
-    cat_df = pack.bank[(pack.bank.business_id == biz) & (pack.bank.txn_date <= as_of)]
-    # Filter salaries in August/September 2026
-    sal_re = cat_df[(cat_df.amount < 0) & (cat_df.narration.str.contains("SALARY|SAL|WAGES", case=False, na=False))]
+    sal_re = b[(b.amount < 0) & (b.narration.str.contains("SALARY|SAL|WAGES", case=False, na=False))]
     monthly_sal = abs(sal_re.amount.tail(15).sum()) / 2.0 if not sal_re.empty else 150_000.0
     
-    # Open bills in next 30 days
     bills = pack.bills[(pack.bills.business_id == biz) & (pack.bills.bill_date <= as_of)]
     open_bills = float(bills.bill_total.sum() - bills.bill_total.head(len(bills)//2).sum()) if not bills.empty else 50_000.0
     formal_commitments = monthly_sal + min(open_bills, 200_000.0)

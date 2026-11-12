@@ -3,7 +3,6 @@
 v1 answers the brief's live tests T1 (who owes me most) and T7 (can I pay salaries), and routes every
 boundary question first (T8, T10 and the other 14). All 67 questions are P1.
 """
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,8 +20,8 @@ from .receivables import by_customer, open_items
 class Answer:
     text: str
     intent: str
-    sources: list[str] = field(default_factory=list)   # txn_ids / document ids behind the numbers
-    numbers: dict = field(default_factory=dict)        # raw values, for tests and the Hindi renderer (P1)
+    sources: list[str] = field(default_factory=list)
+    numbers: dict = field(default_factory=dict)
 
 
 class Copilot:
@@ -34,16 +33,13 @@ class Copilot:
         else:
             self.cat = Categoriser(pack).apply(pack.bank)
 
-    # ── facts ───────────────────────────────────────────────────────────────
     def closing_balance(self, biz: str, on: pd.Timestamp = config.AS_OF) -> tuple[float, str]:
         b = self.pack.bank[(self.pack.bank.business_id == biz) & (self.pack.bank.txn_date <= on)]
         last = b.sort_values(["txn_date", "seq"]).iloc[-1]
         return float(last.balance_inr), last.txn_id
 
     def credit_limit(self, biz: str) -> float:
-        acct = str(self.pack.businesses.set_index("business_id").loc[biz, "bank_account"])
-        m = re.search(r"limit ₹([\d,]+)", acct)
-        return float(m.group(1).replace(",", "")) if m else 0.0
+        return self.pack.credit_limit(biz)
 
     def salary_run(self, biz: str, month: str) -> tuple[float, list[str]]:
         c = self.cat

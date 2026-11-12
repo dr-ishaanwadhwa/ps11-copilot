@@ -7,25 +7,24 @@ Implements:
 - Team lead manual requalification of suspended rule classes
 """
 from __future__ import annotations
-from dataclasses import asdict, dataclass
+
 import hashlib
 import json
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
 import pandas as pd
 
 from .. import config
+
+if TYPE_CHECKING:
+    from .engine import Match
+
 AUTO = "AUTO"
 
-
-@dataclass
-class AuditRecord:
-    txn_id: str
-    business_id: str
-    rule: str
-    correct: bool
-    reviewer: str
-    at: str
+logger = logging.getLogger(__name__)
 
 
 class AuditLedger:
@@ -39,7 +38,8 @@ class AuditLedger:
             try:
                 with open(self.records_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug("Failed loading audit records from %s: %s", self.records_path, exc)
                 return []
         return []
 
@@ -48,7 +48,8 @@ class AuditLedger:
             try:
                 with open(self.requal_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.debug("Failed loading requalifications from %s: %s", self.requal_path, exc)
                 return {}
         return {}
 
@@ -61,9 +62,8 @@ class AuditLedger:
         at: str | None = None,
     ) -> None:
         """Record an audit check result for a transaction."""
-        import datetime
         self.state_dir.mkdir(parents=True, exist_ok=True)
-        now_str = at or datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_str = at or datetime.now(timezone.utc).isoformat()
         rec = {
             "txn_id": txn_id,
             "business_id": rule_class[0],
@@ -79,11 +79,10 @@ class AuditLedger:
 
     def requalify(self, rule_class: tuple[str, str]) -> None:
         """Team lead manual action to restore and requalify a suspended rule class."""
-        import datetime
         self.state_dir.mkdir(parents=True, exist_ok=True)
         key = f"{rule_class[0]}:{rule_class[1]}"
         requals = self._load_requalifications()
-        requals[key] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        requals[key] = datetime.now(timezone.utc).isoformat()
         with open(self.requal_path, "w", encoding="utf-8") as f:
             json.dump(requals, f, indent=2)
 
@@ -132,9 +131,7 @@ def select_audit_sample(
 
     selected: list[str] = []
     for cls, candidates in auto_lines_by_class.items():
-        # Rate-based selection
         cls_selected = [tid for tid, sc in candidates if sc < rate]
-        # At least 1 per class when class has lines in the week
         if not cls_selected and candidates:
             best = min(candidates, key=lambda x: x[1])[0]
             cls_selected.append(best)

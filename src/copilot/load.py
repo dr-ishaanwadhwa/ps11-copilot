@@ -1,4 +1,5 @@
 """FR-IM-1: load the three workbooks, deduplicate, and expose them as DataFrames and DuckDB tables."""
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -6,6 +7,19 @@ import duckdb
 import pandas as pd
 
 from . import config
+
+
+def get_credit_limit(businesses: pd.DataFrame | None, biz: str) -> float:
+    """Extract credit limit from business bank account description."""
+    if businesses is None or businesses.empty:
+        return 0.0
+    df = businesses.set_index("business_id")
+    if biz in df.index:
+        acct = str(df.loc[biz, "bank_account"])
+        m = re.search(r"limit ₹([\d,]+)", acct)
+        if m:
+            return float(m.group(1).replace(",", ""))
+    return 0.0
 
 
 @dataclass
@@ -23,6 +37,9 @@ class Pack:
     admin_log: pd.DataFrame
     duplicates_skipped: int = 0
     meta: dict = field(default_factory=dict)
+
+    def credit_limit(self, biz: str) -> float:
+        return get_credit_limit(self.businesses, biz)
 
 
 def _num(df: pd.DataFrame, cols) -> pd.DataFrame:
@@ -46,7 +63,7 @@ def load_pack(data_dir: Path | None = None) -> Pack:
     dupes = len(raw) - len(bank)
     bank = _num(bank, ["debit_inr", "credit_inr", "balance_inr"])
     bank["txn_date"] = pd.to_datetime(bank["txn_date"])
-    bank["amount"] = bank["credit_inr"] - bank["debit_inr"]          # + money in, − money out
+    bank["amount"] = bank["credit_inr"] - bank["debit_inr"]
 
     inv = pd.read_excel(docs_x, "sales_invoices")
     inv = _num(inv, ["taxable_value", "cgst", "sgst", "igst", "invoice_total", "amount_received",

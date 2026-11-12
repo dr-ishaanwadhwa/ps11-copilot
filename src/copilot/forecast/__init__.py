@@ -13,7 +13,7 @@ from .delays import (
     fit_delay_distributions,
     sample_delay_conditional,
 )
-from .engine import roll_sunday_to_monday, simulate_forecast
+from .engine import CashForecastSimulator, roll_sunday_to_monday, simulate_forecast
 from .models import DailyPoint, ForecastResult, MonthlyForecast, SwingItem, WarningCard
 from .warnings import evaluate_warnings
 
@@ -27,6 +27,7 @@ __all__ = [
     "SwingItem",
     "roll_sunday_to_monday",
     "simulate_forecast",
+    "CashForecastSimulator",
     "evaluate_warnings",
     "evaluate_holdout",
     "HoldoutEvaluation",

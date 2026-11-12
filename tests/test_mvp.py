@@ -127,3 +127,27 @@ def test_reminders_are_drafts(copilot):
 
 def test_inr_grouping():
     assert inr(12_38_950) == "₹12,38,950" and inr(-23_29_533) == "−₹23,29,533" and inr(950) == "₹950"
+
+
+def test_deep_copilot_with_vault(pack):
+    """Test deep Copilot with integrated dual-plane VaultDB."""
+    from copilot.answers import Copilot
+    from copilot.vault import VaultDB
+
+    vault = VaultDB(in_memory=True)
+    vault.seed_from_pack(pack)
+
+    copilot_with_vault = Copilot(pack, vault=vault)
+
+    # 1. Asking about drawer cash directly resolves from vault
+    a_galla = copilot_with_vault.ask("SME-1", "How much cash do I have in the till drawer?")
+    assert a_galla.intent == "FACT"
+    assert "counted" in a_galla.text
+    assert a_galla.numbers["counted_cash"] == 420_000.0
+
+    # 2. Asking about solvency runway buffer resolves from vault
+    a_sol = copilot_with_vault.ask("SME-1", "What is my true cash runway buffer?")
+    assert a_sol.intent == "FACT"
+    assert "runway buffer" in a_sol.text
+    assert a_sol.numbers["runway_inr"] > 0
+

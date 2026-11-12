@@ -89,3 +89,27 @@ def test_live_claude_classifier():
     """Optional live test against Claude structured outputs when key is present."""
     res = route("Can I pay salaries on 1 October 2026?", use_llm=True)
     assert res.intent in ("FACT", "NEEDS_CHIPS")
+
+
+def test_intent_router_class(tmp_path):
+    """Test the deepened IntentRouter class directly with custom audit sink."""
+    from copilot.boundary import IntentRouter
+
+    sink = tmp_path / "disagreements.jsonl"
+    router = IntentRouter(audit_sink=sink)
+
+    client = make_stub_client(
+        parsed_output=RouterDecision(intent="LOAN", language="en", confident=True)
+    )
+    # Question trips disagreement: keywords say FACT, LLM says LOAN
+    res = router.route(
+        "Can you arrange additional credit for me?",
+        use_llm=True,
+        known_names=["Kaveri Distributors"],
+        client=client,
+    )
+    assert res.intent == "LOAN"
+    assert res.source == "llm"
+    assert sink.exists()
+    assert "LOAN" in sink.read_text(encoding="utf-8")
+

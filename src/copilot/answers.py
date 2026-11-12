@@ -5,6 +5,7 @@ boundary question first (T8, T10 and the other 14). All 67 questions are P1.
 """
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 
@@ -25,9 +26,13 @@ class Answer:
 
 
 class Copilot:
-    def __init__(self, pack: Pack):
+    def __init__(self, pack: Pack, vault: Any = None, cat_df: Any = None):
         self.pack = pack
-        self.cat = Categoriser(pack).apply(pack.bank)
+        self.vault = vault
+        if cat_df is not None:
+            self.cat = cat_df
+        else:
+            self.cat = Categoriser(pack).apply(pack.bank)
 
     # ── facts ───────────────────────────────────────────────────────────────
     def closing_balance(self, biz: str, on: pd.Timestamp = config.AS_OF) -> tuple[float, str]:
@@ -86,5 +91,19 @@ class Copilot:
         if "owe" in q and "most" in q:
             return self.who_owes_most(biz)
         if "salar" in q and ("pay" in q or "afford" in q):
-            return self.can_pay_salaries(biz, galla_cash=galla_cash)
+            effective_galla = galla_cash
+            if effective_galla == 0.0 and self.vault:
+                latest = self.vault.get_latest_galla(biz)
+                if latest:
+                    effective_galla = latest.counted_cash
+            return self.can_pay_salaries(biz, galla_cash=effective_galla)
+        if ("cash" in q or "galla" in q or "till" in q) and ("drawer" in q or "hand" in q or "counted" in q or "have" in q) and self.vault:
+            latest = self.vault.get_latest_galla(biz)
+            if latest:
+                text = f"You counted {inr(latest.counted_cash)} in the drawer on {latest.date:%d %b %Y} (Status: {latest.status_label})."
+                return Answer(text, "FACT", [f"GALLA-{latest.date:%Y%m%d}"], {"counted_cash": latest.counted_cash, "status": latest.status_label})
+        if ("solvency" in q or "runway" in q or "buffer" in q) and self.vault:
+            sol = self.vault.compute_solvency(self.pack, biz)
+            text = f"Your true cash runway buffer is {inr(sol.true_cash_runway_inr)} (Net bank liquidity: {inr(sol.net_bank_liquidity)}, drawer cash: {inr(sol.galla_cash)})."
+            return Answer(text, "FACT", [f"SOLVENCY-{biz}"], {"runway_inr": sol.true_cash_runway_inr, "bank_liquidity": sol.net_bank_liquidity, "galla_cash": sol.galla_cash})
         return Answer("I can't answer that yet in this version. It's on the list for the next release.", "UNSUPPORTED")

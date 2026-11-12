@@ -123,7 +123,7 @@ def is_known_fact_question(question: str) -> bool:
         return True
     if re.search(r"\b(pay salaries|salaries|salary run)\b", low):
         return True
-    if re.search(r"\b(balance|cash position|closing balance|headroom)\b", low):
+    if re.search(r"\b(balance|cash position|closing balance|headroom|galla|drawer|till|runway|solvency)\b", low):
         return True
     if re.search(r"\b(explain|hindi)\b", low):
         return True
@@ -194,21 +194,68 @@ from .masking import mask
 from .router_llm import classify
 
 
-def _log_disagreement(question: str, known_names: list[str], kw_intent: str, llm_intent: str, confident: bool) -> None:
-    try:
-        out_path = Path(__file__).resolve().parents[2] / "scripts" / "out" / "router_disagreements.jsonl"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        masked = mask(question, known_names)
-        record = {
-            "masked_question": masked,
-            "keyword_intent": kw_intent,
-            "llm_intent": llm_intent,
-            "confident": confident,
-        }
-        with open(out_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
+class IntentRouter:
+    """Deep module encapsulating fail-closed boundary detection, LLM classification, and audit logging."""
+
+    def __init__(self, audit_sink: Path | None = None):
+        self.audit_sink = audit_sink or (
+            Path(__file__).resolve().parents[2] / "scripts" / "out" / "router_disagreements.jsonl"
+        )
+
+    def _log_disagreement(
+        self,
+        question: str,
+        known_names: list[str],
+        kw_intent: str,
+        llm_intent: str,
+        confident: bool,
+    ) -> None:
+        try:
+            self.audit_sink.parent.mkdir(parents=True, exist_ok=True)
+            masked = mask(question, known_names)
+            record = {
+                "masked_question": masked,
+                "keyword_intent": kw_intent,
+                "llm_intent": llm_intent,
+                "confident": confident,
+            }
+            with open(self.audit_sink, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def route(
+        self,
+        question: str,
+        *,
+        use_llm: bool = False,
+        known_names: list[str] = (),
+        client: Any = None,
+    ) -> Route:
+        """Fail-closed ensemble router combining keyword rules and Claude classifier (Task 3.4)."""
+        kw = keyword_route(question)
+        if kw.intent != "FACT":
+            return kw  # Keywords say boundary -> fail-safe boundary
+
+        if not use_llm:
+            return Route("FACT", None, source="keywords") if is_known_fact_question(question) else NEEDS_CHIPS
+
+        d = classify(question, list(known_names), client=client)
+        if d is None:  # Model unavailable, timeout, or refused
+            return NEEDS_CHIPS
+
+        if d.intent != "FACT":
+            self._log_disagreement(question, list(known_names), kw.intent, d.intent, d.confident)
+            reply = REPLIES.get(d.intent, READ_ONLY)
+            return Route(d.intent, reply, source="llm")
+
+        if not d.confident:
+            return NEEDS_CHIPS
+
+        return Route("FACT", None, source="llm")
+
+
+_default_router = IntentRouter()
 
 
 def route(
@@ -219,23 +266,9 @@ def route(
     client: Any = None,
 ) -> Route:
     """Fail-closed ensemble router combining keyword rules and Claude classifier (Task 3.4)."""
-    kw = keyword_route(question)
-    if kw.intent != "FACT":
-        return kw  # Keywords say boundary -> fail-safe boundary
-
-    if not use_llm:
-        return Route("FACT", None, source="keywords") if is_known_fact_question(question) else NEEDS_CHIPS
-
-    d = classify(question, list(known_names), client=client)
-    if d is None:  # Model unavailable, timeout, or refused
-        return NEEDS_CHIPS
-
-    if d.intent != "FACT":
-        _log_disagreement(question, list(known_names), kw.intent, d.intent, d.confident)
-        reply = REPLIES.get(d.intent, READ_ONLY)
-        return Route(d.intent, reply, source="llm")
-
-    if not d.confident:
-        return NEEDS_CHIPS
-
-    return Route("FACT", None, source="llm")
+    return _default_router.route(
+        question,
+        use_llm=use_llm,
+        known_names=known_names,
+        client=client,
+    )

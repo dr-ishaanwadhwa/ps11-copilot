@@ -14,7 +14,7 @@ import pandas as pd
 
 from .. import config
 from ..categorise import payee_key
-from .asof import AsOfView
+from .asof import AsOfView, as_of
 from .delays import (
     compute_net_amount,
     compute_tpa_rates,
@@ -342,3 +342,36 @@ def simulate_forecast(
         monthly_forecasts=monthly_forecasts,
         warnings=warnings,
     )
+
+
+class CashForecastSimulator:
+    """Deep module encapsulating time-slicing, categoriser caching, delay modeling, and Monte Carlo simulation."""
+
+    def __init__(self, pack):
+        self.pack = pack
+        self._view_cache: dict[pd.Timestamp, AsOfView] = {}
+
+    def get_view(self, cutoff: pd.Timestamp) -> AsOfView:
+        """Retrieve or build a strictly time-cut AsOfView for a cutoff date."""
+        if cutoff not in self._view_cache:
+            self._view_cache[cutoff] = as_of(self.pack, cutoff)
+        return self._view_cache[cutoff]
+
+    def simulate(
+        self,
+        business_id: str,
+        cutoff: pd.Timestamp = config.AS_OF,
+        n_paths: int = 1000,
+        seed: int = 0,
+        owner_floor: float = 0.0,
+    ) -> ForecastResult:
+        """Run bottom-up Monte Carlo cash forecast from a cutoff date."""
+        view = self.get_view(cutoff)
+        return simulate_forecast(
+            view=view,
+            business_id=business_id,
+            n_paths=n_paths,
+            seed=seed,
+            owner_floor=owner_floor,
+        )
+

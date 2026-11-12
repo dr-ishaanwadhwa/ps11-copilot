@@ -213,3 +213,51 @@ class VaultDB:
             is_demo=True,
         )
         self.record_galla(galla_sme3)
+
+    # ── Deep Unified Interface ──────────────────────────────────────────────
+    def compute_solvency(
+        self,
+        pack: Pack,
+        biz: str,
+        as_of: pd.Timestamp = pd.Timestamp("2026-09-30"),
+        haircut_alpha: float | None = None,
+    ):
+        """Compute the dual-plane true solvency position for an SME business."""
+        from .. import config
+        from .solvency import compute_total_solvency
+
+        alpha = haircut_alpha if haircut_alpha is not None else config.KHATA_COLLECTION_ASSUMPTION
+        return compute_total_solvency(pack, self, biz, as_of=as_of, haircut_alpha=alpha)
+
+    def compliance_facts(
+        self,
+        ytd_cash_deposits: float,
+        account_type: str = "CURRENT",
+        has_pan: bool = True,
+    ):
+        """Retrieve factual compliance limits under Income-tax Rules Rule 237."""
+        from .guardrails import cash_deposit_reporting_facts
+
+        return cash_deposit_reporting_facts(ytd_cash_deposits, account_type=account_type, has_pan=has_pan)
+
+    def deposit_checklist(self) -> dict:
+        """Documents recommended for cash deposit verification."""
+        from .guardrails import deposit_records_checklist
+
+        return deposit_records_checklist()
+
+    def chasing_reminders(self, biz: str, business_name: str | None = None, upi_handle: str = "") -> list[dict]:
+        """Generate structured collection reminders for all khata accounts."""
+        from .. import config
+        from .chase import format_whatsapp_reminder
+
+        bname = business_name or config.BUSINESSES.get(biz, biz)
+        reminders = []
+        for name, account in self.khata_records.get(biz, {}).items():
+            if account.balance_due > 0:
+                reminders.append({
+                    "customer": name,
+                    "account": account,
+                    "reminder": format_whatsapp_reminder(account, bname, upi_handle),
+                })
+        return reminders

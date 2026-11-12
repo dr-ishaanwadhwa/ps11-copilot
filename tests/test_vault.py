@@ -157,3 +157,30 @@ def test_confidential_chasing_and_limitation_act():
     assert rem_stale["limitation_warning"] is not None
     assert "This balance is over 30 months old." in rem_stale["limitation_warning"]
     assert "your CA or lawyer can confirm" in rem_stale["limitation_warning"]
+
+
+def test_deep_vault_interface(pack):
+    """Test the consolidated deep interface on VaultDB."""
+    vault = VaultDB(in_memory=True)
+    vault.seed_from_pack(pack)
+
+    # 1. Unified solvency call directly on vault
+    solvency = vault.compute_solvency(pack, "SME-1", haircut_alpha=0.80)
+    assert solvency.business_id == "SME-1"
+    assert solvency.galla_cash > 0
+    assert solvency.net_bank_liquidity > 0
+
+    # 2. Compliance facts directly on vault
+    facts = vault.compliance_facts(1_200_000.0)
+    assert "Rule 237" in facts.citation
+    assert facts.is_safe
+
+    # 3. Deposit checklist directly on vault
+    checklist = vault.deposit_checklist()
+    assert len(checklist["documents"]) >= 3
+
+    # 4. Chasing reminders directly on vault
+    reminders = vault.chasing_reminders("SME-1")
+    assert len(reminders) > 0
+    assert "wa_link" in reminders[0]["reminder"]
+

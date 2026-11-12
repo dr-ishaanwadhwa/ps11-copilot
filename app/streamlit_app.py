@@ -38,6 +38,7 @@ from copilot.gemini import ocr_collection_slip, transcribe_audio
 from copilot.ingest import parse_bank_statement, parse_tally_xml
 from copilot.vault import (
     Collection,
+    GallaEntry,
     VaultDB,
     cash_deposit_reporting_facts,
     compute_total_solvency,
@@ -86,49 +87,47 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 
 /* sidebar */
-[data-testid="stSidebar"] { background: #F3F3F0; border-right: 1px solid #E5E5E0; }
+[data-testid="stSidebar"] { background: #F3F3F0; border-right: 1px solid #B8B8B0; }
 [data-testid="stSidebarUserContent"] { padding-top: 0.25rem; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] { min-height: 40px; padding: 0 10px; border-radius: 8px; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover { background: #E9E9E5; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p { font-size: 0.9rem; }
-.st-key-nav, .st-key-nav_more { gap: 2px !important; }
-.st-key-nav_more { border-top: 1px solid #E2E2DC; padding-top: 12px; margin-top: 4px; }
-.st-key-side_bottom { border-top: 1px solid #E2E2DC; padding-top: 14px; margin-top: 8px; }
-[data-testid="stSidebar"] [data-baseweb="select"] > div { background: #FFFFFF; border-color: #E2E2DC; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 12px; border-radius: 8px; margin-bottom: 4px; transition: background 150ms ease; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover { background: #E5E5DF; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p { font-size: 0.92rem; font-weight: 500; }
+.st-key-nav, .st-key-nav_more { gap: 0px !important; }
+.st-key-nav_more { border-top: 1px solid #B8B8B0; padding-top: 12px; margin-top: 6px; }
+.st-key-side_bottom { border-top: 1px solid #B8B8B0; padding-top: 14px; margin-top: 8px; }
+[data-testid="stSidebar"] [data-baseweb="select"] > div { background: #FFFFFF; border: 1px solid #B8B8B0; border-radius: 8px; }
 
 /* inputs */
 .stMain [data-baseweb="input"], .stMain [data-baseweb="base-input"],
 .stMain [data-baseweb="select"] > div, div[role="dialog"] [data-baseweb="input"],
-div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important; }
-[data-baseweb="input"], [data-baseweb="select"] > div { border-radius: 8px !important; }
+div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important; border: 1px solid #B8B8B0 !important; border-radius: 8px !important; }
 
 /* buttons */
-.stButton > button, .stFormSubmitButton > button { min-height: 44px; border-radius: 9px; font-weight: 500; padding: 0 18px; }
+.stButton > button, .stFormSubmitButton > button { min-height: 44px; border-radius: 8px; font-weight: 500; padding: 0 18px; transition: all 150ms ease; }
 .stButton > button p, .stFormSubmitButton > button p { font-weight: 500; white-space: nowrap; }
-.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"] { border-color: #DCDCD6; }
-.stLinkButton > a { min-height: 40px; border-radius: 8px; border-color: #DCDCD6; color: #17191C; }
-.stLinkButton > a p { font-weight: 500; font-size: 0.85rem; white-space: nowrap; }
-.stLinkButton > a { padding: 0 10px; }
+.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"] { border: 1px solid #B8B8B0; color: #17191C; }
+.stLinkButton > a { min-height: 44px; border-radius: 8px; border: 1px solid #B8B8B0; color: #17191C; display: inline-flex; align-items: center; padding: 0 14px; }
+.stLinkButton > a p { font-weight: 500; font-size: 0.88rem; white-space: nowrap; }
 [class*="st-key-go_"] .stButton { display: flex; justify-content: flex-end; }
 [class*="st-key-go_"] button { background: transparent !important; border: 0 !important; box-shadow: none !important;
-  min-height: 40px; padding: 0 10px; color: #24509A !important; white-space: nowrap; }
-[class*="st-key-go_"] button p { color: #24509A !important; font-weight: 500; white-space: nowrap; }
-[class*="st-key-go_"] button:hover { background: #EDF1F8 !important; }
+  min-height: 44px; padding: 0 12px; color: #24509A !important; white-space: nowrap; }
+[class*="st-key-go_"] button p { color: #24509A !important; font-weight: 600; white-space: nowrap; }
+[class*="st-key-go_"] button:hover { background: #EDF1F8 !important; border-radius: 6px; }
 
 /* the "Ask about your cash" field in each page header */
-.st-key-askfield [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 14px; border: 1px solid #DCDCD6;
-  border-radius: 10px; background: #FFFFFF; }
-.st-key-askfield [data-testid="stPageLink-NavLink"]:hover { border-color: #C2C2BB; background: #FFFFFF; }
+.st-key-askfield [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 14px; border: 1px solid #B8B8B0;
+  border-radius: 8px; background: #FFFFFF; transition: border-color 150ms ease; }
+.st-key-askfield [data-testid="stPageLink-NavLink"]:hover { border-color: #24509A; background: #FFFFFF; }
 .st-key-askfield [data-testid="stPageLink-NavLink"] p, .st-key-askfield [data-testid="stPageLink-NavLink"] span { color: #646A72; }
 
 /* row lists */
-[class*="st-key-row_"], [class*="st-key-krow_"], [class*="st-key-crow_"] { border-bottom: 1px solid #ECECE8; padding: 6px 0; gap: 0; }
-.st-key-rows, .st-key-krows, .st-key-crows { border-top: 1px solid #ECECE8; gap: 0 !important; }
+[class*="st-key-row_"], [class*="st-key-krow_"], [class*="st-key-crow_"] { border-bottom: 1px solid #B8B8B0; padding: 8px 0; gap: 0; }
+.st-key-rows, .st-key-krows, .st-key-crows { border-top: 1px solid #B8B8B0; gap: 0 !important; }
 
 /* panels */
-.st-key-cc_panel { background: #F7F7F4; border-radius: 12px; padding: 20px; }
-[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 12px; }
-[data-testid="stExpander"] details { border-color: #E2E2DC; border-radius: 10px; }
+.st-key-cc_panel { background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 10px; padding: 20px; }
+[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 10px; border-color: #B8B8B0 !important; }
+[data-testid="stExpander"] details { border: 1px solid #B8B8B0; border-radius: 8px; }
 [data-testid="stExpander"] summary p { font-weight: 500; }
 [data-testid="stAlert"] { border-radius: 10px; }
 
@@ -136,7 +135,7 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
 .cc-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 2px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
 .cc-title { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: #17191C; }
 .cc-sub { font-size: 0.85rem; color: #545A63; margin-top: 2px; }
-.cc-rule { border-top: 1px solid #ECECE8; margin: 6px 0 10px; }
+.cc-rule { border-top: 1px solid #B8B8B0; margin: 6px 0 10px; }
 .cc-h2 { font-size: 1rem; font-weight: 600; color: #17191C; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cc-label { font-size: 0.875rem; font-weight: 500; color: #545A63; }
 .cc-hero { font-size: clamp(2.1rem, 4.5vw, 2.75rem); font-weight: 600; letter-spacing: -0.025em; line-height: 1.1;
@@ -144,8 +143,28 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
 .cc-muted { font-size: 0.82rem; color: #545A63; }
 .cc-note { font-size: 0.76rem; color: #646A72; }
 .cc-num { font-variant-numeric: tabular-nums; }
-.cc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
-.cc-tile { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: #F7F7F4; border-radius: 10px; }
+.cc-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+@media (max-width: 900px) {
+  .cc-tiles {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .cc-tile {
+    min-width: 190px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+}
+.cc-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 8px; }
 .cc-tile .l { font-size: 0.76rem; color: #545A63; }
 .cc-tile .v { font-size: 1.12rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cc-tile .s { font-size: 0.76rem; color: #646A72; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -160,8 +179,8 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
 .cc-tile.warn .l, .cc-tile.warn .v, .cc-tile.warn .s { color: #7A4A00; }
 .cc-tile.neg { background: #FBECEA; }
 .cc-tile.neg .l, .cc-tile.neg .v, .cc-tile.neg .s { color: #A8261D; }
-.cc-demo { font-size: 0.68rem; font-weight: 500; color: #545A63; border: 1px solid #D4D4CE; border-radius: 4px; padding: 0 5px; line-height: 1.55; }
-.cc-tag { display: inline-block; font-size: 0.75rem; font-weight: 500; border-radius: 6px; padding: 1px 8px; line-height: 1.6; white-space: nowrap; }
+.cc-demo { font-size: 0.75rem; font-weight: 600; color: #545A63; border: 1px solid #B8B8B0; border-radius: 4px; padding: 1px 6px; line-height: 1.5; letter-spacing: 0.02em; }
+.cc-tag { display: inline-block; font-size: 0.78rem; font-weight: 500; border-radius: 6px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; }
 .cc-tag.pos { color: #1A6E45; background: #EAF4EE; }
 .cc-tag.warn { color: #8A5300; background: #FBF1DF; }
 .cc-tag.info { color: #24509A; background: #EDF1F8; }
@@ -437,34 +456,43 @@ def render_audio_briefing(text: str) -> None:
     js_text = text.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
     play_lbl = "Listen" if not is_hi() else "सुनें"
     stop_lbl = "Stop" if not is_hi() else "रोकें"
-    title_lbl = "30-sec Daily Audio Briefing" if not is_hi() else "दैनिक नकद ब्रिफिंग (30 सेकंड)"
-    sub_lbl = "(AI voice summary of today's cash)" if not is_hi() else "(आज की नकद स्थिति का संक्षिप्त सारांश)"
+    title_lbl = "Morning Cash Briefing" if not is_hi() else "दैनिक नकद ब्रिफिंग"
+    sub_lbl = "30-second audio summary" if not is_hi() else "30 सेकंड का नकद सारांश"
     lang = "hi-IN" if is_hi() else "en-IN"
 
+    svg_volume = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#24509A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>'
+
     html_code = f"""
-    <div style="display:flex;align-items:center;justify-content:space-between;background:#F4F6FB;border:1px solid #D9E2F2;border-radius:8px;padding:8px 14px;font-family:'IBM Plex Sans', -apple-system, sans-serif;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">🎙️</span>
-        <span style="font-size:13px;font-weight:600;color:#17191C;">{title_lbl}</span>
-        <span style="font-size:12px;color:#555E68;">{sub_lbl}</span>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Devanagari:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#F4F6FB;border:1px solid #B8B8B0;border-radius:8px;padding:10px 16px;font-family:'IBM Plex Sans','IBM Plex Sans Devanagari',system-ui,sans-serif;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:12px;min-width:240px;">
+        <span style="display:flex;align-items:center;">{svg_volume}</span>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#17191C;line-height:1.2;">{title_lbl}</div>
+          <div style="font-size:12px;color:#545A63;margin-top:2px;">{sub_lbl}</div>
+        </div>
       </div>
-      <button id="speakBtn" onclick="togglePlay()" style="background:#24509A;color:white;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
-        <span id="btnIcon">▶️</span> <span id="btnTxt">{play_lbl}</span>
-      </button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="speechWarn" style="display:none;font-size:11px;color:#A8261D;font-weight:500;">Browser speech synthesis unavailable</div>
+        <button id="speakBtn" onclick="togglePlay()" aria-label="Play daily audio briefing" style="background:#24509A;color:white;border:none;min-height:44px;min-width:108px;padding:0 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background 150ms ease;">
+          <span id="btnTxt">{play_lbl}</span>
+        </button>
+      </div>
     </div>
     <script>
       let isPlaying = false;
       const text = "{js_text}";
       function togglePlay() {{
         if (!('speechSynthesis' in window)) {{
-          alert('Speech synthesis is not supported in this browser.');
+          const warn = document.getElementById('speechWarn');
+          if (warn) warn.style.display = 'block';
           return;
         }}
         if (isPlaying) {{
           window.speechSynthesis.cancel();
           isPlaying = false;
           document.getElementById('btnTxt').innerText = "{play_lbl}";
-          document.getElementById('btnIcon').innerText = "▶️";
+          document.getElementById('speakBtn').style.background = "#24509A";
         }} else {{
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(text);
@@ -473,22 +501,22 @@ def render_audio_briefing(text: str) -> None:
           u.onend = function() {{
             isPlaying = false;
             document.getElementById('btnTxt').innerText = "{play_lbl}";
-            document.getElementById('btnIcon').innerText = "▶️";
+            document.getElementById('speakBtn').style.background = "#24509A";
           }};
           u.onerror = function() {{
             isPlaying = false;
             document.getElementById('btnTxt').innerText = "{play_lbl}";
-            document.getElementById('btnIcon').innerText = "▶️";
+            document.getElementById('speakBtn').style.background = "#24509A";
           }};
           window.speechSynthesis.speak(u);
           isPlaying = true;
           document.getElementById('btnTxt').innerText = "{stop_lbl}";
-          document.getElementById('btnIcon').innerText = "⏹️";
+          document.getElementById('speakBtn').style.background = "#A8261D";
         }}
       }}
     </script>
     """
-    components.html(html_code, height=52)
+    components.html(html_code, height=68)
 
 
 @st.dialog("Daily Recovery Sheet")
@@ -511,7 +539,7 @@ def daily_print_dialog():
     csv_data["Amount Collected"] = ""
     csv_data["Remarks"] = ""
     c_btn1.download_button(
-        label=t("📥 Download CSV", "📥 CSV डाउनलोड करें"),
+        label=t("Download CSV", "CSV डाउनलोड करें"),
         data=csv_data.to_csv(index=False),
         file_name=f"recovery_sheet_{biz}_{config.AS_OF:%Y%m%d}.csv",
         mime="text/csv",
@@ -521,19 +549,22 @@ def daily_print_dialog():
     table_rows = ""
     for idx, (_, r) in enumerate(late.iterrows(), 1):
         table_rows += (
-            f'<tr style="border-bottom:1px solid #ECECE8;">'
-            f'<td style="padding:6px;text-align:left;">{idx}</td>'
-            f'<td style="padding:6px;font-weight:600;color:#17191C;">{esc(r["customer_name"])}</td>'
-            f'<td style="padding:6px;text-align:right;font-weight:600;color:#17191C;">{inr(r["outstanding"])}</td>'
-            f'<td style="padding:6px;text-align:center;color:#8A5300;">{int(r["oldest_days"])}d</td>'
-            f'<td style="padding:6px;text-align:center;"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #555E68;border-radius:2px;"></span></td>'
-            f'<td style="padding:6px;border-bottom:1px dashed #CCC;width:90px;"></td>'
-            f'<td style="padding:6px;border-bottom:1px dashed #CCC;"></td>'
+            f'<tr style="border-bottom:1px solid #E5E5DF;">'
+            f'<td style="padding:8px 6px;text-align:left;">{idx}</td>'
+            f'<td style="padding:8px 6px;font-weight:600;color:#17191C;">{esc(r["customer_name"])}</td>'
+            f'<td style="padding:8px 6px;text-align:right;font-weight:600;color:#17191C;">{inr(r["outstanding"])}</td>'
+            f'<td style="padding:8px 6px;text-align:center;color:#8A5300;">{int(r["oldest_days"])}d</td>'
+            f'<td style="padding:8px 6px;text-align:center;"><span style="display:inline-block;width:16px;height:16px;border:1.5px solid #545A63;border-radius:2px;"></span></td>'
+            f'<td style="padding:8px 6px;border-bottom:1px dashed #B8B8B0;width:95px;"></td>'
+            f'<td style="padding:8px 6px;border-bottom:1px dashed #B8B8B0;"></td>'
             f'</tr>'
         )
 
+    svg_print = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>'
+
     html_sheet = f"""
-    <div id="printSheet" style="background:#FFF;padding:16px;font-family:'IBM Plex Sans', -apple-system, sans-serif;border:1px solid #E2E2DC;border-radius:8px;margin-top:10px;">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Devanagari:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <div id="printSheet" style="background:#FFF;padding:16px;font-family:'IBM Plex Sans','IBM Plex Sans Devanagari',system-ui,sans-serif;border:1px solid #B8B8B0;border-radius:8px;margin-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #17191C;padding-bottom:10px;margin-bottom:12px;">
         <div>
           <div style="font-size:18px;font-weight:700;color:#17191C;">{esc(BIZ_NAME)}</div>
@@ -541,26 +572,26 @@ def daily_print_dialog():
         </div>
         <div style="text-align:right;">
           <div style="font-size:12px;font-weight:600;color:#17191C;">Date: {config.AS_OF:%d %b %Y}</div>
-          <div style="font-size:11px;color:#555E68;">Overdue (45+ Days): {len(late)} shops · Total: {inr(total_due)}</div>
+          <div style="font-size:11px;color:#545A63;">Overdue (45+ Days): {len(late)} shops · Total: {inr(total_due)}</div>
         </div>
       </div>
 
       <div style="margin-bottom:12px;text-align:right;">
-        <button onclick="window.print()" style="background:#24509A;color:white;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
-          🖨️ Print Sheet / PDF
+        <button onclick="window.print()" style="background:#24509A;color:white;border:none;min-height:44px;padding:0 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;">
+          {svg_print} Print Sheet / PDF
         </button>
       </div>
 
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;">
         <thead>
-          <tr style="background:#F4F4F1;border-bottom:1px solid #17191C;">
-            <th style="padding:6px;text-align:left;width:30px;">#</th>
-            <th style="padding:6px;text-align:left;">Retailer / Shop</th>
-            <th style="padding:6px;text-align:right;width:95px;">Due (₹)</th>
-            <th style="padding:6px;text-align:center;width:55px;">Age</th>
-            <th style="padding:6px;text-align:center;width:50px;">Visit</th>
-            <th style="padding:6px;text-align:left;width:90px;">Recvd (₹)</th>
-            <th style="padding:6px;text-align:left;">Salesman Notes</th>
+          <tr style="background:#F3F3F0;border-bottom:1px solid #17191C;">
+            <th style="padding:8px 6px;text-align:left;width:30px;">#</th>
+            <th style="padding:8px 6px;text-align:left;">Retailer / Shop</th>
+            <th style="padding:8px 6px;text-align:right;width:95px;">Due (₹)</th>
+            <th style="padding:8px 6px;text-align:center;width:55px;">Age</th>
+            <th style="padding:8px 6px;text-align:center;width:50px;">Visit</th>
+            <th style="padding:8px 6px;text-align:left;width:95px;">Recvd (₹)</th>
+            <th style="padding:8px 6px;text-align:left;">Salesman Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -587,7 +618,7 @@ def page_overview():
     items = open_items(pack, biz)
 
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
         if is_hi():
             p_text = f"नमस्ते {BIZ_NAME}। बैंक बैलेंस {inr(bal)} है। कुल इनवॉइस बकाया {inr(items.outstanding.sum())} है।"
         else:
@@ -607,7 +638,7 @@ def page_overview():
             c_on1, c_on2 = st.columns([5, 1], vertical_alignment="center")
             with c_on1:
                 H(f'<div class="cc-onboard">'
-                  f'<div><b>{t("✨ Quick Setup & Privacy Summary:", "✨ त्वरित सेटअप और गोपनीयता सुरक्षा:")}</b> '
+                  f'<div><b>{t("Quick Setup & Privacy Summary:", "त्वरित सेटअप और गोपनीयता सुरक्षा:")}</b> '
                   f'{t("1. Owner PIN: active (0000)", "1. गुप्त PIN: सक्रिय (0000)")} · '
                   f'{t("2. ₹25L CC Headroom: monitored", "2. ₹25 लाख CC लिमिट: सक्रिय")} · '
                   f'{t("3. Cash Drawer: Private (not shared with CA)", "3. गल्ला: केवल मालिक के लिए सुरक्षित")}</div>'
@@ -821,16 +852,31 @@ def _action_row(key: str, title_html: str, detail: str, label: str, page, ask: s
 @st.dialog("Close the day")
 def day_close_dialog():
     H(f'<div class="cc-muted">{t("Takes about a minute. Saved in your cash book on this device.", "लगभग एक मिनट लगेगा। आपके डिवाइस पर रोकड़ बही में सुरक्षित होगा।")}</div>')
+    latest_g = vault.get_latest_galla(biz)
+    default_open = latest_g.counted_cash if latest_g else 0.0
     with st.form("galla_close_form", border=False):
         c1, c2 = st.columns(2)
-        c1.number_input(t("Opening till cash (₹)", "सुबह का शुरुआती नकद (₹)"), value=10000.0, step=500.0)
-        c2.number_input(t("Today's cash takings (₹)", "आज की नकद बिक्री (₹)"), value=25000.0, step=1000.0)
-        c1.number_input(t("Cash expenses paid (₹)", "नकद खर्चे व हमाली (₹)"), value=2500.0, step=100.0, help=t("Hamali, petty and other cash expenses", "हमाली, चाय-पानी व अन्य खर्चे"))
-        c2.number_input(t("Cash banked into account (₹)", "बैंक खाते में जमा नकद (₹)"), value=20000.0, step=1000.0)
-        c1.number_input(t("Physical count at close (₹)", "शाम को गल्ले में बचा नकद (₹)"), value=12500.0, step=500.0)
-        c2.text_input(t("Notes", "विवरण / नोट"), value="Routine daily close")
+        open_cash = c1.number_input(t("Opening till cash (₹)", "सुबह का शुरुआती नकद (₹)"), value=float(default_open), step=500.0)
+        takings = c2.number_input(t("Today's cash takings (₹)", "आज की नकद बिक्री (₹)"), value=0.0, step=500.0)
+        expenses = c1.number_input(t("Cash expenses paid (₹)", "नकद खर्चे व हमाली (₹)"), value=0.0, step=100.0, help=t("Hamali, petty and other cash expenses", "हमाली, चाय-पानी व अन्य खर्चे"))
+        banked = c2.number_input(t("Cash banked into account (₹)", "बैंक खाते में जमा नकद (₹)"), value=0.0, step=500.0)
+        expected_close = open_cash + takings - expenses - banked
+        phys_count = c1.number_input(t("Physical count at close (₹)", "शाम को गल्ले में बचा नकद (₹)"), value=float(expected_close), step=500.0)
+        notes = c2.text_input(t("Notes", "विवरण / नोट"), placeholder=t("e.g. Evening till balance", "उदा. शाम का गल्ला मिलान"))
         submitted = st.form_submit_button(t("Record in cash book", "रोकड़ बही में दर्ज करें"), type="primary")
     if submitted:
+        entry = GallaEntry(
+            business_id=biz,
+            date=config.AS_OF,
+            opening_cash=open_cash,
+            cash_in=takings,
+            cash_out=expenses,
+            cash_banked=banked,
+            counted_cash=phys_count,
+            notes=notes or "Daily Close",
+            is_demo=False,
+        )
+        vault.record_galla(entry)
         st.session_state["toast"] = t("Recorded locally in Cash Book. Balance updated.", "रोकड़ बही में दर्ज हुआ। बैलेंस अपडेट हो गया।")
         st.rerun()
 
@@ -840,22 +886,23 @@ def collections_dialog():
     H(f'<div class="cc-muted">{t("What each salesman collected from shops. Used to match cash deposits to invoices.", "दुकानों से सेल्समैन द्वारा की गई वसूली। बैंक जमा को इनवॉइस से जोड़ने के लिए उपयोगी।")}</div>')
 
     # ── VISION OCR: CAMERA / FILE UPLOAD ──
-    slip_file = st.file_uploader(t("📷 Scan handwritten slip photo (Optional)", "📷 हाथ से लिखी पर्ची की फोटो खींचें (वैकल्पिक)"),
+    slip_file = st.file_uploader(t("Scan handwritten slip photo (Optional)", "हाथ से लिखी पर्ची की फोटो खींचें (वैकल्पिक)"),
                                  type=["jpg", "jpeg", "png", "webp"], key="_slip_upload_img")
-    prefill_shop = "Laxmi Kirana Stores"
-    prefill_amount = 15000.0
-    prefill_salesman = "Ramesh K."
+    prefill_shop = ""
+    prefill_amount = 0.0
+    prefill_salesman = ""
     if slip_file:
         with st.spinner(t("Scanning slip with Gemini Vision…", "Gemini AI से पर्ची पढ़ी जा रही है…")):
             ocr_data = ocr_collection_slip(slip_file.read(), mime_type=slip_file.type or "image/jpeg")
-            if ocr_data.get("shop"):
-                prefill_shop = ocr_data["shop"]
-            if ocr_data.get("amount"):
-                prefill_amount = float(ocr_data["amount"])
-            if ocr_data.get("salesman"):
-                prefill_salesman = ocr_data["salesman"]
-            st.success(t(f"Extracted: {prefill_shop} · {inr(prefill_amount)} · {prefill_salesman}",
-                         f"पहचाना गया: {prefill_shop} · {inr(prefill_amount)} · {prefill_salesman}"))
+            if ocr_data.get("shop") or ocr_data.get("amount") or ocr_data.get("salesman"):
+                prefill_shop = ocr_data.get("shop", "")
+                prefill_amount = float(ocr_data.get("amount", 0.0))
+                prefill_salesman = ocr_data.get("salesman", "")
+                st.success(t(f"Extracted: {prefill_shop or 'Shop'} · {inr(prefill_amount)} · {prefill_salesman or 'Salesman'}",
+                             f"पहचाना गया: {prefill_shop or 'दुकान'} · {inr(prefill_amount)} · {prefill_salesman or 'सेल्समैन'}"))
+            else:
+                st.warning(t("Could not auto-detect slip details. Please enter manually below.",
+                             "पर्ची का विवरण स्वतः नहीं पढ़ा जा सका। कृपया नीचे स्वयं दर्ज करें।"))
 
     with st.form("collections_today_form", border=False):
         c1, c2 = st.columns(2)
@@ -891,7 +938,7 @@ def page_cash_book():
                 t("Drawer cash and informal khata. Kept on this device only.", "गल्ले का नकद और कच्चा खाता। केवल इस डिवाइस पर सुरक्षित।"),
                 right=share_toggle)
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
     owner_pin = os.environ.get("COPILOT_OWNER_PIN")
     pin_is_default = owner_pin is None
@@ -1006,7 +1053,7 @@ def page_forecast():
                 t(f"90 days from {config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y}, trained only on data before that date.",
                   f"{config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y} से अगले 90 दिनों का सुरक्षित नकद अनुमान।"))
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
     fc_res = forecast_for(biz)
 
@@ -1117,7 +1164,7 @@ def page_review():
                 t(f"Receipts that need you. {counts['auto']:,} others matched one rule to exactly one set of documents under strict Decision 60.",
                   f"जमा प्रविष्टियां जिन पर निर्णय बाकी है। अन्य {counts['auto']:,} प्रविष्टियों का स्वतः सही इनवॉइस से मिलान हो चुका है।"))
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
     bank = pack.bank.set_index("txn_id")
     rows = []
@@ -1158,13 +1205,13 @@ def page_review():
             view, gridOptions=gb.build(), height=560, fit_columns_on_grid_load=False, theme="alpine",
             key=f"queue_grid_{biz}_{choice}",
             custom_css={
-                ".ag-root-wrapper": {"border": "1px solid #E2E2DC !important", "border-radius": "10px !important"},
-                ".ag-header": {"background-color": "#FAFAF8 !important", "border-bottom-color": "#E2E2DC !important"},
-                ".ag-header-cell-text": {"font-weight": "500 !important", "color": "#646A72 !important"},
-                ".ag-row": {"border-color": "#ECECE8 !important", "font-size": "13px !important"},
+                ".ag-root-wrapper": {"border": "1px solid #B8B8B0 !important", "border-radius": "8px !important"},
+                ".ag-header": {"background-color": "#F3F3F0 !important", "border-bottom": "1px solid #B8B8B0 !important"},
+                ".ag-header-cell-text": {"font-weight": "600 !important", "color": "#17191C !important"},
+                ".ag-row": {"border-bottom": "1px solid #E5E5DF !important", "font-size": "13px !important"},
                 ".ag-row-selected": {"background-color": "#EDF1F8 !important"},
                 ".ag-row-hover": {"background-color": "#F7F7F4 !important"},
-                ".ag-cell-focus": {"border-color": "transparent !important"},
+                ".ag-cell-focus": {"border": "2px solid #24509A !important", "outline": "none !important"},
             },
         )
     sel = grid.get("selected_rows")
@@ -1199,9 +1246,23 @@ def page_review():
                 H(f'<dl class="cc-dl">{doc_rows}</dl>')
             else:
                 H('<div class="cc-muted">No single document fits this receipt yet.</div>')
-            st.button("Accept", disabled=True, use_container_width=True,
-                      help="Posting is wired in the next build; v1 is read-only.")
-            H('<div class="cc-note">Posting comes in the next build. This version is read-only.</div>')
+            st.write("")
+            verified_keys = st.session_state.setdefault("_verified_matches", set())
+            is_v = txn_id in verified_keys
+            col_v1, col_v2 = st.columns([1.4, 1])
+            with col_v1:
+                v_lbl = t("✓ Verified by Owner", "✓ मालिक द्वारा सत्यापित") if is_v else t("Mark as Verified", "सत्यापित चिह्नित करें")
+                if st.button(v_lbl, key=f"verify_{txn_id}", type="primary" if not is_v else "secondary", use_container_width=True):
+                    if is_v:
+                        verified_keys.remove(txn_id)
+                    else:
+                        verified_keys.add(txn_id)
+                    st.rerun()
+            with col_v2:
+                reconcile_note = f"Txn {txn_id} | {r['amount']} | {b.narration} | Matched: {m.rule}"
+                st.download_button(t("Export Note", "नोट डाउनलोड"), data=reconcile_note,
+                                   file_name=f"match_{txn_id}.txt", mime="text/plain", use_container_width=True)
+            H(f'<div class="cc-note" style="margin-top:6px">{t("Read-only mode: Staged locally for your CA. Zero ledger mutation.", "रीड-ओनली मोड: एकाउंटेंट के लिए लोकल सेव हुआ। कोई बदलाव नहीं किया जाता।")}</div>')
 
 
 # ── PAGE: RECEIVABLES ────────────────────────────────────────────────────────
@@ -1210,7 +1271,7 @@ def page_receivables():
                 t(f"Who owes you on formal invoices, as of {config.AS_OF:%d %b %Y}.",
                   f"{config.AS_OF:%d %b %Y} तक इनवॉइस के अनुसार किस पर कितना बकाया है।"))
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
     items = open_items(pack, biz)
     cust_df = by_customer(items)
@@ -1233,7 +1294,7 @@ def page_receivables():
                                       format_func=lambda o: f"{o}  {len(filters[o])}",
                                       label_visibility="collapsed") or def_f
     with c_f2:
-        if st.button(t("🖨️ Daily Recovery Sheet", "🖨️ दैनिक वसूली शीट"), key="btn_open_print_sheet", use_container_width=True):
+        if st.button(t("Daily Recovery Sheet", "दैनिक वसूली शीट"), icon=":material/print:", key="btn_open_print_sheet", use_container_width=True):
             daily_print_dialog()
     filtered_cust = filters[choice]
     with head:
@@ -1319,7 +1380,7 @@ def page_ask():
     tab_ask = st.container()
     with tab_ask:
         if showing_partial_view:
-            render_partial_view_notice()
+            st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
         if "ask_prefill" in st.session_state:
             st.session_state["ask_typed"] = st.session_state.pop("ask_prefill")
@@ -1332,7 +1393,7 @@ def page_ask():
                                   placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
                     c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True, on_click=_submit_typed)
 
-                with st.expander(t("🎙️ Speak your question (माइक से बोलें)", "🎙️ माइक से बोलकर पूछें")):
+                with st.expander(t("Speak your question (माइक से बोलें)", "माइक से बोलकर पूछें"), icon=":material/mic:"):
                     rec_audio = st.audio_input(t("Record voice question", "आवाज़ रिकॉर्ड करें"), key="mic_audio_input")
                     if rec_audio:
                         with st.spinner(t("Transcribing with Gemini Voice…", "आवाज़ समझी जा रही है…")):
@@ -1372,17 +1433,17 @@ def page_ask():
                     hi_summary = ""
                     sq = selected_q.lower()
                     if "salar" in sq or "1 अक्टूबर" in sq or "सैलरी" in sq:
-                        hi_summary = "💡 <b>सरल समझ:</b> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।"
+                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।'
                     elif "who owes" in sq or "बकाया" in sq or "उधारी" in sq:
-                        hi_summary = "💡 <b>सरल समझ:</b> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल ₹7,82,910 (4 खुले इनवॉइस)।"
+                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल ₹7,82,910 (4 खुले इनवॉइस)।'
                     elif "cash in till" in sq or "galla" in sq or "drawer" in sq or "गल्ला" in sq or "रोकड़" in sq:
-                        hi_summary = f"💡 <b>सरल समझ:</b> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।"
+                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।'
                     elif "worst cash dip" in sq or "कम बैलेंस" in sq or "कमी" in sq:
-                        hi_summary = "💡 <b>सरल समझ:</b> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।"
+                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।'
                     elif "loan" in sq or "लोन" in sq:
-                        hi_summary = "💡 <b>सरल समझ:</b> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।"
+                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।'
                     elif "reminder" in sq or "तकादा" in sq:
-                        hi_summary = "💡 <b>सरल समझ:</b> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश 'Receivables' पेज पर तैयार हैं।"
+                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश \'Receivables\' पेज पर तैयार हैं।'
                     if hi_summary:
                         H(f'<div style="margin-top:12px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:0.92rem;color:#166534">{hi_summary}</div>')
 
@@ -1425,7 +1486,7 @@ def _html_table(df: pd.DataFrame, highlight: str | None = None, min_width: int =
 def page_quality():
     page_header("Data quality", "What was read, and how the copilot scored against the answer keys.")
     if showing_partial_view:
-        render_partial_view_notice()
+        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
     rep = data_report()
     section("Your data, checked")
@@ -1515,7 +1576,7 @@ def page_setup():
                     H(f'<div class="cc-row-title" style="color:#1A6E45;margin-top:16px">{svg(ICON_CHECK_CIRCLE, 18)}'
                       f'Every line ties to its running balance. Matching is ready.</div>')
 
-                with st.expander(t("📁 Upload Live Statement or Tally Prime XML", "📁 लाइव बैंक स्टेटमेंट या टैली XML अपलोड करें")):
+                with st.expander(t("Upload Live Statement or Tally Prime XML", "लाइव बैंक स्टेटमेंट या टैली XML अपलोड करें"), icon=":material/upload_file:"):
                     st.caption(t("Upload your real bank CSV/Excel or Tally Prime XML export to verify balance ties and open bills.",
                                  "बैलेंस मिलान और इनवॉइस जांचने के लिए बैंक स्टेटमेंट (CSV/Excel) या टैली XML अपलोड करें।"))
                     u_file = st.file_uploader(t("Choose statement or Tally XML", "फाइल चुनें"), type=["csv", "xlsx", "xls", "xml"], key="setup_upload_file")

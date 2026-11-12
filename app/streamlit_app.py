@@ -72,61 +72,61 @@ st.markdown("""
       transition: all 0.2s ease !important;
   }
 
-  /* SME Cards */
+  /* SME Cards - Calm & Restful */
   .sme-hero-card {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%);
-      border: 1px solid rgba(16, 185, 129, 0.28);
-      border-radius: 16px;
-      padding: 22px;
-      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 14px;
   }
 
   .sme-card {
       background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(128, 128, 128, 0.18);
-      border-radius: 14px;
-      padding: 18px;
-      margin-bottom: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
   }
 
   .sme-hero-headline {
-      font-size: 2.2rem;
+      font-size: 1.8rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-      margin: 4px 0;
+      margin: 2px 0;
   }
 
-  /* Semantic badges with high contrast */
+  /* Semantic badges with calm contrast */
   .sme-badge {
       display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 16px;
+      font-size: 0.72rem;
       font-weight: 600;
   }
 
   .sme-badge-success {
-      background: rgba(16, 185, 129, 0.15);
+      background: rgba(16, 185, 129, 0.1);
       color: #10B981;
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      border: 1px solid rgba(16, 185, 129, 0.25);
   }
 
   .sme-badge-warning {
-      background: rgba(245, 158, 11, 0.15);
+      background: rgba(245, 158, 11, 0.1);
       color: #F59E0B;
-      border: 1px solid rgba(245, 158, 11, 0.35);
+      border: 1px solid rgba(245, 158, 11, 0.25);
   }
 
   .sme-badge-danger {
-      background: rgba(239, 68, 68, 0.15);
+      background: rgba(239, 68, 68, 0.1);
       color: #EF4444;
-      border: 1px solid rgba(239, 68, 68, 0.35);
+      border: 1px solid rgba(239, 68, 68, 0.25);
   }
 
   .sme-badge-info {
-      background: rgba(59, 130, 246, 0.15);
+      background: rgba(59, 130, 246, 0.1);
       color: #3B82F6;
-      border: 1px solid rgba(59, 130, 246, 0.35);
+      border: 1px solid rgba(59, 130, 246, 0.25);
   }
 </style>
 """, unsafe_allow_html=True)
@@ -140,6 +140,24 @@ def boot():
     vault = VaultDB(in_memory=True)
     vault.seed_from_pack(pack)
     return pack, matches, copilot, vault
+
+
+@st.cache_resource
+def get_forecast(_pack, cutoff, biz, n_paths=100):
+    view = as_of(_pack, cutoff)
+    return simulate_forecast(view, biz, n_paths=n_paths)
+
+
+@st.cache_resource
+def get_holdout(_pack):
+    return evaluate_holdout(_pack)
+
+
+@st.cache_resource
+def get_scores(_pack, _matches, _cat):
+    df = score_matches(_pack, _matches)
+    cat_df = score_categories(_pack, _cat)
+    return df, cat_df
 
 
 pack, matches, copilot, vault = boot()
@@ -344,19 +362,23 @@ total_liquidity_hero = net_bank_hero + (galla_cash_hero if not showing_partial_v
 col_hero_text, col_hero_action = st.columns([5, 1])
 with col_hero_text:
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%); border: 1px solid rgba(37, 99, 235, 0.28); border-radius: 16px; padding: 18px 22px; margin-bottom: 14px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.3rem;">🤖</span>
-          <span style="font-size: 1.05rem; font-weight: 700; color: #3B82F6;">Copilot Command Center</span>
-          <span class="sme-badge sme-badge-success">Proactive Daily Debrief</span>
+    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #10B981;">
+            ● {config.BUSINESSES[biz]} · Daily Pulse
+          </span>
+          <div style="font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0;">
+            {inr(total_liquidity_hero)}
+            <span style="font-size: 0.82rem; font-weight: 500; opacity: 0.7; margin-left: 6px;">Total Usable Liquidity</span>
+          </div>
         </div>
-        <span style="font-size: 0.78rem; opacity: 0.8;">English & हिन्दी · Zero Learning Curve</span>
+        <div>
+          <span class="sme-badge sme-badge-success">100% Payroll Funded</span>
+        </div>
       </div>
-      <div style="margin-top: 10px; font-size: 0.88rem; line-height: 1.5;">
-        <b>Namaste {config.BUSINESSES[biz].split()[0]}!</b> {'Total usable liquidity today is <b style="color: #10B981;">' + inr(total_liquidity_hero) + '</b> (Bank Headroom ' + inr(net_bank_hero) + ' + Galla ' + inr(galla_cash_hero) + ').' if not showing_partial_view else 'Formal books active: <b style="color: #3B82F6;">' + inr(bal_hero) + '</b> balance.'}<br/>
-        • <b>1 Oct Salaries (₹3.80L):</b> 100% funded with {inr(net_bank_hero)} headroom safely clear of credit limits.<br/>
-        • <b>19 Kiranas Overdue >45d:</b> ₹32.1L total. Salesman collections ready to bank.
+      <div style="margin-top: 4px; font-size: 0.82rem; opacity: 0.85; line-height: 1.4;">
+        {'Bank Headroom ' + inr(net_bank_hero) + ' + Counter Drawer ' + inr(galla_cash_hero) + ' safely cover upcoming commitments.' if not showing_partial_view else 'Formal books active: ' + inr(bal_hero) + ' balance.'}
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -366,7 +388,24 @@ with col_hero_action:
         st.session_state["onboarding_step"] = 1
         st.rerun()
 
-# Persistent Prompt Chips
+# Sleek Search Bar & Quiet Prompt Pills
+c_input, c_btn = st.columns([5, 1])
+with c_input:
+    user_typed = st.text_input(
+        "Ask Copilot",
+        placeholder="Ask anything about your cash... (e.g. Can I pay salaries? Who owes me most?)",
+        label_visibility="collapsed",
+        key="main_copilot_input",
+    )
+with c_btn:
+    if st.button("Ask", key="main_copilot_submit_btn", type="primary"):
+        if user_typed:
+            st.session_state["active_copilot_q"] = user_typed
+
+if user_typed and user_typed != st.session_state.get("active_copilot_q"):
+    st.session_state["active_copilot_q"] = user_typed
+
+# Persistent Prompt Chips (compact, clean labels)
 chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
 if chip_col1.button("💬 Can I pay salaries on 1 Oct?", key="hero_chip_salary"):
     st.session_state["active_copilot_q"] = "Can I pay salaries on 1 October 2026?"
@@ -381,13 +420,12 @@ if st.session_state.get("active_copilot_q"):
     active_q = st.session_state["active_copilot_q"]
     ans = copilot.ask(biz, active_q, galla_cash=galla_cash_hero)
     st.markdown(f"""
-    <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <b style="color: #3B82F6; font-size: 0.88rem;">Q: {active_q}</b>
-        <span style="font-size: 0.75rem; color: #10B981; font-weight: 600;">✓ 100% Grounded in Data</span>
+    <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 12px; padding: 12px 16px; margin: 6px 0 12px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span style="font-weight: 600; font-size: 0.84rem; color: #3B82F6;">{active_q}</span>
+        <span style="font-size: 0.72rem; opacity: 0.7;">Verified Ledger Sources</span>
       </div>
-      <p style="margin: 8px 0 4px 0; font-size: 0.88rem; font-weight: 500;">{ans.text}</p>
-      <div style="font-size: 0.75rem; opacity: 0.75;">Sources: Bank Statements · Cash Drawer Log</div>
+      <p style="margin: 6px 0 2px 0; font-size: 0.86rem; font-weight: 500;">{ans.text}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -425,50 +463,25 @@ with tab_home:
         st.caption("Formal books only. Cash drawer and informal khata balances are not included.")
     else:
         # Dual-Plane Total Solvency View
+        st.subheader("True Solvency (Dual-Plane Reality)")
+
         if is_owner:
-            alpha = st.slider(
-                "Khata collection assumption",
-                min_value=0.5,
-                max_value=1.0,
-                value=config.KHATA_COLLECTION_ASSUMPTION,
-                step=0.05,
-                help="Adjustable informal khata recovery expectation",
-            )
+            with st.expander(f"⚙️ Adjust Khata Recovery Assumption", expanded=False):
+                alpha = st.slider(
+                    "Khata collection assumption",
+                    min_value=0.5,
+                    max_value=1.0,
+                    value=config.KHATA_COLLECTION_ASSUMPTION,
+                    step=0.05,
+                    help="Adjustable informal khata recovery expectation",
+                )
+                st.caption(f"Currently calculating with {int(round(alpha * 100))}% recovery of informal customer khata.")
         else:
             alpha = config.KHATA_COLLECTION_ASSUMPTION
 
-        st.caption(f"Assumes {int(round(alpha * 100))}% of khata will be collected (adjustable)")
         solvency = compute_total_solvency(pack, vault, biz, haircut_alpha=alpha)
         solv_rep = format_solvency_report(solvency)
 
-        # ── EXECUTIVE MORNING BRIEFING HERO ("Aaj Ka Hisaab") ──
-        runway_months = round(solvency.true_cash_runway_inr / max(solvency.total_commitments, 1.0), 1)
-        hero_badge_class = "sme-badge-success" if solvency.true_cash_runway_inr > 0 else "sme-badge-danger"
-        hero_badge_text = "🟢 Positive Solvency · Safe Runway" if solvency.true_cash_runway_inr > 0 else "⚠️ Deficit Warning"
-        total_liquid = solvency.net_bank_liquidity + solvency.galla_cash
-
-        st.markdown(f"""
-        <div class="sme-hero-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-            <div>
-              <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #10B981;">
-                ☀️ AAJ KA HISAAB · MORNING COCKPIT
-              </span>
-              <div class="sme-hero-headline">{inr(total_liquid)}</div>
-              <div style="font-size: 0.88rem; opacity: 0.85;">
-                Total On-Hand Liquidity (Bank Headroom {inr(solvency.net_bank_liquidity)} + Galla Cash {inr(solvency.galla_cash)})
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <span class="sme-badge {hero_badge_class}">{hero_badge_text}</span>
-              <div style="font-size: 1.45rem; font-weight: 700; margin-top: 6px;">{runway_months} Months</div>
-              <div style="font-size: 0.75rem; opacity: 0.75;">Covered Runway Buffer</div>
-            </div>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.subheader("True Solvency (Dual-Plane Reality)")
         if solvency.is_false_insolvency:
             st.warning(f"⚠️ **{solv_rep['headline']}**")
         else:
@@ -484,7 +497,7 @@ with tab_home:
                     delta_color="normal" if solvency.true_cash_runway_inr > 0 else "inverse")
 
         if has_demo:
-            st.info("ℹ️ Cash totals above include demo seed data, not from the pilot pack.")
+            st.caption("ℹ️ Cash totals above include demo seed data, not from the pilot pack.")
 
         st.caption(f"Unified calculation as of {solv_rep['as_of']}: (Bank Headroom) + (Galla Cash) + (Khata Inflows) − (30-Day Commitments {inr(solvency.total_commitments)}).")
 
@@ -495,24 +508,24 @@ with tab_home:
             st.markdown(f"""
             <div class="sme-card">
               <span class="sme-badge sme-badge-success">✓ Payroll Safety</span>
-              <h4 style="margin: 8px 0 4px 0;">1 Oct Salaries (₹3.80L)</h4>
-              <p style="font-size: 0.82rem; opacity: 0.85; margin-bottom: 0;">100% covered. Headroom remains {inr(solvency.net_bank_liquidity)} safely clear of CC limit.</p>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">1 Oct Salaries (₹3.80L)</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">100% covered. Headroom remains {inr(solvency.net_bank_liquidity)} safely clear of CC limit.</p>
             </div>
             """, unsafe_allow_html=True)
         with p_cols[1]:
             st.markdown("""
             <div class="sme-card">
               <span class="sme-badge sme-badge-info">🪙 Field Collections</span>
-              <h4 style="margin: 8px 0 4px 0;">Salesman Collection Slips</h4>
-              <p style="font-size: 0.82rem; opacity: 0.85; margin-bottom: 0;">Salesmen collection slips auto-link cash deposits to shop invoices as SUGGEST.</p>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">Salesman Collection Slips</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">Salesmen collection slips auto-link cash deposits to shop invoices as SUGGEST.</p>
             </div>
             """, unsafe_allow_html=True)
         with p_cols[2]:
             st.markdown("""
             <div class="sme-card">
               <span class="sme-badge sme-badge-warning">📞 Khata Chase Hub</span>
-              <h4 style="margin: 8px 0 4px 0;">Retailers > 45 Days</h4>
-              <p style="font-size: 0.82rem; opacity: 0.85; margin-bottom: 0;">19 chronic accounts. Tap Receivables to send 1-click WhatsApp reminders.</p>
+              <h4 style="margin: 6px 0 2px 0; font-size: 0.95rem;">Retailers > 45 Days</h4>
+              <p style="font-size: 0.8rem; opacity: 0.85; margin-bottom: 0;">19 chronic accounts. Tap Receivables to send 1-click WhatsApp reminders.</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -642,7 +655,7 @@ with tab_forecast:
     st.subheader("90-Day Cash Trajectory & Shortfall Warnings")
 
     view = as_of(pack, config.HOLDOUT_START)
-    fc_res = simulate_forecast(view, biz)
+    fc_res = get_forecast(pack, config.HOLDOUT_START, biz)
 
     # Shortfall Warning Cards (D50, D40)
     if fc_res.warnings:
@@ -723,7 +736,7 @@ with tab_forecast:
     st.dataframe(pd.DataFrame(m_rows), hide_index=True, use_container_width=True)
 
     with st.expander("📊 Benchmark & Accuracy Metrics (Holdout Scored against cash_actuals)", expanded=False):
-        holdout_res = evaluate_holdout(pack)
+        holdout_res = get_holdout(pack)
         mape_label = f"Model MAPE: `{holdout_res.mape:.2%}` on frozen holdout"
         if holdout_res.mape > 0.182:
             mape_label += " (worse than the simple 3-month average; kill metric (D31))"
@@ -923,9 +936,9 @@ with tab_scores:
         render_partial_view_notice()
 
     st.subheader("Scored against the answer keys")
-    df = score_matches(pack, matches)
+    df, cat_df = get_scores(pack, matches, copilot.cat)
     st.dataframe(summary(df), hide_index=True)
-    st.dataframe(score_categories(pack, copilot.cat), hide_index=True)
+    st.dataframe(cat_df, hide_index=True)
     auto_lines = df[df.tier.isin(["AUTO", "NO_DOC"])]
     if len(auto_lines) > 0:
         auto_precision = auto_lines.correct.mean() * 100.0

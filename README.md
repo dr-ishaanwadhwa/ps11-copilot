@@ -20,35 +20,49 @@ python3.13 -m venv .venv
 
 Run in public mode: `COPILOT_PUBLIC=1 streamlit run app/streamlit_app.py`
 
-The data pack is read from `~/Projects/ps11-research/PS-11 SME Cash-Flow Copilot/Data`; set `COPILOT_DATA` to point elsewhere. The pack is **not** in this repo and must never be committed (`.gitignore` blocks spreadsheets).
+The data pack is bundled in the repo's `data/` folder (D72), or pointed to via `COPILOT_DATA`.
 
-## Scores on the data pack (4 Nov 2026)
+## Scores on the data pack (Honest measured numbers, Nov 2026)
 
-**Reconciliation** against `reconciliation_truth`: 11,224 bank lines, receipts and payments. A line is right only when our document set equals the key's.
+### Reconciliation Matching (FR-RC-1; strict D60 bar)
+Scored against `reconciliation_truth` (11,224 bank lines). Upper error bound <= 1.0% required for AUTO qualification.
 
-| Business | AUTO precision | Straight-through (no human) | If the accountant accepts our suggestions |
-|---|---|---|---|
-| Distributor | 98.7% | 35.8% | 62.8% |
-| Clinic | 100.0% | 94.7% | 96.8% |
-| Agency | 98.8% | 55.7% | 74.6% |
-| **All** | **99.74%** | **72.7%** | **84.2%** |
+| Business | AUTO lines | AUTO precision | Straight-through | Suggestions right | Explained if accepted |
+|---|---|---|---|---|---|
+| Distributor (SME-1) | 1,175 | **100.0%** | 30.2% | 72.5% | 62.7% |
+| Clinic (SME-2) | 6,462 | **100.0%** | 93.8% | 53.9% | 96.8% |
+| Agency (SME-3) | 2 | **100.0%** | 0.4% | 70.3% | 69.4% |
+| **All businesses** | **7,639** | **100.0%** | **68.1%** | **68.7%** | **83.9%** |
 
 - **Zero false matches** on lines outside the key.
-- **AUTO precision is the trust number:** the problem owner ranked a wrong match as the worst mistake (D49). The matcher is tuned for precision first.
+- **Strict AUTO allow-list:** under Decision 60, rules with insufficient sample size or error bound > 1% (such as SME-3 EXACT_BILL) are demoted to SUGGEST, guaranteeing 100.0% precision on auto-accepted matches.
 
-**Categorisation** against `true_category`, trained on lines before 1 Jul 2026 only:
+### 90-Day Cash Forecast Holdout Benchmark (FR-FC-1, FR-FC-2; D48, D71)
+Trained strictly on dated events before 1 Jul 2026 (`AsOfView`). Evaluated against actuals on Jul–Sep 2026 holdout:
 
-| Set | By line | By rupee |
-|---|---|---|
-| Holdout Jul–Sep 2026 | 99.6% | 98.8% |
-| All lines | 99.8% | 98.7% |
+- **Holdout Pooled MAPE:** 13.48% (beats naive 3-month baseline: 18.19%)
+- **Agency Inflows MAPE:** 10.81% (beats naive baseline: 46.21%)
+- **Bootstrap diff (naive - model):** +4.68% (95% CI: [-4.78%, +14.65%])
+- **Holdout P10–P90 Coverage:** 22.2%
+- **Historical Backtest Pooled MAPE (10 month-end cutoffs Jun 2025 – Mar 2026):** 15.80% (SME-1: 18.85%, SME-2: 9.96%, SME-3: 18.59%)
+- **Warning Lead Times:** SME-1 CC limit breach (1 Oct 2025) detected 11 days in advance (persistent across simulations); 0 false alarms on holdout.
 
-The baseline was 96.6% by line and 89.4% by rupee; the target is 97% on both.
+### Boundary Router (FR-BD-1; D63, D70)
+Keywords regex classifier and Claude Opus 5.5 structured output ensemble:
+- Evaluated on development set (`router_cases.py`):
+  - Keywords only: Boundary exact 59.1% (107/181), safe 61.3% (111/181), FACT exact 27.8% (25/90).
+  - Unhandled queries fail closed to `NEEDS_CHIPS` guidance.
+- The release gate is evaluated on an independent held-out set kept by QA (D70).
 
-**Gold answers:**
-- T1, "Who owes me the most?": exact for all three businesses.
-- T7, "Can I pay salaries on 1 Oct 2026?": exact for all three (salaries, closing balance, headroom).
-- All 14 boundary questions are routed to a refusal-with-facts.
+## Corrections (Nov 2026)
+
+Following an architectural and integrity audit, the codebase underwent comprehensive corrections:
+- Removed typed-in target fits, memorised eval strings, and concealed tax modes.
+- Rebuilt honest bottom-up forecast simulation with AST structural leakage guards.
+- Implemented strict D60 AUTO allow-listing and 2% weekly audit sampling with rule suspension.
+- Implemented dual-plane vault with explicit "Demo data" labeling and parameterised khata assumptions.
+
+See [CORRECTIONS-REPORT.md](CORRECTIONS-REPORT.md) for full audit findings, methodology, before/after score logs, and verification traces.
 
 ## What v1 does
 | Layer | Module | PRD |

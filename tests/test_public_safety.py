@@ -107,4 +107,39 @@ def test_public_mode_has_no_free_text():
     )
 
 
+def test_data_pack_is_bundled():
+    from copilot import config
+
+    assert config.DEFAULT_DATA_DIR.name == "data"
+    for fname in [config.BANK_XLSX, config.DOCS_XLSX, config.EVAL_XLSX]:
+        assert (config.DEFAULT_DATA_DIR / fname).exists(), f"Missing {fname} in data/"
+
+
+def test_invented_seed_data_is_labeled_demo(pack):
+    """Test 5.1: Invented seed data is labeled demo and uses fake phone numbers."""
+    from copilot.vault import VaultDB
+
+    vault = VaultDB()
+    vault.seed_from_pack(pack)
+
+    # SME-1 and SME-3 are demo seeds
+    g1 = vault.get_latest_galla("SME-1")
+    assert g1 is not None and g1.is_demo is True
+
+    g3 = vault.get_latest_galla("SME-3")
+    assert g3 is not None and g3.is_demo is True
+
+    # SME-2 clinic cash bridge is from data pack
+    g2 = vault.get_latest_galla("SME-2")
+    assert g2 is not None and g2.is_demo is False
+
+    # SME-1 khata accounts are demo with obviously fake phone numbers
+    khata = vault.get_khata_summary("SME-1")["accounts"]
+    assert len(khata) > 0
+    for acc in khata:
+        assert acc.is_demo is True
+        assert acc.phone.startswith("+91 00000 000")
+
+
+
 

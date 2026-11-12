@@ -133,7 +133,7 @@ class VaultDB:
                 self.record_galla(entry)
                 running_cash = counted
 
-        # 2. SME-1 (Distributor) Galla and Salesman collections
+        # 2. SME-1 (Distributor) Galla and Salesman collections (Demo data)
         # Distributor maintains a healthy godown cash buffer of ~₹4.5L for supplier rokda discounts
         galla_sme1 = GallaEntry(
             business_id="SME-1",
@@ -143,16 +143,17 @@ class VaultDB:
             cash_out=65_000.0,      # hamali, tempo drivers, local loading
             cash_banked=120_000.0,
             counted_cash=420_000.0,
-            notes="Godown main till cash float"
+            notes="Godown main till cash float",
+            is_demo=True,
         )
         self.record_galla(galla_sme1)
 
-        # Seed SME-1 informal retailer khata accounts (Kaccha Udhar)
+        # Seed SME-1 informal retailer khata accounts (Demo data; Task 5.1)
         sme1_retailers = [
-            ("Laxmi Kirana Stores", 85_000.0, 12, "9822014521"),
-            ("Gajanan Departmental Stores", 62_000.0, 8, "9822019943"),
-            ("Matoshree Supermarket", 114_000.0, 31, "9822098112"),  # >30 months (Limitation alert)
-            ("Jai Bhavani Traders", -45_000.0, 4, "9822077123"),     # Payable (we owe supplier cash)
+            ("Laxmi Kirana Stores", 85_000.0, 12, "+91 00000 00001"),
+            ("Gajanan Departmental Stores", 62_000.0, 8, "+91 00000 00002"),
+            ("Matoshree Supermarket", 114_000.0, 31, "+91 00000 00003"),  # >30 months (Limitation alert)
+            ("Jai Bhavani Traders", -45_000.0, 4, "+91 00000 00004"),     # Payable (we owe supplier cash)
         ]
         for name, bal, months, phone in sme1_retailers:
             self.khata_records["SME-1"][name] = KhataAccount(
@@ -161,10 +162,11 @@ class VaultDB:
                 balance_due=bal,
                 last_active_date=pd.Timestamp("2026-09-20"),
                 months_open=months,
-                phone=phone
+                phone=phone,
+                is_demo=True,
             )
 
-        # 3. SME-3 (Agency)
+        # 3. SME-3 (Agency, Demo data)
         galla_sme3 = GallaEntry(
             business_id="SME-3",
             date=pd.Timestamp("2026-09-30"),
@@ -173,6 +175,7 @@ class VaultDB:
             cash_out=15_000.0,      # studio supplies, courier
             cash_banked=0.0,
             counted_cash=95_000.0,
-            notes="Office emergency contingency petty cash"
+            notes="Office emergency contingency petty cash",
+            is_demo=True,
         )
         self.record_galla(galla_sme3)

@@ -127,13 +127,17 @@ with tab_home:
         else:
             st.info(f"💡 **{solv_rep['headline']}**")
 
+        has_demo = biz in ("SME-1", "SME-3")
         c = st.columns(4)
         c[0].metric("Net Bank Headroom", inr(solvency.net_bank_liquidity), help=f"Bank balance {inr(bal)} plus CC headroom")
-        c[1].metric("Physical Galla Cash", inr(solvency.galla_cash), "In shop drawer", delta_color="normal")
-        c[2].metric("Expected Khata Inflows", inr(solvency.total_expected_inflows), "Risk-adjusted (85%)", delta_color="normal")
+        c[1].metric("Physical Galla Cash", inr(solvency.galla_cash), "Demo data, not from the pilot pack." if has_demo else "In shop drawer", delta_color="normal")
+        c[2].metric("Expected Khata Inflows", inr(solvency.total_expected_inflows), "Demo data, not from the pilot pack." if has_demo and solvency.informal_receivables > 0 else "Risk-adjusted", delta_color="normal")
         c[3].metric("True Cash Runway Buffer", inr(solvency.true_cash_runway_inr),
                     "Positive Solvency" if solvency.true_cash_runway_inr > 0 else "Deficit Alert",
                     delta_color="normal" if solvency.true_cash_runway_inr > 0 else "inverse")
+
+        if has_demo:
+            st.info("ℹ️ Cash totals above include demo seed data, not from the pilot pack.")
 
         st.caption(f"Unified calculation as of {solv_rep['as_of']}: (Bank Headroom) + (Galla Cash) + (Khata Inflows) − (30-Day Commitments {inr(solvency.total_commitments)}).")
 
@@ -177,6 +181,8 @@ with tab_vault:
         with col_galla:
             st.markdown("### 🪙 Daily Cash Drawer (Galla)")
             latest_g = vault.get_latest_galla(biz)
+            if latest_g and latest_g.is_demo:
+                st.caption("🏷️ Demo data, not from the pilot pack.")
             if latest_g:
                 c = st.columns(3)
                 c[0].metric("Counted in Drawer", inr(latest_g.counted_cash))
@@ -218,6 +224,8 @@ with tab_vault:
         st.caption("Generate client-side WhatsApp deep-links.")
 
         khata_data = vault.get_khata_summary(biz)
+        if khata_data["accounts"] and any(getattr(a, "is_demo", False) for a in khata_data["accounts"]):
+            st.caption("🏷️ Demo data, not from the pilot pack.")
         if khata_data["accounts"]:
             for acc in khata_data["accounts"]:
                 rem = format_whatsapp_reminder(acc, config.BUSINESSES[biz], upi_handle="payment@bank")

@@ -22,6 +22,7 @@ class GallaEntry:
     cash_banked: float       # cash deposited into bank current/savings account
     counted_cash: float      # physical cash counted in drawer at day close
     notes: str = ""
+    is_demo: bool = False
 
     @property
     def expected_cash(self) -> float:
@@ -63,6 +64,7 @@ class KhataAccount:
     last_active_date: pd.Timestamp
     months_open: int = 0
     phone: str = ""
+    is_demo: bool = False
 
     @property
     def is_limitation_alert(self) -> bool:

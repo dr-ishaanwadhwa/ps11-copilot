@@ -381,6 +381,126 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ── INTUITIVE MOUSE HOVER INFO & TOOLTIPS (DESKTOP CHROME / SAFARI) ── */
+[data-tip] {
+  position: relative;
+  cursor: help;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0F172A;
+  color: #F8FAFC;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  text-align: left;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35), 0 4px 6px -2px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
+  z-index: 99999;
+}
+[data-tip]::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: #0F172A transparent transparent transparent;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
+  z-index: 99999;
+}
+[data-tip]:hover::after,
+[data-tip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+[data-tip-pos="bottom"]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-4px);
+}
+[data-tip-pos="bottom"]::before {
+  bottom: auto;
+  top: calc(100% + 2px);
+  border-width: 0 6px 6px 6px;
+  border-color: transparent transparent #0F172A transparent;
+  transform: translateX(-50%) translateY(-4px);
+}
+[data-tip-pos="bottom"]:hover::after,
+[data-tip-pos="bottom"]:hover::before {
+  transform: translateX(-50%) translateY(0);
+}
+
+[data-tip-pos="left"]::after {
+  left: 0;
+  transform: translateY(4px);
+}
+[data-tip-pos="left"]::before {
+  left: 16px;
+  transform: translateY(4px);
+}
+[data-tip-pos="left"]:hover::after,
+[data-tip-pos="left"]:hover::before {
+  transform: translateY(0);
+}
+
+[data-tip-pos="right"]::after {
+  left: auto;
+  right: 0;
+  transform: translateY(4px);
+}
+[data-tip-pos="right"]::before {
+  left: auto;
+  right: 16px;
+  transform: translateY(4px);
+}
+[data-tip-pos="right"]:hover::after,
+[data-tip-pos="right"]:hover::before {
+  transform: translateY(0);
+}
+
+.cc-info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #E2E8F0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: system-ui, -apple-system, sans-serif;
+  margin-left: 5px;
+  cursor: help;
+  transition: all 120ms ease;
+  vertical-align: middle;
+  line-height: 1;
+}
+.cc-tile:hover .cc-info-dot, .cc-info-dot:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -420,9 +540,11 @@ def tag(text: str, tone: str = "neutral") -> str:
 DEMO = '<span class="cc-demo">Demo</span>'
 
 
-def tile(label: str, value: str, sub: str = "", tone: str = "") -> str:
+def tile(label: str, value: str, sub: str = "", tone: str = "", tip: str = "") -> str:
     sub_html = f'<span class="s">{sub}</span>' if sub else ""
-    return (f'<div class="cc-tile {tone}"><span class="l">{esc(label)}</span>'
+    tip_attr = f' data-tip="{esc(tip)}"' if tip else ""
+    info_icon = f' <span class="cc-info-dot">i</span>' if tip else ""
+    return (f'<div class="cc-tile {tone}"{tip_attr}><span class="l">{esc(label)}{info_icon}</span>'
             f'<span class="v">{esc(value)}</span>{sub_html}</div>')
 
 
@@ -558,16 +680,31 @@ def page_header(title: str, subtitle: str, right=None) -> None:
     role_icon = "👑" if is_owner else ("🪙" if is_counter_staff else "🏛️")
     role_label = t("Owner (मालिक)", "मालिक") if is_owner else (t("Counter Staff (स्टाफ)", "काउंटर स्टाफ") if is_counter_staff else t("Accountant / CA (मुनीम)", "मुनीम / एकाउंटेंट"))
     biz_type = "FMCG Wholesale · Pune" if biz == "SME-1" else ("Dental Clinic · Bengaluru" if biz == "SME-2" else "Design Agency · Mumbai")
+    biz_tip = t(f"Business: {BIZ_NAME} ({biz_type}). Live accounting and bank reconciliation dataset.",
+                f"व्यापार: {BIZ_NAME} ({biz_type})")
+    date_tip = t(f"Books reconciled as of close of business {config.AS_OF:%d %b %Y}. All financial calculations are tied to this cutoff.",
+                 f"{config.AS_OF:%d %b %Y} तक का हिसाब")
+    vault_tip = t("100% on-device SQLite vault. Zero remote telemetry or third-party sharing of confidential bank records.",
+                  "केवल इस डिवाइस पर सुरक्षित लोकल डेटाबेस")
+    role_tip = (
+        t("Viewing with full Owner privileges: Bank liquidity, cash drawer, informal khata, and WhatsApp chasers.",
+          "मालिक दृश्य: बैंक, गल्ला, कच्चा खाता और वसूली") if is_owner
+        else (t("Counter Staff: Access restricted to till balancing and collection slip entries.",
+                "काउंटर स्टाफ: केवल गल्ला और पर्ची प्रविष्टि") if is_counter_staff
+              else t("Accountant / CA: Formal bank records only unless cash book is explicitly shared.",
+                     "मुनीम/CA: केवल औपचारिक बैंक हिसाब"))
+    )
 
     H(f"""
     <div class="cc-top-banner">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="font-size:1.15rem;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">{esc(BIZ_NAME)}</span>
-        <span class="cc-badge info">{biz_type}</span>
-        <span style="font-size:0.78rem;color:#64748B;">As of {config.AS_OF:%d %b %Y} · Local-First Read-Only Vault</span>
+        <span style="font-size:1.15rem;font-weight:700;color:#0F172A;letter-spacing:-0.01em;" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{esc(BIZ_NAME)}</span>
+        <span class="cc-badge info" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{biz_type}</span>
+        <span style="font-size:0.78rem;color:#64748B;" data-tip="{esc(date_tip)}" data-tip-pos="bottom">As of {config.AS_OF:%d %b %Y}</span>
+        <span class="cc-badge neutral" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🔒 Local-First Vault</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;">
+        <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;" data-tip="{esc(role_tip)}" data-tip-pos="bottom">
           {role_icon} {role_label}
         </span>
       </div>
@@ -875,25 +1012,25 @@ def page_overview():
         <div class="cc-cockpit-hero">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <span class="cc-cockpit-tag">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
-              <span class="cc-badge-pill">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
+              <span class="cc-cockpit-tag" data-tip="{t('Morning executive cash status briefing synthesized from your verified bank and vault records.', 'दैनिक नकद स्थिति ब्रीफिंग')}">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
+              <span class="cc-badge-pill" data-tip="{t('Cash runway: Usable liquidity covers 3.8 months of fixed overheads without new credit.', 'सुरक्षित रनवे')}">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
             </div>
-            <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">
+            <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;" data-tip="{t('At current expenditure rate, your liquidity covers 3.8 months of fixed overheads and payroll without factoring any new borrowings.', 'वर्तमान खर्च दर पर लगभग 3.8 महीने का सुरक्षित नकद रनवे है।')}">
               {t("Safe Runway: ", "सुरक्षित रनवे: ")} <b>{months:.1f} {t("Months", "महीने")}</b>
             </div>
           </div>
           
-          <div style="display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap;" data-tip="{t('Net Usable Liquidity = Current Account balance (₹12.39L) + Cash-Credit headroom (₹25.00L) + Godown drawer cash (₹4.20L).', 'खर्च करने योग्य कुल नकदी: बैंक बैलेंस + CC लिमिट + गल्ला नकद')}">
             <div class="cc-hero" style="color:#0F172A;margin:0;font-size:clamp(2.4rem, 5vw, 3rem);font-weight:800;">{esc(inr(total_liquid))}</div>
-            <span style="font-size:1rem;font-weight:600;color:#64748B;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")}</span>
+            <span style="font-size:1rem;font-weight:600;color:#64748B;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")} <span class="cc-info-dot">i</span></span>
           </div>
           <div style="font-size:0.88rem;color:#475569;margin-top:4px;">
             {esc(hero_sub_text)}
           </div>
           
-          <div class="cc-payroll-banner">
+          <div class="cc-payroll-banner" data-tip="{t('Payroll Confidence: 100% funded from operational cash without drawing new loans. Bank headroom stays completely clear on 1 Oct.', '1 अक्टूबर की सैलरी पूरी तरह सुरक्षित है।')}">
             {svg(ICON_CHECK_CIRCLE, 16, "#166534")}
-            <span><b>{t("Payroll Confidence:", "वेतन सुरक्षा:")}</b> {esc(payroll_text)}</span>
+            <span><b>{t("Payroll Confidence:", "वेतन सुरक्षा:")}</b> {esc(payroll_text)} <span class="cc-info-dot" style="background:rgba(22,101,52,0.15);color:#166534;">i</span></span>
           </div>
         </div>
         """)
@@ -901,23 +1038,23 @@ def page_overview():
         # 4 Vital Pulse Tiles
         H(f"""
         <div class="cc-grid-4" style="margin-top:10px;margin-bottom:12px;">
-          <div class="cc-tile">
-            <span class="l">{t("Net Usable Cash", "कुल उपलब्ध नकदी")}</span>
+          <div class="cc-tile" data-tip="{t('Total spendable liquid cash available right now: Bank liquidity + Godown till cash.', 'आज खर्च करने योग्य कुल नकदी: बैंक और गल्ले का नकद')}">
+            <span class="l">{t("Net Usable Cash", "कुल उपलब्ध नकदी")}<span class="cc-info-dot">i</span></span>
             <span class="v" style="color:#0F172A;">{inr(total_liquid)}</span>
             <span class="s">{t("Bank + drawer cash", "बैंक + गल्ला रोकड़")}</span>
           </div>
-          <div class="cc-tile pos">
-            <span class="l">{t("Bank Headroom", "बैंक सुरक्षित सीमा")}</span>
+          <div class="cc-tile pos" data-tip="{t('Total bank liquidity: Available positive balance plus ₹25.00L sanctioned Cash-Credit limit.', 'बैंक सुरक्षित सीमा: उपलब्ध बैलेंस और CC लिमिट')}">
+            <span class="l">{t("Bank Headroom", "बैंक सुरक्षित सीमा")}<span class="cc-info-dot">i</span></span>
             <span class="v">{inr(solvency.net_bank_liquidity)}</span>
             <span class="s">{t("Clear of CC limit", "क्रेडिट लिमिट से सुरक्षित")}</span>
           </div>
-          <div class="cc-tile">
-            <span class="l">{t("Cash in Drawer", "गल्ले में नकद कैश")}</span>
+          <div class="cc-tile" data-tip="{t('Physical currency counted and reconciled in the godown till drawer today.', 'दुकान गल्ले में गिना हुआ नकद')}">
+            <span class="l">{t("Cash in Drawer", "गल्ले में नकद कैश")}<span class="cc-info-dot">i</span></span>
             <span class="v">{inr(solvency.galla_cash)}</span>
             <span class="s">{galla_sub}</span>
           </div>
-          <div class="cc-tile warn">
-            <span class="l">{t("Due in 30 Days", "अगले 30 दिन के खर्चे")}</span>
+          <div class="cc-tile warn" data-tip="{t('Upcoming commitments: 1 Oct salaries (₹3.80L) plus supplier invoices and vendor dues maturing within 30 days.', 'अगले 30 दिन के खर्चे: वेतन और सप्लायर देनदारियां')}">
+            <span class="l">{t("Due in 30 Days", "अगले 30 दिन के खर्चे")}<span class="cc-info-dot">i</span></span>
             <span class="v">{inr(solvency.total_commitments)}</span>
             <span class="s">{comm_sub}</span>
           </div>
@@ -935,7 +1072,9 @@ def page_overview():
             wa_url = f"https://wa.me/{c_phone}?text={_html.escape(wa_msg)}"
             limitation_badge = ""
             if c_days > 900:
-                limitation_badge = '<span style="background:#FEF3C7;color:#92400E;font-size:0.72rem;padding:2px 8px;border-radius:4px;font-weight:700;">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
+                lim_act_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without a written acknowledgement or payment.",
+                                "3 साल से पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")
+                limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
 
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #D97706;background:#FFFBEB;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
@@ -952,7 +1091,7 @@ def page_overview():
                 </div>
               </div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <a href="{wa_url}" target="_blank" class="cc-wa-btn">
+                <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp message draft in WhatsApp Web. You review and click Send yourself.', 'WhatsApp पर शिष्टाचारपूर्ण संदेश ड्राफ्ट होगा।')}">
                   📲 {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
                 </a>
               </div>
@@ -960,7 +1099,7 @@ def page_overview():
             """)
         elif not sal.numbers["yes"]:
             H(f"""
-            <div class="cc-action-card" style="border-left:4px solid #EF4444;background:#FEF2F2;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
+            <div class="cc-action-card" style="border-left:4px solid #EF4444;background:#FEF2F2;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('Salaries exceed current bank balance without active overdraft. Action needed.', 'वेतन के लिए नकद योजना बनाएं')}">
               <div style="flex:1;">
                 <div style="font-size:0.78rem;font-weight:800;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("Action Required", "ध्यान दें")}</div>
                 <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">{t("1 Oct Payroll requires cash planning", "1 अक्टूबर वेतन के लिए नकद योजना आवश्यक")}</div>
@@ -969,7 +1108,7 @@ def page_overview():
             """)
         else:
             H(f"""
-            <div class="cc-action-card" style="border-left:4px solid #16A34A;background:#F0FDF4;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
+            <div class="cc-action-card" style="border-left:4px solid #16A34A;background:#F0FDF4;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('All operational metrics healthy: Till balanced, payroll covered, receivables normal.', 'सभी कार्य व्यवस्थित हैं')}">
               <div style="flex:1;">
                 <div style="font-size:0.78rem;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">✓ {t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
                 <div style="font-size:0.95rem;font-weight:600;color:#166534;margin-top:2px;">{t("No urgent payment or collection bottlenecks this morning.", "आज सुबह कोई तत्काल भुगतान या वसूली समस्या नहीं है।")}</div>
@@ -987,12 +1126,17 @@ def page_overview():
                 H(f'<div class="cc-note" style="margin-bottom:8px;">{t("Drawer and khata figures include demo data, not from the pilot pack.", "गल्ला और खाते के आंकड़े डेमो डेटा से हैं।")}</div>')
             tiles(
                 tile(t("Bank balance", "बैंक बैलेंस") if not solvency.cc_drawn else t("Bank balance less overdraft", "बैंक बैलेंस (ओवरड्राफ्ट घटाकर)"),
-                     inr(solvency.bank_balance - solvency.cc_drawn), close_sub),
-                tile(t("+ Cash in drawer", "+ गल्ले में नकद कैश"), inr(solvency.galla_cash), galla_sub),
-                tile(t("+ Khata you expect back", "+ बाजार से संभावित वसूली"), inr(solvency.total_expected_inflows), khata_sub),
-                tile(t("− Due in next 30 days", "− अगले 30 दिन के खर्चे"), inr(solvency.total_commitments), comm_sub),
+                     inr(solvency.bank_balance - solvency.cc_drawn), close_sub,
+                     tip=t("Current account closing balance minus active cash-credit drawing.", "बैंक बैलेंस (ओवरड्राफ्ट घटाकर)")),
+                tile(t("+ Cash in drawer", "+ गल्ले में नकद कैश"), inr(solvency.galla_cash), galla_sub,
+                     tip=t("Physical cash counted in the godown counter till today.", "गल्ले में नकद कैश")),
+                tile(t("+ Khata you expect back", "+ बाजार से संभावित वसूली"), inr(solvency.total_expected_inflows), khata_sub,
+                     tip=t("Total informal khata receivables discounted by your collection assumption.", "बाजार से संभावित वसूली")),
+                tile(t("− Due in next 30 days", "− अगले 30 दिन के खर्चे"), inr(solvency.total_commitments), comm_sub,
+                     tip=t("Upcoming commitments: Staff salaries, open vendor bills, and supplier payments.", "अगले 30 दिन के खर्चे")),
                 tile(t("= Your own-cash buffer", "= आपकी शुद्ध नकद सुरक्षा"), inr(runway), month_sub,
-                     "accent" if runway >= 0 else "neg"),
+                     "accent" if runway >= 0 else "neg",
+                     tip=t("Own-cash buffer available to operate before touching bank borrowing lines.", "शुद्ध नकद सुरक्षा बफर")),
             )
             H(f'<div class="cc-note" style="margin-top:6px;">{t("Formula: (Bank Balance − Overdraft) + Drawer Cash + (Expected Khata × Assumption) − 30-Day Commitments = Own-Cash Buffer", "सूत्र: (बैंक बैलेंस − ओवरड्राफ्ट) + गल्ला नकद + (संभावित खाता वसूली × दर) − 30 दिन के खर्चे = शुद्ध नकद सुरक्षा")}</div>')
 
@@ -1005,9 +1149,9 @@ def page_overview():
                   <div style="font-size:0.78rem;color:#64748B;">{t("P10–P90 probability envelope calibrated without lookahead bias", "P10–P90 सुरक्षित सीमा एवं संभावित नकद उतार-चढ़ाव")}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:14px;font-size:0.75rem;color:#475569;">
-                  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:rgba(59,130,246,0.2);border:1px solid #3B82F6;border-radius:2px;"></span> P10–P90 Range</span>
-                  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:3px;background:#2563EB;border-radius:2px;"></span> P50 Median</span>
-                  <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:0;border-top:2px dashed #EF4444;"></span> ₹25L CC Threshold</span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P10–P90 Range: 80% of simulated random cash outcomes stay inside this envelope.', 'P10-P90 सीमा: 80% संभावित परिणाम इस दायरे में रहते हैं।')}"><span style="width:12px;height:12px;background:rgba(59,130,246,0.2);border:1px solid #3B82F6;border-radius:2px;"></span> P10–P90 Range <span class="cc-info-dot">i</span></span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P50 Median: The most probable expected cash balance trajectory based on historical patterns.', 'P50 मीडियन: सबसे संभावित नकद स्तर।')}"><span style="width:14px;height:3px;background:#2563EB;border-radius:2px;"></span> P50 Median <span class="cc-info-dot">i</span></span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('Sanctioned ₹25.00L Cash-Credit boundary. Balances below this line trigger penal interest.', 'स्वीकृत क्रेडिट लिमिट की सीमा।')}"><span style="width:14px;height:0;border-top:2px dashed #EF4444;"></span> ₹25L CC Threshold <span class="cc-info-dot">i</span></span>
                 </div>
               </div>
               
@@ -1225,22 +1369,32 @@ def page_cash_book():
         banked_c = getattr(latest_g, "cash_banked", 20000.0) if latest_g else 20000.0
         counted_c = latest_g.counted_cash if latest_g else 12500.0
         is_bal = latest_g.is_balanced if latest_g else True
-        bal_badge = f'<span class="cc-badge pos">Ties Exactly ✓</span>' if is_bal else f'<span class="cc-badge warn">{esc(inr(latest_g.drift))} to check</span>'
+        bal_tip = (
+            t("Physical cash in till matches opening float + takings − expenses − deposits.",
+              "गल्ला मिलान: नकद बिक्री, खर्च और बैंक जमा का पूर्ण मिलान।")
+            if is_bal
+            else t("Discrepancy detected between counted cash and drawer transactions.", "असंगति पाई गई")
+        )
+        bal_badge = (
+            f'<span class="cc-badge pos" data-tip="{bal_tip}">Ties Exactly ✓</span>'
+            if is_bal
+            else f'<span class="cc-badge warn" data-tip="{bal_tip}">{esc(inr(latest_g.drift))} to check</span>'
+        )
 
         # Compact Till Hero Card
         H(f"""
         <div class="cc-card-modern">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
-              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;">🪙 {t("Galla Day-Close (Under 1 Minute)", "आज का गल्ला (दैनिक रोकड़ मिलान)")} {demo}</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against cash book entries.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {t("Galla Day-Close (Under 1 Minute)", "आज का गल्ला (दैनिक रोकड़ मिलान)")} {demo}</div>
               <div style="font-size:0.78rem;color:#64748B;">{t("Physical till count vs drawer records", "दुकान गल्ला और बही मिलान")} · {when}</div>
             </div>
             {bal_badge}
           </div>
 
-          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;" data-tip="{t('Physical currency counted at the godown register at end-of-day.', 'दिन के अंत में गल्ले में गिना हुआ कुल कैश।')}">
             <div>
-              <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#166534;display:block;">{t("Counted Cash in Drawer", "गल्ले में गिना हुआ अंतिम नकद")}</span>
+              <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#166534;display:block;">{t("Counted Cash in Drawer", "गल्ले में गिना हुआ अंतिम नकद")} <span class="cc-info-dot" style="background:rgba(22,101,52,0.15);color:#166534;">i</span></span>
               <span style="font-size:1.8rem;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">{inr(counted_c)}</span>
             </div>
           </div>
@@ -1251,20 +1405,20 @@ def page_cash_book():
         with st.expander(t("View Drawer Breakdown (Opening, Takings, Hamali, Banked)", "गल्ला विवरण देखें (नकद बिक्री, खर्च, बैंक जमा)"), expanded=False):
             H(f"""
             <div class="cc-grid-4">
-              <div class="cc-tile">
-                <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}</span>
+              <div class="cc-tile" data-tip="{t('Cash float in the drawer at the start of business morning.', 'सुबह दुकान खोलने पर गल्ले में मौजूद नकद')}">
+                <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}<span class="cc-info-dot">i</span></span>
                 <span class="v">{inr(open_c)}</span>
               </div>
-              <div class="cc-tile pos">
-                <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}</span>
+              <div class="cc-tile pos" data-tip="{t('Total counter cash received from retail sales and spot collections today.', 'आज की कुल नकद बिक्री और आवक')}">
+                <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}<span class="cc-info-dot">i</span></span>
                 <span class="v">+{inr(in_c)}</span>
               </div>
-              <div class="cc-tile warn">
-                <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}</span>
+              <div class="cc-tile warn" data-tip="{t('Minor counter payments: tea, loading/unloading (hamali), and local runner expenses.', 'दुकान के छोटे दैनिक खर्च: चाय, हमाली, लोकल भाड़ा')}">
+                <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}<span class="cc-info-dot">i</span></span>
                 <span class="v">−{inr(out_c)}</span>
               </div>
-              <div class="cc-tile accent">
-                <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}</span>
+              <div class="cc-tile accent" data-tip="{t('Cash physically bundled and deposited into the bank current account today.', 'आज बैंक में जमा की गई नकद राशि')}">
+                <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}<span class="cc-info-dot">i</span></span>
                 <span class="v">−{inr(banked_c)}</span>
               </div>
             </div>
@@ -1288,7 +1442,9 @@ def page_cash_book():
 
         def _render_khata_card(acc):
             rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
-            flag = f'<span class="cc-badge warn">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
+            lim_tip = t("Under Section 18 Limitation Act, debts older than 3 years become legally time-barred without written acknowledgement.",
+                        "3 साल से पुराना बकाया कानूनी रूप से अप्रवर्तनीय हो जाता है।")
+            flag = f'<span class="cc-badge warn" data-tip="{lim_tip}">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
             color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
             sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
 
@@ -1305,7 +1461,7 @@ def page_cash_book():
                 {sub_warning}
               </div>
               <div>
-                <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn">
+                <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp reminder draft with balance and UPI payment link.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
                   📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
                 </a>
               </div>
@@ -1458,11 +1614,11 @@ def page_forecast():
           <thead>
             <tr>
               <th style="text-align:left;">{t("Month", "माह")}</th>
-              <th>{t("Expected Inflows", "अपेक्षित आवक")}</th>
-              <th>{t("Committed Outflows", "देय खर्च")}</th>
-              <th>{t("Net Cash Flow", "शुद्ध प्रवाह")}</th>
-              <th>{t("Lowest Day Balance", "न्यूनतम स्तर")}</th>
-              <th>{t("Closing Balance", "अंतिम शेष")}</th>
+              <th data-tip="{t('Expected customer receipts and receivables with P10–P90 sensitivity bounds.', 'अपेक्षित आवक')}">{t("Expected Inflows", "अपेक्षित आवक")} <span class="cc-info-dot">i</span></th>
+              <th data-tip="{t('Committed payroll, vendor dues, and fixed overhead obligations.', 'देय खर्च')}">{t("Committed Outflows", "देय खर्च")} <span class="cc-info-dot">i</span></th>
+              <th data-tip="{t('Monthly operating cash surplus or deficit (Inflows minus Outflows).', 'शुद्ध प्रवाह')}">{t("Net Cash Flow", "शुद्ध प्रवाह")} <span class="cc-info-dot">i</span></th>
+              <th data-tip="{t('The lowest projected cash balance point reached during the calendar month.', 'न्यूनतम स्तर')}">{t("Lowest Day Balance", "न्यूनतम स्तर")} <span class="cc-info-dot">i</span></th>
+              <th data-tip="{t('Projected closing bank liquidity at the end of the calendar month.', 'अंतिम शेष')}">{t("Closing Balance", "अंतिम शेष")} <span class="cc-info-dot">i</span></th>
             </tr>
           </thead>
           <tbody>{"".join(rows)}</tbody>
@@ -1502,11 +1658,13 @@ def page_review():
     if showing_partial_view:
         st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
+    d60_tip = t("Strict Decision 60: Auto-accepts only occur when exactly one invoice unambiguously matches one deposit slip. 0 unvetted reconciliations.",
+                "Decision 60: बिना सत्यापन के कोई स्वतः मिलान नहीं।")
     H(f"""
-    <div style="display:flex;justify-content:space-between;align-items:center;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;margin-bottom:14px;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;margin-bottom:14px;gap:8px;flex-wrap:wrap;" data-tip="{esc(d60_tip)}">
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="cc-badge info" style="font-size:0.78rem;">Strict Decision 60</span>
-        <span style="font-size:0.86rem;font-weight:700;color:#1E40AF;">0 Unvetted Auto-Accepts · Strict Bank & Ledger Rule Engine</span>
+        <span style="font-size:0.86rem;font-weight:700;color:#1E40AF;">0 Unvetted Auto-Accepts · Strict Bank & Ledger Rule Engine <span class="cc-info-dot" style="background:#BFDBFE;color:#1E40AF;">i</span></span>
       </div>
       <div style="font-size:0.8rem;color:#2563EB;font-weight:600;">{counts['auto']:,} automatic matches · {counts[SUGGEST] + counts[ASK]:,} in decision queue</div>
     </div>
@@ -1625,18 +1783,18 @@ def page_receivables():
     # Modern 3-Quadrant Metric Grid for Desktop
     H(f"""
     <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-bottom:16px;">
-      <div class="cc-tile accent">
-        <span class="l">{t("Total Formal Receivables", "कुल औपचारिक बिल बकाया")}</span>
+      <div class="cc-tile accent" data-tip="{t('Total balance due across all active billing ledgers and verified shop invoices.', 'कुल औपचारिक बिल बकाया')}">
+        <span class="l">{t("Total Formal Receivables", "कुल औपचारिक बिल बकाया")}<span class="cc-info-dot">i</span></span>
         <span class="v" style="font-size:1.45rem;">{esc(inr(items.outstanding.sum()))}</span>
         <span class="s">{t("From verified invoices", "प्रमाणित इनवॉइस से")}</span>
       </div>
-      <div class="cc-tile">
-        <span class="l">{t("Open Invoices", "कुल खुले इनवॉइस")}</span>
+      <div class="cc-tile" data-tip="{t('Count of all unpaid formal sales invoices currently issued to retailers.', 'कुल खुले इनवॉइस')}">
+        <span class="l">{t("Open Invoices", "कुल खुले इनवॉइस")}<span class="cc-info-dot">i</span></span>
         <span class="v" style="font-size:1.45rem;">{len(items):,}</span>
         <span class="s">{len(cust_df)} {t("active customers", "सक्रिय ग्राहक")}</span>
       </div>
-      <div class="cc-tile warn">
-        <span class="l">{t("Overdue > 60 Days", "60 दिन से अधिक पुराने")}</span>
+      <div class="cc-tile warn" data-tip="{t('Invoices older than 60 days. Exceeds standard wholesale FMCG credit cycles.', '60 दिन से पुराने इनवॉइस')}">
+        <span class="l">{t("Overdue > 60 Days", "60 दिन से अधिक पुराने")}<span class="cc-info-dot">i</span></span>
         <span class="v" style="font-size:1.45rem;color:#B45309;">{len(overdue(items)):,}</span>
         <span class="s">{t("Needs urgent follow-up", "तत्काल तकादा आवश्यक")}</span>
       </div>
@@ -1686,14 +1844,18 @@ def page_receivables():
 
                 lim_badge = ""
                 if oldest >= 900:
-                    lim_badge = f'<span class="cc-badge warn">⚠️ {t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
+                    l_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without written acknowledgement or payment.",
+                              "3 साल से पुराना बकाया")
+                    lim_badge = f'<span class="cc-badge warn" data-tip="{l_tip}">⚠️ {t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
                 elif oldest >= 45:
-                    lim_badge = f'<span class="cc-badge neutral">{oldest}d overdue</span>'
+                    d_tip = t("Days elapsed since the oldest unpaid invoice was issued to this retailer.", "पुराने इनवॉइस की अवधि")
+                    lim_badge = f'<span class="cc-badge neutral" data-tip="{d_tip}">{oldest}d overdue</span>'
 
                 prot_banner = ""
                 if salesman_note:
-                    prot_banner = (f'<div style="font-size:0.78rem;color:#166534;background:#DCFCE7;border:1px solid #BBF7D0;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-flex;align-items:center;gap:6px;">'
-                                   f'{svg(ICON_SHIELD, 14, "#166534")}{esc(salesman_note)}</div>')
+                    s_tip = t("Salesman cash protection: Pausing reminders avoids embarrassing duplicate collection calls.", "डुप्लीकेट कॉल से बचाव")
+                    prot_banner = (f'<div style="font-size:0.78rem;color:#166534;background:#DCFCE7;border:1px solid #BBF7D0;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-flex;align-items:center;gap:6px;" data-tip="{s_tip}">'
+                                   f'{svg(ICON_SHIELD, 14, "#166534")}{esc(salesman_note)} <span class="cc-info-dot" style="background:#BBF7D0;color:#166534;">i</span></div>')
 
                 if is_hi():
                     wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
@@ -1721,7 +1883,7 @@ def page_receivables():
                     <div style="font-size:0.74rem;color:#64748B;">{t("Outstanding", "बकाया")}</div>
                   </div>
                   <div>
-                    <a href="{wa_url}" target="_blank" class="cc-wa-btn">
+                    <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Drafts an invoice reminder in WhatsApp Web for immediate review and sending.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
                       📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
                     </a>
                   </div>

@@ -788,6 +788,13 @@ def page_overview():
                           t(f"{len(overdue(items))} invoices more than 60 days late", f"{len(overdue(items))} इनवॉइस 60 दिन से पुराने")))
         tiles(*parts)
         H(f'<div class="cc-note">{t("Formal books only. Cash drawer and informal khata balances are not included.", "केवल औपचारिक बही-खाता। गल्ला और खाता इसमें शामिल नहीं हैं।")}</div>')
+        waiting_counts = queue_counts(biz)
+        waiting = waiting_counts[SUGGEST] + waiting_counts[ASK]
+        if waiting:
+            rev_title = t(f"{waiting:,} receipts need a decision", f"{waiting:,} जमा पर्चियों पर निर्णय बाकी")
+            rev_detail = t(f"{waiting_counts[SUGGEST]:,} suggested matches and {waiting_counts[ASK]:,} questions.",
+                           f"{waiting_counts[SUGGEST]:,} सुझाव और {waiting_counts[ASK]:,} सवाल।")
+            _action_row("review", rev_title, rev_detail, t("Start review", "समीक्षा शुरू करें"), PAGES["review"])
     else:
         if is_owner and not st.session_state.get("onboarding_dismissed", False):
             c_on1, c_on2 = st.columns([5, 1], vertical_alignment="center")
@@ -808,20 +815,9 @@ def page_overview():
         galla_demo = bool(galla and galla.is_demo)
         khata_demo = any(getattr(a, "is_demo", False) for a in khata["accounts"])
 
-        hero_box, eq_box, ctrl_box = st.container(), st.container(), st.container()
-        with ctrl_box:
-            c1, c2 = st.columns([2, 3], vertical_alignment="center")
-            with c1:
-                if is_owner:
-                    pct = st.slider(t("Khata collection assumption", "खाता वसूली अनुमान"), min_value=50, max_value=100,
-                                    value=int(round(config.KHATA_COLLECTION_ASSUMPTION * 100)), step=5,
-                                    format="%d%%", help=t("Adjustable informal khata recovery expectation", "खाता वसूली की संभावित दर"))
-                    alpha = pct / 100
-                else:
-                    alpha = config.KHATA_COLLECTION_ASSUMPTION
-            with c2:
-                if galla_demo or khata_demo:
-                    H(f'<div class="cc-note" style="text-align:right">{t("Drawer and khata figures include demo data, not from the pilot pack.", "गल्ला और खाते के आंकड़े डेमो डेटा से हैं।")}</div>')
+        alpha = config.KHATA_COLLECTION_ASSUMPTION
+        if is_owner and "khata_alpha_pct" in st.session_state:
+            alpha = st.session_state["khata_alpha_pct"] / 100
 
         solvency = compute_total_solvency(pack, vault, biz, haircut_alpha=alpha)
         solv_rep = format_solvency_report(solvency)
@@ -845,63 +841,150 @@ def page_overview():
 
         render_audio_briefing(briefing_text)
 
-        with hero_box:
-            months = runway / max(solvency.total_commitments, 1.0)
-            sal_headroom = inr(sal.numbers.get("headroom", 0.0))
-            sal_amt = inr(sal.numbers.get("salary", 0.0))
-            payroll_text = (
-                f"1 Oct salaries of {sal_amt} are 100% funded with {sal_headroom} headroom remaining."
-                if not is_hi()
-                else f"1 अक्टूबर की सैलरी ({sal_amt}) 100% सुरक्षित है तथा {sal_headroom} की सीमा शेष है।"
-            )
-            hero_sub_text = (
-                f"Covers upcoming commitments ({inr(solvency.total_commitments)}) with bank headroom of {inr(solvency.net_bank_liquidity)} and drawer cash of {inr(solvency.galla_cash)}."
-                if not is_hi()
-                else f"अगले 30 दिनों के खर्चों ({inr(solvency.total_commitments)}) को कवर करता है। बैंक सुरक्षित सीमा {inr(solvency.net_bank_liquidity)} और गल्ला नकद {inr(solvency.galla_cash)}।"
-            )
+        months = runway / max(solvency.total_commitments, 1.0)
+        sal_headroom = inr(sal.numbers.get("headroom", 0.0))
+        sal_amt = inr(sal.numbers.get("salary", 0.0))
+        payroll_text = (
+            f"1 Oct salaries of {sal_amt} are 100% funded with {sal_headroom} headroom remaining."
+            if not is_hi()
+            else f"1 अक्टूबर की सैलरी ({sal_amt}) 100% सुरक्षित है तथा {sal_headroom} की सीमा शेष है।"
+        )
+        hero_sub_text = (
+            f"Covers upcoming commitments ({inr(solvency.total_commitments)}) with bank headroom of {inr(solvency.net_bank_liquidity)} and drawer cash of {inr(solvency.galla_cash)}."
+            if not is_hi()
+            else f"अगले 30 दिनों के खर्चों ({inr(solvency.total_commitments)}) को कवर करता है। बैंक सुरक्षित सीमा {inr(solvency.net_bank_liquidity)} और गल्ला नकद {inr(solvency.galla_cash)}।"
+        )
+
+        if is_hi():
+            khata_sub = (f"{esc(inr(solvency.informal_receivables))} का {int(round(alpha * 100))}% {DEMO if khata_demo else ''}"
+                         if solvency.informal_receivables else "कोई उधारी नहीं")
+            month_sub = f"लगभग {months:.1f} महीने के खर्चे सुरक्षित"
+            comm_sub = "सैलरी, बिल और लेनदारों की देनदारी"
+            close_sub = f"अंतिम बैलेंस, {config.AS_OF:%d %b}"
+            galla_sub = f"{'आज गिना हुआ' if galla else 'गिना नहीं गया'} {DEMO if galla_demo else ''}"
+        else:
+            khata_sub = (f"{int(round(alpha * 100))}% of {esc(inr(solvency.informal_receivables))} {DEMO if khata_demo else ''}"
+                         if solvency.informal_receivables else "No informal khata")
+            month_sub = f"About {months:.1f} months of commitments"
+            comm_sub = "Salaries, open bills and khata you owe"
+            close_sub = f"Closing, {config.AS_OF:%d %b}"
+            galla_sub = f"{esc(galla.status_label) if galla else 'Not counted'} {DEMO if galla_demo else ''}"
+
+        # ── TIER 1: CALM EXECUTIVE COCKPIT (ZERO DESKTOP SCROLL) ─────────────
+        H(f"""
+        <div class="cc-cockpit-hero">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="cc-cockpit-tag">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
+              <span class="cc-badge-pill">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
+            </div>
+            <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">
+              {t("Safe Runway: ", "सुरक्षित रनवे: ")} <b>{months:.1f} {t("Months", "महीने")}</b>
+            </div>
+          </div>
+          
+          <div style="display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap;">
+            <div class="cc-hero" style="color:#0F172A;margin:0;font-size:clamp(2.4rem, 5vw, 3rem);font-weight:800;">{esc(inr(total_liquid))}</div>
+            <span style="font-size:1rem;font-weight:600;color:#64748B;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")}</span>
+          </div>
+          <div style="font-size:0.88rem;color:#475569;margin-top:4px;">
+            {esc(hero_sub_text)}
+          </div>
+          
+          <div class="cc-payroll-banner">
+            {svg(ICON_CHECK_CIRCLE, 16, "#166534")}
+            <span><b>{t("Payroll Confidence:", "वेतन सुरक्षा:")}</b> {esc(payroll_text)}</span>
+          </div>
+        </div>
+        """)
+
+        # 4 Vital Pulse Tiles
+        H(f"""
+        <div class="cc-grid-4" style="margin-top:10px;margin-bottom:12px;">
+          <div class="cc-tile">
+            <span class="l">{t("Net Usable Cash", "कुल उपलब्ध नकदी")}</span>
+            <span class="v" style="color:#0F172A;">{inr(total_liquid)}</span>
+            <span class="s">{t("Bank + drawer cash", "बैंक + गल्ला रोकड़")}</span>
+          </div>
+          <div class="cc-tile pos">
+            <span class="l">{t("Bank Headroom", "बैंक सुरक्षित सीमा")}</span>
+            <span class="v">{inr(solvency.net_bank_liquidity)}</span>
+            <span class="s">{t("Clear of CC limit", "क्रेडिट लिमिट से सुरक्षित")}</span>
+          </div>
+          <div class="cc-tile">
+            <span class="l">{t("Cash in Drawer", "गल्ले में नकद कैश")}</span>
+            <span class="v">{inr(solvency.galla_cash)}</span>
+            <span class="s">{galla_sub}</span>
+          </div>
+          <div class="cc-tile warn">
+            <span class="l">{t("Due in 30 Days", "अगले 30 दिन के खर्चे")}</span>
+            <span class="v">{inr(solvency.total_commitments)}</span>
+            <span class="s">{comm_sub}</span>
+          </div>
+        </div>
+        """)
+
+        # 1 Single Focal Action This Morning
+        if len(late) > 0:
+            top_late = late.iloc[0]
+            c_name = top_late["customer_name"]
+            c_due = inr(top_late["outstanding"])
+            c_days = int(top_late["oldest_days"])
+            c_phone = "910000000001"
+            wa_msg = f"Namaste {c_name}, Kaveri Distributors balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
+            wa_url = f"https://wa.me/{c_phone}?text={_html.escape(wa_msg)}"
+            limitation_badge = ""
+            if c_days > 900:
+                limitation_badge = '<span style="background:#FEF3C7;color:#92400E;font-size:0.72rem;padding:2px 8px;border-radius:4px;font-weight:700;">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
+
             H(f"""
-            <div class="cc-cockpit-hero">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <span class="cc-cockpit-tag">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
-                  <span class="cc-badge-pill">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
+            <div class="cc-action-card" style="border-left:4px solid #D97706;background:#FFFBEB;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
+              <div style="flex:1;min-width:260px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span style="font-size:0.78rem;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("1 Urgent Action This Morning", "आज सुबह की 1 सबसे जरूरी कार्रवाई")}</span>
+                  {limitation_badge}
                 </div>
-                <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">
-                  {t("Safe Runway: ", "सुरक्षित रनवे: ")} <b>{months:.1f} {t("Months", "महीने")}</b>
+                <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">
+                  {esc(c_name)} {t("owes", "बकाया")} {esc(c_due)} ({c_days} {t("days overdue", "दिन पुराना")})
+                </div>
+                <div style="font-size:0.8rem;color:#475569;margin-top:2px;">
+                  {t("Oldest invoice is 30+ months open. Collect or obtain acknowledgement before the 3-year statutory limit.", "30 महीने से अधिक पुराना बकाया। 3 साल की वैधानिक सीमा समाप्त होने से पहले संपर्क करें।")}
                 </div>
               </div>
-              
-              <div style="display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap;">
-                <div class="cc-hero" style="color:#0F172A;margin:0;font-size:clamp(2.4rem, 5vw, 3rem);font-weight:800;">{esc(inr(total_liquid))}</div>
-                <span style="font-size:1rem;font-weight:600;color:#64748B;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")}</span>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <a href="{wa_url}" target="_blank" class="cc-wa-btn">
+                  📲 {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
+                </a>
               </div>
-              <div style="font-size:0.88rem;color:#475569;margin-top:4px;">
-                {esc(hero_sub_text)}
+            </div>
+            """)
+        elif not sal.numbers["yes"]:
+            H(f"""
+            <div class="cc-action-card" style="border-left:4px solid #EF4444;background:#FEF2F2;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
+              <div style="flex:1;">
+                <div style="font-size:0.78rem;font-weight:800;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("Action Required", "ध्यान दें")}</div>
+                <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">{t("1 Oct Payroll requires cash planning", "1 अक्टूबर वेतन के लिए नकद योजना आवश्यक")}</div>
               </div>
-              
-              <div class="cc-payroll-banner">
-                {svg(ICON_CHECK_CIRCLE, 16, "#166534")}
-                <span><b>{t("Payroll Confidence:", "वेतन सुरक्षा:")}</b> {esc(payroll_text)}</span>
+            </div>
+            """)
+        else:
+            H(f"""
+            <div class="cc-action-card" style="border-left:4px solid #16A34A;background:#F0FDF4;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
+              <div style="flex:1;">
+                <div style="font-size:0.78rem;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">✓ {t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
+                <div style="font-size:0.95rem;font-weight:600;color:#166534;margin-top:2px;">{t("No urgent payment or collection bottlenecks this morning.", "आज सुबह कोई तत्काल भुगतान या वसूली समस्या नहीं है।")}</div>
               </div>
             </div>
             """)
 
-        with eq_box:
-            months = runway / max(solvency.total_commitments, 1.0)
-            if is_hi():
-                khata_sub = (f"{esc(inr(solvency.informal_receivables))} का {int(round(alpha * 100))}% {DEMO if khata_demo else ''}"
-                             if solvency.informal_receivables else "कोई उधारी नहीं")
-                month_sub = f"लगभग {months:.1f} महीने के खर्चे सुरक्षित"
-                comm_sub = "सैलरी, बिल और लेनदारों की देनदारी"
-                close_sub = f"अंतिम बैलेंस, {config.AS_OF:%d %b}"
-                galla_sub = f"{'आज गिना हुआ' if galla else 'गिना नहीं गया'} {DEMO if galla_demo else ''}"
-            else:
-                khata_sub = (f"{int(round(alpha * 100))}% of {esc(inr(solvency.informal_receivables))} {DEMO if khata_demo else ''}"
-                             if solvency.informal_receivables else "No informal khata")
-                month_sub = f"About {months:.1f} months of commitments"
-                comm_sub = "Salaries, open bills and khata you owe"
-                close_sub = f"Closing, {config.AS_OF:%d %b}"
-                galla_sub = f"{esc(galla.status_label) if galla else 'Not counted'} {DEMO if galla_demo else ''}"
+        # ── TIER 2: PROGRESSIVE DISCLOSURE EXPANDERS (ON-DEMAND 1-CLICK) ──────
+        with st.expander(t("How is this calculated? (The 5-Part Cash Equation)", "यह हिसाब कैसे निकला? (5-चरणीय नकद समीकरण)"), expanded=False):
+            if is_owner:
+                pct = st.slider(t("Khata collection assumption", "खाता वसूली अनुमान"), min_value=50, max_value=100,
+                                value=int(round(alpha * 100)), step=5, format="%d%%", key="khata_alpha_pct",
+                                help=t("Adjustable informal khata recovery expectation", "खाता वसूली की संभावित दर"))
+            if galla_demo or khata_demo:
+                H(f'<div class="cc-note" style="margin-bottom:8px;">{t("Drawer and khata figures include demo data, not from the pilot pack.", "गल्ला और खाते के आंकड़े डेमो डेटा से हैं।")}</div>')
             tiles(
                 tile(t("Bank balance", "बैंक बैलेंस") if not solvency.cc_drawn else t("Bank balance less overdraft", "बैंक बैलेंस (ओवरड्राफ्ट घटाकर)"),
                      inr(solvency.bank_balance - solvency.cc_drawn), close_sub),
@@ -911,9 +994,11 @@ def page_overview():
                 tile(t("= Your own-cash buffer", "= आपकी शुद्ध नकद सुरक्षा"), inr(runway), month_sub,
                      "accent" if runway >= 0 else "neg"),
             )
+            H(f'<div class="cc-note" style="margin-top:6px;">{t("Formula: (Bank Balance − Overdraft) + Drawer Cash + (Expected Khata × Assumption) − 30-Day Commitments = Own-Cash Buffer", "सूत्र: (बैंक बैलेंस − ओवरड्राफ्ट) + गल्ला नकद + (संभावित खाता वसूली × दर) − 30 दिन के खर्चे = शुद्ध नकद सुरक्षा")}</div>')
 
+        with st.expander(t("90-Day Cash Trajectory Simulation (Monte Carlo Fan Chart)", "90-दिवसीय संभावित नकद रनवे सिमुलेशन"), expanded=False):
             H(f"""
-            <div class="cc-fanchart-card">
+            <div class="cc-fanchart-card" style="box-shadow:none;border:none;padding:4px 0 0;">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
                 <div>
                   <div style="font-size:0.95rem;font-weight:700;color:#17191C;">{t("90-Day Projected Cash Runway (Monte Carlo Fan Chart)", "90-दिवसीय संभावित नकद रनवे (प्रायिकता विश्लेषण)")}</div>
@@ -944,115 +1029,53 @@ def page_overview():
             </div>
             """)
 
-    st.write("")
-    section(t("Needs you today", "आज का सबसे जरूरी काम"))
-    counts = queue_counts(biz)
-    cust = by_customer(items)
-    late = cust[cust.oldest_days >= 45]
-    with st.container(key="rows"):
-        sal = copilot.can_pay_salaries(biz, galla_cash=answer_galla())
-        n = sal.numbers
-        if n["yes"]:
-            title = t(f'Salaries on 1 Oct are covered {tag("Covered", "pos")}',
-                      f'1 अक्टूबर की सैलरी सुरक्षित है {tag("सुरक्षित", "pos")}')
-        else:
-            title = t(f'Salaries on 1 Oct need a plan {tag("Check", "warn")}',
-                      f'1 अक्टूबर की सैलरी के लिए योजना जरूरी {tag("ध्यान दें", "warn")}')
-        if is_hi():
-            detail = f"सितंबर की कुल सैलरी {inr(n['salary'])} थी। "
-            detail += (f"CC लिमिट के बाद भी {inr(n['headroom'])} की सुरक्षित सीमा बची रहेगी।" if limit
-                       else f"30 सितंबर को बैंक बैलेंस {inr(n['closing_balance'])} है।")
-        else:
-            detail = f"September payroll was {inr(n['salary'])}. "
-            detail += (f"Headroom of {inr(n['headroom'])} stays clear of the cash-credit limit." if limit
-                       else f"The 30 Sep balance is {inr(n['closing_balance'])}.")
-        _action_row("salary", title, detail, t("See the answer", "जवाब देखें"), PAGES["ask"], ask=ASK_CHIPS[0])
-        if len(late):
-            late_title = t(f'{len(late)} customers are more than 45 days overdue {tag(inr(late.outstanding.sum()), "warn")}',
-                           f'{len(late)} ग्राहकों पर 45 दिन से अधिक का बकाया {tag(inr(late.outstanding.sum()), "warn")}')
-            late_detail = t("Start with the largest. Each reminder opens as a WhatsApp draft for you to send.",
-                            "सबसे बड़े बकायेदार से शुरू करें। प्रत्येक तकादा WhatsApp पर ड्राफ्ट होगा।")
-            _action_row("late", late_title, late_detail, t("Open chasing list", "वसूली सूची देखें"), PAGES["recv"])
-
-            with st.expander(t(f"Quick Chaser: Top {min(2, len(late))} Overdue Accounts", f"त्वरित तकादा: शीर्ष {min(2, len(late))} बकायेदार"), expanded=True):
-                for _, r in late.head(2).iterrows():
-                    c_name = r["customer_name"]
-                    c_due = inr(r["outstanding"])
-                    c_days = int(r["oldest_days"])
-                    c_phone = "910000000001"
-                    wa_msg = f"Namaste {c_name}, Kaveri Distributors balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
-                    wa_url = f"https://wa.me/{c_phone}?text={_html.escape(wa_msg)}"
-                    limitation_badge = ""
-                    if c_days > 900:
-                        limitation_badge = '<span style="background:#FEF3C7;color:#92400E;font-size:0.72rem;padding:2px 6px;border-radius:4px;font-weight:600;">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
-
-                    H(f"""
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FFFFFF;border:1px solid #B8B8B0;border-radius:8px;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
-                      <div>
-                        <div style="font-weight:600;font-size:0.88rem;color:#17191C;">{esc(c_name)} {limitation_badge}</div>
-                        <div style="font-size:0.78rem;color:#545A63;">Due: <b>{esc(c_due)}</b> · Oldest invoice: {c_days}d ago</div>
-                      </div>
-                      <a href="{wa_url}" target="_blank" class="cc-wa-btn">
-                        📲 {t("Draft WhatsApp", "WhatsApp भेजें")}
-                      </a>
-                    </div>
-                    """)
         waiting = counts[SUGGEST] + counts[ASK]
-        if waiting:
-            rev_title = t(f"{waiting:,} receipts need a decision", f"{waiting:,} जमा पर्चियों पर निर्णय बाकी")
-            rev_detail = t(f"{counts[SUGGEST]:,} suggested matches and {counts[ASK]:,} questions. Another {counts['auto']:,} were matched automatically.",
-                           f"{counts[SUGGEST]:,} सुझाव और {counts[ASK]:,} सवाल। अन्य {counts['auto']:,} स्वतः मिलान हो चुके हैं।")
-            _action_row("review", rev_title, rev_detail, t("Start review", "समीक्षा शुरू करें"), PAGES["review"])
-        _action_row("slips", t("Record today's collection slips", "आज की वसूली पर्चियां दर्ज करें"),
-                    t("Salesman slips let cash deposits link to the right shop invoices.",
-                      "सेल्समैन की पर्चियों से कैश जमा सीधे सही दुकान के इनवॉइस से जुड़ जाता है।"),
-                    t("Record slips", "पर्ची दर्ज करें"), PAGES["cash"])
-        if len(late):
-            with st.container(key="row_recovery_sheet"):
-                r_a, r_b = st.columns([5, 1.6], vertical_alignment="center")
-                with r_a:
-                    H(f'<div class="cc-row-title">{t("Daily Field Recovery Sheet (गोदाम / फील्ड वसूली शीट)", "दैनिक फील्ड वसूली शीट (गोदाम)")}</div>'
-                      f'<div class="cc-row-detail">{t(f"Print or export today\'s {len(late)} overdue retailers with checkmarks and signature lines.", f"45+ दिन पुराने {len(late)} बकायेदारों की प्रिंट शीट, चेकबॉक्स और हस्ताक्षर सहित।")}</div>')
-                with r_b:
-                    if st.button(t("Print Sheet", "शीट प्रिंट करें"), key="btn_ov_print_sheet", use_container_width=True):
-                        daily_print_dialog()
+        task_count = (1 if len(late) > 1 else 0) + (1 if waiting else 0) + 1 + 1
+        with st.expander(t(f"Other Tasks Today ({task_count} items waiting)", f"आज के अन्य कार्य ({task_count} प्रविष्टियां)"), expanded=False):
+            if len(late):
+                late_title = t(f'{len(late)} customers are more than 45 days overdue {tag(inr(late.outstanding.sum()), "warn")}',
+                               f'{len(late)} ग्राहकों पर 45 दिन से अधिक का बकाया {tag(inr(late.outstanding.sum()), "warn")}')
+                late_detail = t("Start with the largest. Each reminder opens as a WhatsApp draft for you to send.",
+                                "सबसे बड़े बकायेदार से शुरू करें। प्रत्येक तकादा WhatsApp पर ड्राफ्ट होगा।")
+                _action_row("late", late_title, late_detail, t("Open chasing list", "वसूली सूची देखें"), PAGES["recv"])
 
-    st.write("")
-    left, right = st.columns([2, 1], gap="large")
-    with left:
-        section(t("90-day forecast", "90 दिन का नकद अनुमान"), (t("Open forecast", "पूरा अनुमान देखें"), "forecast", PAGES["forecast"]))
-        fc = forecast_for(biz)
-        if fc.warnings:
-            H(f'<div class="cc-tag warn">{len(fc.warnings)} {t("shortfall warning", "कमी की चेतावनी")}{"s" if len(fc.warnings) > 1 and not is_hi() else ""}</div>')
-        else:
-            H(f'<div class="cc-row-title" style="color:#1A6E45;font-size:0.85rem">{svg(ICON_CHECK, 16, width=2.2)}'
-              f'{t("No shortfall projected", "कोई नकद कमी नहीं आएगी")}</div>')
-        if fc.daily_points:
-            df = pd.DataFrame([{"Date": p.date, "p10": p.balance_p10, "p50": p.balance_p50, "p90": p.balance_p90}
-                               for p in fc.daily_points])
-            base = alt.Chart(df)
-            x = alt.X("Date:T", title=None, axis=alt.Axis(format="%b", tickCount="month", grid=False, domain=False,
-                                                          ticks=False, labelColor=SUBTLE, labelPadding=6))
-            band = base.mark_area(color=ACCENT, opacity=0.12).encode(
-                x=x, y=alt.Y("p10:Q", axis=None, scale=alt.Scale(zero=False)), y2="p90:Q")
-            line = base.mark_line(color=ACCENT, strokeWidth=2).encode(x="Date:T", y="p50:Q")
-            chart = (band + line).properties(height=150).configure(font=FONT).configure_view(strokeWidth=0)
-            st.altair_chart(chart, use_container_width=True, theme=None)
-            low = df.loc[df.p50.idxmin()]
-            closing = fc.monthly_forecasts[-1] if fc.monthly_forecasts else None
-            closing_txt = (f" {pd.Timestamp(closing.month + '-01'):%B} closes near {inr(closing.closing_balance_p50)}."
-                           if closing and not is_hi() else (f" {pd.Timestamp(closing.month + '-01'):%B} का समापन लगभग {inr(closing.closing_balance_p50)} पर होगा।" if closing else ""))
-            H(f'<div class="cc-muted">{t("Lowest expected balance is", "सबसे कम संभावित बैलेंस")} {esc(inr(low.p50))} '
-              f'({pd.Timestamp(low.Date):%d %b})। {esc(closing_txt)}</div>')
-    with right:
-        section(t("Your data, checked", "डेटा शुद्धता एवं ऑडिट"), (t("Details", "विवरण देखें"), "quality", PAGES["quality"]))
-        rep = data_report()
-        ties = t("Yes, no breaks", "हाँ, पूर्ण मिलान") if rep["balance_ties"] else f"{rep['balance_breaks']} {t('breaks', 'असंगतियां')}"
-        H(f'<dl class="cc-dl">'
-          f'<div><dt>{t("Bank lines read", "बैंक प्रविष्टियां पढ़ी गईं")}</dt><dd>{rep["bank_lines"]:,}</dd></div>'
-          f'<div><dt>{t("Duplicates skipped", "दोहरी प्रविष्टियां हटाई गईं")}</dt><dd>{rep["duplicates_skipped"]:,}</dd></div>'
-          f'<div><dt>{t("Running balances tie", "दैनिक बैलेंस का मिलान")}</dt><dd style="color:{"#1A6E45" if rep["balance_ties"] else NEG}">{ties}</dd></div>'
-          f'<div><dt>{t("Invoices and claims", "कुल इनवॉइस व दावे")}</dt><dd>{rep["documents"]:,}</dd></div></dl>')
+            if waiting:
+                rev_title = t(f"{waiting:,} receipts need a decision", f"{waiting:,} जमा पर्चियों पर निर्णय बाकी")
+                rev_detail = t(f"{counts[SUGGEST]:,} suggested matches and {counts[ASK]:,} questions. Another {counts['auto']:,} were matched automatically.",
+                               f"{counts[SUGGEST]:,} सुझाव और {counts[ASK]:,} सवाल। अन्य {counts['auto']:,} स्वतः मिलान हो चुके हैं।")
+                _action_row("review", rev_title, rev_detail, t("Start review", "समीक्षा शुरू करें"), PAGES["review"])
+
+            _action_row("slips", t("Record today's collection slips", "आज की वसूली पर्चियां दर्ज करें"),
+                        t("Salesman slips let cash deposits link to the right shop invoices.",
+                          "सेल्समैन की पर्चियों से कैश जमा सीधे सही दुकान के इनवॉइस से जुड़ जाता है।"),
+                        t("Record slips", "पर्ची दर्ज करें"), PAGES["cash"])
+
+            n = sal.numbers
+            if n["yes"]:
+                title = t(f'Salaries on 1 Oct are covered {tag("Covered", "pos")}',
+                          f'1 अक्टूबर की सैलरी सुरक्षित है {tag("सुरक्षित", "pos")}')
+            else:
+                title = t(f'Salaries on 1 Oct need a plan {tag("Check", "warn")}',
+                          f'1 अक्टूबर की सैलरी के लिए योजना जरूरी {tag("ध्यान दें", "warn")}')
+            if is_hi():
+                detail = f"सितंबर की कुल सैलरी {inr(n['salary'])} थी। "
+                detail += (f"CC लिमिट के बाद भी {inr(n['headroom'])} की सुरक्षित सीमा बची रहेगी।" if limit
+                           else f"30 सितंबर को बैंक बैलेंस {inr(n['closing_balance'])} है।")
+            else:
+                detail = f"September payroll was {inr(n['salary'])}. "
+                detail += (f"Headroom of {inr(n['headroom'])} stays clear of the cash-credit limit." if limit
+                           else f"The 30 Sep balance is {inr(n['closing_balance'])}.")
+            _action_row("salary", title, detail, t("See the answer", "जवाब देखें"), PAGES["ask"], ask=ASK_CHIPS[0])
+
+            if len(late):
+                with st.container(key="row_recovery_sheet"):
+                    r_a, r_b = st.columns([5, 1.6], vertical_alignment="center")
+                    with r_a:
+                        H(f'<div class="cc-row-title">{t("Daily Field Recovery Sheet (गोदाम / फील्ड वसूली शीट)", "दैनिक फील्ड वसूली शीट (गोदाम)")}</div>'
+                          f'<div class="cc-row-detail">{t(f"Print or export today\'s {len(late)} overdue retailers with checkmarks and signature lines.", f"45+ दिन पुराने {len(late)} बकायेदारों की प्रिंट शीट, चेकबॉक्स और हस्ताक्षर सहित।")}</div>')
+                    with r_b:
+                        if st.button(t("Print Sheet", "शीट प्रिंट करें"), key="btn_ov_print_sheet", use_container_width=True):
+                            daily_print_dialog()
 
 
 def _action_row(key: str, title_html: str, detail: str, label: str, page, ask: str | None = None) -> None:
@@ -1204,9 +1227,10 @@ def page_cash_book():
         is_bal = latest_g.is_balanced if latest_g else True
         bal_badge = f'<span class="cc-badge pos">Ties Exactly ✓</span>' if is_bal else f'<span class="cc-badge warn">{esc(inr(latest_g.drift))} to check</span>'
 
+        # Compact Till Hero Card
         H(f"""
         <div class="cc-card-modern">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
               <div style="font-size:1.05rem;font-weight:700;color:#0F172A;">🪙 {t("Galla Day-Close (Under 1 Minute)", "आज का गल्ला (दैनिक रोकड़ मिलान)")} {demo}</div>
               <div style="font-size:0.78rem;color:#64748B;">{t("Physical till count vs drawer records", "दुकान गल्ला और बही मिलान")} · {when}</div>
@@ -1214,33 +1238,37 @@ def page_cash_book():
             {bal_badge}
           </div>
 
-          <div class="cc-grid-4">
-            <div class="cc-tile">
-              <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}</span>
-              <span class="v">{inr(open_c)}</span>
-            </div>
-            <div class="cc-tile pos">
-              <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}</span>
-              <span class="v">+{inr(in_c)}</span>
-            </div>
-            <div class="cc-tile warn">
-              <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}</span>
-              <span class="v">−{inr(out_c)}</span>
-            </div>
-            <div class="cc-tile accent">
-              <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}</span>
-              <span class="v">−{inr(banked_c)}</span>
-            </div>
-          </div>
-
           <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
             <div>
               <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#166534;display:block;">{t("Counted Cash in Drawer", "गल्ले में गिना हुआ अंतिम नकद")}</span>
-              <span style="font-size:1.6rem;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">{inr(counted_c)}</span>
+              <span style="font-size:1.8rem;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">{inr(counted_c)}</span>
             </div>
           </div>
         </div>
         """)
+
+        # Collapsed Drawer Breakdown
+        with st.expander(t("View Drawer Breakdown (Opening, Takings, Hamali, Banked)", "गल्ला विवरण देखें (नकद बिक्री, खर्च, बैंक जमा)"), expanded=False):
+            H(f"""
+            <div class="cc-grid-4">
+              <div class="cc-tile">
+                <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}</span>
+                <span class="v">{inr(open_c)}</span>
+              </div>
+              <div class="cc-tile pos">
+                <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}</span>
+                <span class="v">+{inr(in_c)}</span>
+              </div>
+              <div class="cc-tile warn">
+                <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}</span>
+                <span class="v">−{inr(out_c)}</span>
+              </div>
+              <div class="cc-tile accent">
+                <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}</span>
+                <span class="v">−{inr(banked_c)}</span>
+              </div>
+            </div>
+            """)
 
         b1, b2, _ = st.columns([1.2, 1.6, 1.2])
         if b1.button(t("Close the day", "आज का गल्ला बंद करें"), type="primary", key="open_day_close", use_container_width=True):
@@ -1257,33 +1285,43 @@ def page_cash_book():
         H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline;margin:16px 0 10px;">'
           f'<div class="cc-h2" role="heading" aria-level="2">{t("Pending khata & Chaser", "कच्चा खाता व तकादा")} {k_demo}</div>'
           f'<div class="cc-muted">{totals}</div></div>')
+
+        def _render_khata_card(acc):
+            rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
+            flag = f'<span class="cc-badge warn">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
+            color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
+            sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
+
+            H(f"""
+            <div class="cc-action-card">
+              <div style="flex:1;min-width:180px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span style="font-size:0.92rem;font-weight:700;color:#0F172A;">{esc(acc.party_name)}</span>
+                  {flag}
+                </div>
+                <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
+                  {t("Informal khata balance", "कच्चा खाता बकाया")}: <span style="{color}">{esc(inr(acc.balance_due))}</span>
+                </div>
+                {sub_warning}
+              </div>
+              <div>
+                <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn">
+                  📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                </a>
+              </div>
+            </div>
+            """)
+
         if accounts:
             with st.container(key="krows"):
-                for i, acc in enumerate(accounts):
-                    rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
-                    flag = f'<span class="cc-badge warn">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
-                    color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
-                    sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
-
-                    H(f"""
-                    <div class="cc-action-card">
-                      <div style="flex:1;min-width:180px;">
-                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                          <span style="font-size:0.92rem;font-weight:700;color:#0F172A;">{esc(acc.party_name)}</span>
-                          {flag}
-                        </div>
-                        <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
-                          {t("Informal khata balance", "कच्चा खाता बकाया")}: <span style="{color}">{esc(inr(acc.balance_due))}</span>
-                        </div>
-                        {sub_warning}
-                      </div>
-                      <div>
-                        <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn">
-                          📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
-                        </a>
-                      </div>
-                    </div>
-                    """)
+                top_accs = accounts[:3]
+                rest_accs = accounts[3:]
+                for acc in top_accs:
+                    _render_khata_card(acc)
+                if rest_accs:
+                    with st.expander(t(f"Show {len(rest_accs)} More Khata Accounts", f"{len(rest_accs)} अन्य खाते देखें"), expanded=False):
+                        for acc in rest_accs:
+                            _render_khata_card(acc)
             H(f'<div class="cc-note" style="margin-top:8px;">{t("Drafts open in WhatsApp. Nothing is sent until you press send there.", "मैसेज WhatsApp में ड्राफ्ट होगा। आपके भेजने से पहले कुछ भी नहीं भेजा जाता।")}</div>')
         else:
             H(f'<div class="cc-muted">{t("No informal khata records for this business.", "इस व्यापार के लिए कोई कच्चा खाता दर्ज नहीं है।")}</div>')
@@ -1299,10 +1337,10 @@ def page_cash_book():
               f'<div class="cc-hero" style="font-size:1.6rem">{esc(inr(ytd_deposits))}</div>'
               f'<div class="cc-muted" style="color:#3F444B">{esc(facts_res.message)}</div>'
               f'<div class="cc-note" style="margin-top:8px">{esc(facts_res.citation)}</div>'
-              f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>'
-              f'<div style="font-weight:600;font-size:0.85rem;margin-bottom:10px">{t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड")}</div>'
-              f'<ul class="cc-list sm">{items_html}</ul>'
-              f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
+              f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>')
+            with st.expander(t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड"), expanded=False):
+                H(f'<ul class="cc-list sm">{items_html}</ul>'
+                  f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
 
 
 # ── PAGE: FORECAST (FR-FC-1, FR-FC-2) ────────────────────────────────────────
@@ -1436,7 +1474,7 @@ def page_forecast():
 
     st.write("")
     holdout_res = holdout_scores()
-    with st.expander(f"How accurate is this forecast? {holdout_res.mape:.2%} average error on the holdout"):
+    with st.expander(f"How accurate is this forecast? {holdout_res.mape:.2%} average error on the holdout", expanded=False):
         mape_label = f"{holdout_res.mape:.2%}"
         if holdout_res.mape > 0.182:
             mape_note = "worse than the simple 3-month average; kill metric (D31)"
@@ -1874,6 +1912,28 @@ def page_quality():
     left, _ = st.columns([3, 2])
     with left:
         H(_html_table(cats))
+
+    st.write("")
+    section("Holdout forecast backtest accuracy")
+    holdout_res = holdout_scores()
+    mape_label = f"{holdout_res.mape:.2%}"
+    if holdout_res.mape > 0.182:
+        mape_note = "worse than the simple 3-month average; kill metric (D31)"
+    else:
+        mape_note = "target ≤ 10%"
+    H(f"""
+    <div class="cc-card-modern">
+      <div style="font-size:0.95rem;font-weight:700;color:#0F172A;margin-bottom:8px;">Holdout Forecast Benchmarks (Jul–Sep 2026 Out-of-Sample)</div>
+      <div class="cc-tiles">
+        {tile("Model error (MAPE) on the frozen holdout", mape_label, f"{mape_note} · naive 3-month baseline {holdout_res.naive_mape:.2%}")}
+        {tile("Agency inflows error", f"{holdout_res.agency_inflow_mape:.2%}", f"naive baseline {holdout_res.naive_agency_inflow_mape:.2%}")}
+        {tile("Paired bootstrap improvement (naive − model)", f"{holdout_res.bootstrap_diff_mean:+.2%}", f"95% CI {holdout_res.bootstrap_diff_ci[0]:+.2%} to {holdout_res.bootstrap_diff_ci[1]:+.2%}")}
+        {tile("Holdout P10–P90 coverage", f"{holdout_res.coverage_p10_p90:.1%}", "of actuals fell inside the range")}
+        {tile("Holdout likely warnings", f"{holdout_res.false_alarms.get(biz, 0)}", "for this business")}
+      </div>
+      <div class="cc-note" style="margin-top:8px">Calibrated without lookahead bias across 10,000 paired bootstrap resamples.</div>
+    </div>
+    """)
 
 
 # ── PAGE: SETUP GUIDE (3 steps, Account Aggregator consent) ──────────────────

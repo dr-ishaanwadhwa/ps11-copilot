@@ -161,3 +161,12 @@ def test_daily_recovery_candidates(pack):
     assert candidates.outstanding.sum() > 0
 
 
+def test_streamlit_app_loads_without_exceptions():
+    """Verify that Streamlit app initializes and runs the Overview cockpit with zero exceptions."""
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
+    at.run()
+    assert not at.exception, f"Streamlit app raised exception: {at.exception[0].message if at.exception else ''}"
+
+
+

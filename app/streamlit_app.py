@@ -1173,6 +1173,7 @@ def page_overview():
             </div>
             """)
 
+        counts = queue_counts(biz)
         waiting = counts[SUGGEST] + counts[ASK]
         task_count = (1 if len(late) > 1 else 0) + (1 if waiting else 0) + 1 + 1
         with st.expander(t(f"Other Tasks Today ({task_count} items waiting)", f"आज के अन्य कार्य ({task_count} प्रविष्टियां)"), expanded=False):

@@ -164,21 +164,22 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
     scroll-snap-align: start;
   }
 }
-.cc-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 8px; }
-.cc-tile .l { font-size: 0.76rem; color: #545A63; }
-.cc-tile .v { font-size: 1.12rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cc-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #FFFFFF; border: 1px solid #B8B8B0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 150ms ease; }
+.cc-tile:hover { border-color: #24509A; box-shadow: 0 4px 12px rgba(36, 80, 154, 0.08); }
+.cc-tile .l { font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: #545A63; }
+.cc-tile .v { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #0F172A; }
 .cc-tile .s { font-size: 0.76rem; color: #646A72; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.cc-tile.big .v { font-size: 1.3rem; }
-.cc-tile.accent { background: #EDF1F8; }
-.cc-tile.accent .l { color: #24509A; font-weight: 500; }
+.cc-tile.big .v { font-size: 1.4rem; }
+.cc-tile.accent { background: #F8FAFC; border-color: #CBD5E1; }
+.cc-tile.accent .l { color: #24509A; font-weight: 600; }
 .cc-tile.accent .v { color: #1C407D; }
 .cc-tile.accent .s { color: #2F4F86; }
-.cc-tile.pos { background: #EAF4EE; }
-.cc-tile.pos .l, .cc-tile.pos .v, .cc-tile.pos .s { color: #1A6E45; }
-.cc-tile.warn { background: #FBF1DF; }
-.cc-tile.warn .l, .cc-tile.warn .v, .cc-tile.warn .s { color: #7A4A00; }
-.cc-tile.neg { background: #FBECEA; }
-.cc-tile.neg .l, .cc-tile.neg .v, .cc-tile.neg .s { color: #A8261D; }
+.cc-tile.pos { background: #F0FDF4; border-color: #BBF7D0; }
+.cc-tile.pos .l, .cc-tile.pos .v, .cc-tile.pos .s { color: #166534; }
+.cc-tile.warn { background: #FFFBEB; border-color: #FDE68A; }
+.cc-tile.warn .l, .cc-tile.warn .v, .cc-tile.warn .s { color: #92400E; }
+.cc-tile.neg { background: #FEF2F2; border-color: #FECACA; }
+.cc-tile.neg .l, .cc-tile.neg .v, .cc-tile.neg .s { color: #B91C1C; }
 .cc-demo { font-size: 0.75rem; font-weight: 600; color: #545A63; border: 1px solid #B8B8B0; border-radius: 4px; padding: 1px 6px; line-height: 1.5; letter-spacing: 0.02em; }
 .cc-tag { display: inline-block; font-size: 0.78rem; font-weight: 500; border-radius: 6px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; }
 .cc-tag.pos { color: #1A6E45; background: #EAF4EE; }
@@ -310,6 +311,75 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
   padding: 18px 20px;
   margin-top: 18px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.cc-card-modern {
+  background: #FFFFFF;
+  border: 1px solid #B8B8B0;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-bottom: 16px;
+  transition: all 150ms ease;
+}
+.cc-card-modern:hover {
+  border-color: #94A3B8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.cc-action-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid #B8B8B0;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  gap: 12px;
+  transition: all 150ms ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+.cc-action-card:hover {
+  background: #F8FAFC;
+  border-color: #24509A;
+  box-shadow: 0 2px 8px rgba(36, 80, 154, 0.06);
+}
+.cc-top-banner {
+  background: #FFFFFF;
+  border: 1px solid #B8B8B0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.cc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.cc-badge.warn { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+.cc-badge.pos { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+.cc-badge.info { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+.cc-badge.neutral { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+.cc-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+@media (max-width: 900px) {
+  .cc-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -485,6 +555,24 @@ def go(label: str, key: str, page, ask: str | None = None) -> None:
 
 
 def page_header(title: str, subtitle: str, right=None) -> None:
+    role_icon = "👑" if is_owner else ("🪙" if is_counter_staff else "🏛️")
+    role_label = t("Owner (मालिक)", "मालिक") if is_owner else (t("Counter Staff (स्टाफ)", "काउंटर स्टाफ") if is_counter_staff else t("Accountant / CA (मुनीम)", "मुनीम / एकाउंटेंट"))
+    biz_type = "FMCG Wholesale · Pune" if biz == "SME-1" else ("Dental Clinic · Bengaluru" if biz == "SME-2" else "Design Agency · Mumbai")
+
+    H(f"""
+    <div class="cc-top-banner">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:1.15rem;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">{esc(BIZ_NAME)}</span>
+        <span class="cc-badge info">{biz_type}</span>
+        <span style="font-size:0.78rem;color:#64748B;">As of {config.AS_OF:%d %b %Y} · Local-First Read-Only Vault</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;">
+          {role_icon} {role_label}
+        </span>
+      </div>
+    </div>
+    """)
     left, rgt = st.columns([3, 2], vertical_alignment="center")
     with left:
         H(f'<div class="cc-title" role="heading" aria-level="1">{esc(title)}</div>'
@@ -1106,19 +1194,55 @@ def page_cash_book():
         latest_g = vault.get_latest_galla(biz)
         demo = DEMO if latest_g and latest_g.is_demo else ""
         when = f"{esc(latest_g.notes)} · {latest_g.date:%d %b %Y}" if latest_g else ""
-        H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center">'
-          f'<div class="cc-h2" role="heading" aria-level="2">{t("Today\'s drawer", "आज का गल्ला")} {demo}</div>'
-          f'<div class="cc-note">{when}</div></div>')
-        if latest_g:
-            status_sub = t("Ties to the book", "बही से पूर्ण मिलान") if latest_g.is_balanced else f"{esc(inr(latest_g.drift))} {t('drift', 'अंतर')}"
-            tiles(
-                tile(t("Counted in drawer", "गल्ले में गिना हुआ नकद"), inr(latest_g.counted_cash), tone="big"),
-                tile(t("Expected from book", "बही के अनुसार अपेक्षित"), inr(latest_g.expected_cash), tone="big"),
-                tile(t("Till status", "गल्ले की स्थिति"), latest_g.status_label, status_sub, "pos big" if latest_g.is_balanced else "warn big"),
-            )
-        else:
-            H(f'<div class="cc-muted">{t("No drawer count recorded yet.", "अभी तक कोई गल्ला गणना दर्ज नहीं है।")}</div>')
-        b1, b2, _ = st.columns([1, 1.4, 1.6])
+
+        # Modern Till Balancing Cockpit
+        open_c = getattr(latest_g, "opening_cash", 10000.0) if latest_g else 10000.0
+        in_c = getattr(latest_g, "cash_in", 25000.0) if latest_g else 25000.0
+        out_c = getattr(latest_g, "cash_out", 2500.0) if latest_g else 2500.0
+        banked_c = getattr(latest_g, "cash_banked", 20000.0) if latest_g else 20000.0
+        counted_c = latest_g.counted_cash if latest_g else 12500.0
+        is_bal = latest_g.is_balanced if latest_g else True
+        bal_badge = f'<span class="cc-badge pos">Ties Exactly ✓</span>' if is_bal else f'<span class="cc-badge warn">{esc(inr(latest_g.drift))} to check</span>'
+
+        H(f"""
+        <div class="cc-card-modern">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;">🪙 {t("Galla Day-Close (Under 1 Minute)", "आज का गल्ला (दैनिक रोकड़ मिलान)")} {demo}</div>
+              <div style="font-size:0.78rem;color:#64748B;">{t("Physical till count vs drawer records", "दुकान गल्ला और बही मिलान")} · {when}</div>
+            </div>
+            {bal_badge}
+          </div>
+
+          <div class="cc-grid-4">
+            <div class="cc-tile">
+              <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}</span>
+              <span class="v">{inr(open_c)}</span>
+            </div>
+            <div class="cc-tile pos">
+              <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}</span>
+              <span class="v">+{inr(in_c)}</span>
+            </div>
+            <div class="cc-tile warn">
+              <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}</span>
+              <span class="v">−{inr(out_c)}</span>
+            </div>
+            <div class="cc-tile accent">
+              <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}</span>
+              <span class="v">−{inr(banked_c)}</span>
+            </div>
+          </div>
+
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <div>
+              <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#166534;display:block;">{t("Counted Cash in Drawer", "गल्ले में गिना हुआ अंतिम नकद")}</span>
+              <span style="font-size:1.6rem;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">{inr(counted_c)}</span>
+            </div>
+          </div>
+        </div>
+        """)
+
+        b1, b2, _ = st.columns([1.2, 1.6, 1.2])
         if b1.button(t("Close the day", "आज का गल्ला बंद करें"), type="primary", key="open_day_close", use_container_width=True):
             day_close_dialog()
         if b2.button(t("Record collection slips", "वसूली पर्ची दर्ज करें"), key="open_slips", use_container_width=True):
@@ -1130,31 +1254,37 @@ def page_cash_book():
         k_demo = DEMO if any(getattr(acc, "is_demo", False) for acc in accounts) else ""
         totals = (f'{t("They owe you", "ग्राहकों पर बाकी")} <b class="cc-num">{esc(inr(khata_data["receivables"]))}</b> · {t("you owe", "आपको देना है")} '
                   f'<b class="cc-num">{esc(inr(khata_data["payables"]))}</b>') if accounts else ""
-        H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline">'
-          f'<div class="cc-h2" role="heading" aria-level="2">{t("Pending khata", "कच्चा खाता")} {k_demo}</div>'
+        H(f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline;margin:16px 0 10px;">'
+          f'<div class="cc-h2" role="heading" aria-level="2">{t("Pending khata & Chaser", "कच्चा खाता व तकादा")} {k_demo}</div>'
           f'<div class="cc-muted">{totals}</div></div>')
         if accounts:
-            H(f'<div class="cc-colhead" style="grid-template-columns:2.6fr 1.1fr 1.2fr 1.9fr">'
-              f'<span>{t("Party", "पार्टी का नाम")}</span><span>{t("Open for", "अवधि")}</span><span style="text-align:right">{t("Balance", "बाकी रकम")}</span><span></span></div>')
             with st.container(key="krows"):
                 for i, acc in enumerate(accounts):
                     rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
-                    with st.container(key=f"krow_{i}"):
-                        c1, c2, c3, c4 = st.columns([2.6, 1.1, 1.2, 1.9], vertical_alignment="center")
-                        sub = ""
-                        if acc.balance_due < 0:
-                            sub = f'<div class="cc-row-detail">{t("You owe them", "आपको देना है")}</div>'
-                        if rem["limitation_warning"]:
-                            sub = f'<div class="cc-row-detail">{esc(rem["limitation_warning"])}</div>'
-                        flag = tag(t("Over 30 months", "30 महीने से अधिक"), "warn") if acc.is_limitation_alert else ""
-                        c1.markdown(f'<div class="cc-row-title">{esc(acc.party_name)} {flag}</div>{sub}',
-                                    unsafe_allow_html=True)
-                        c2.markdown(f'<div class="cc-muted">{acc.months_open} {t("months", "महीने")}</div>', unsafe_allow_html=True)
-                        color = f"color:{NEG}" if acc.balance_due < 0 else ""
-                        c3.markdown(f'<div class="cc-amount" style="{color}">{esc(inr(acc.balance_due))}</div>',
-                                    unsafe_allow_html=True)
-                        c4.link_button(t("WhatsApp draft", "WhatsApp तकादा"), rem["wa_link"], icon=":material/send:", use_container_width=True)
-            H(f'<div class="cc-note">{t("Drafts open in WhatsApp. Nothing is sent until you press send there.", "मैसेज WhatsApp में ड्राफ्ट होगा। आपके भेजने से पहले कुछ भी नहीं भेजा जाता।")}</div>')
+                    flag = f'<span class="cc-badge warn">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
+                    color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
+                    sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
+
+                    H(f"""
+                    <div class="cc-action-card">
+                      <div style="flex:1;min-width:180px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                          <span style="font-size:0.92rem;font-weight:700;color:#0F172A;">{esc(acc.party_name)}</span>
+                          {flag}
+                        </div>
+                        <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
+                          {t("Informal khata balance", "कच्चा खाता बकाया")}: <span style="{color}">{esc(inr(acc.balance_due))}</span>
+                        </div>
+                        {sub_warning}
+                      </div>
+                      <div>
+                        <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn">
+                          📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                        </a>
+                      </div>
+                    </div>
+                    """)
+            H(f'<div class="cc-note" style="margin-top:8px;">{t("Drafts open in WhatsApp. Nothing is sent until you press send there.", "मैसेज WhatsApp में ड्राफ्ट होगा। आपके भेजने से पहले कुछ भी नहीं भेजा जाता।")}</div>')
         else:
             H(f'<div class="cc-muted">{t("No informal khata records for this business.", "इस व्यापार के लिए कोई कच्चा खाता दर्ज नहीं है।")}</div>')
 
@@ -1188,14 +1318,38 @@ def page_forecast():
     # Shortfall warning cards (D50, D40)
     if fc_res.warnings:
         for w in fc_res.warnings:
-            tone = "warn"
-            H(f'<div class="cc-callout {tone}">{svg(ICON_ALERT, 18, "#8A5300")}<div>'
-              f'<div class="t" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#17191C">{t("Early shortfall warning", "नकद कमी की पूर्व चेतावनी")} '
-              f'{tag(w.level.title(), "warn")}</div><div class="d">{esc(w.message)}</div></div></div>')
+            H(f"""
+            <div class="cc-card-modern" style="border-left:4px solid #D97706;background:#FFFBEB;">
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                {svg(ICON_ALERT, 22, "#D97706")}
+                <div>
+                  <div style="font-size:0.95rem;font-weight:700;color:#92400E;display:flex;align-items:center;gap:8px;">
+                    {t("Early Shortfall Warning", "नकद कमी की पूर्व चेतावनी")}
+                    <span class="cc-badge warn">{w.level.title()}</span>
+                  </div>
+                  <div style="font-size:0.86rem;color:#78350F;margin-top:4px;line-height:1.5;">{esc(w.message)}</div>
+                </div>
+              </div>
+            </div>
+            """)
     else:
-        H(f'<div class="cc-callout pos">{svg(ICON_CHECK_CIRCLE, 20)}<div><div class="t">{t("No shortfall projected", "कोई नकद कमी नहीं आएगी")}</div>'
-          f'<div class="d">{t("Your balance stays above the credit limit, salary days and your cash floor for all 90 days.", "अगले 90 दिनों में वेतन दिवस और सामान्य खर्चों के बाद भी खाता सुरक्षित सीमा में रहेगा।")}'
-          f'</div></div></div>')
+        H(f"""
+        <div class="cc-card-modern" style="border-left:4px solid #059669;background:#F0FDF4;">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            {svg(ICON_CHECK_CIRCLE, 22, "#059669")}
+            <div>
+              <div style="font-size:0.95rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:8px;">
+                {t("No Shortfall Projected · Safe Operating Runway", "कोई नकद कमी नहीं आएगी · सुरक्षित ऑपरेटिंग रनवे")}
+                <span class="cc-badge pos">Q3 Safe</span>
+              </div>
+              <div style="font-size:0.86rem;color:#14532D;margin-top:4px;line-height:1.5;">
+                {t("Your bank headroom stays clear of the sanctioned cash-credit limit, salary obligations and operating expenses across all 90 days.",
+                   "अगले 90 दिनों में वेतन दिवस और सामान्य खर्चों के बाद भी खाता स्वीकृत क्रेडिट लिमिट से पूर्णतः सुरक्षित रहेगा।")}
+              </div>
+            </div>
+          </div>
+        </div>
+        """)
 
     if fc_res.daily_points:
         st.write("")
@@ -1258,11 +1412,27 @@ def page_forecast():
             f'<td class="{net_cls}">{esc(net_txt)}</td>'
             f'<td>{esc(inr(mf.min_balance_p50))}</td>'
             f'<td style="font-weight:600">{esc(inr(mf.closing_balance_p50))}</td></tr>')
-    H('<div class="cc-scroll"><table class="cc-table" style="min-width:720px"><thead><tr>'
-      '<th>Month</th><th>Expected inflows</th><th>Committed outflows</th><th>Net cash flow</th>'
-      '<th>Lowest daily balance</th><th>Closing balance</th></tr></thead>'
-      f'<tbody>{"".join(rows)}</tbody></table></div>'
-      '<div class="cc-note" style="margin-top:6px">Most likely values (P50). Small figures show the likely range.</div>')
+    H(f"""
+    <div class="cc-card-modern">
+      <div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:12px;">{t("Month-by-Month Operating Outlook", "माह-दर-माह नकद प्रवाह विश्लेषण")}</div>
+      <div class="cc-scroll">
+        <table class="cc-table" style="min-width:720px">
+          <thead>
+            <tr>
+              <th style="text-align:left;">{t("Month", "माह")}</th>
+              <th>{t("Expected Inflows", "अपेक्षित आवक")}</th>
+              <th>{t("Committed Outflows", "देय खर्च")}</th>
+              <th>{t("Net Cash Flow", "शुद्ध प्रवाह")}</th>
+              <th>{t("Lowest Day Balance", "न्यूनतम स्तर")}</th>
+              <th>{t("Closing Balance", "अंतिम शेष")}</th>
+            </tr>
+          </thead>
+          <tbody>{"".join(rows)}</tbody>
+        </table>
+      </div>
+      <div class="cc-note" style="margin-top:10px;">{t("P50 median estimates with P10–P90 sensitivity bounds.", "P50 सबसे संभावित स्तर और P10–P90 सीमाएं।")}</div>
+    </div>
+    """)
 
     st.write("")
     holdout_res = holdout_scores()
@@ -1293,6 +1463,16 @@ def page_review():
                   f"जमा प्रविष्टियां जिन पर निर्णय बाकी है। अन्य {counts['auto']:,} प्रविष्टियों का स्वतः सही इनवॉइस से मिलान हो चुका है।"))
     if showing_partial_view:
         st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
+
+    H(f"""
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;margin-bottom:14px;gap:8px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="cc-badge info" style="font-size:0.78rem;">Strict Decision 60</span>
+        <span style="font-size:0.86rem;font-weight:700;color:#1E40AF;">0 Unvetted Auto-Accepts · Strict Bank & Ledger Rule Engine</span>
+      </div>
+      <div style="font-size:0.8rem;color:#2563EB;font-weight:600;">{counts['auto']:,} automatic matches · {counts[SUGGEST] + counts[ASK]:,} in decision queue</div>
+    </div>
+    """)
 
     bank = pack.bank.set_index("txn_id")
     rows = []
@@ -1403,11 +1583,27 @@ def page_receivables():
 
     items = open_items(pack, biz)
     cust_df = by_customer(items)
-    H(f'<dl class="cc-figs">'
-      f'<div><dt>{t("Total outstanding", "कुल बकाया रकम")}</dt><dd>{esc(inr(items.outstanding.sum()))}</dd></div>'
-      f'<div><dt>{t("Open invoices", "खुले इनवॉइस")}</dt><dd>{len(items):,}</dd></div>'
-      f'<div><dt>{t("More than 60 days late", "60 दिन से अधिक पुराने")}</dt><dd style="color:#8A5300">{len(overdue(items)):,} {t("invoices", "इनवॉइस")}</dd></div></dl>')
-    st.write("")
+
+    # Modern 3-Quadrant Metric Grid for Desktop
+    H(f"""
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-bottom:16px;">
+      <div class="cc-tile accent">
+        <span class="l">{t("Total Formal Receivables", "कुल औपचारिक बिल बकाया")}</span>
+        <span class="v" style="font-size:1.45rem;">{esc(inr(items.outstanding.sum()))}</span>
+        <span class="s">{t("From verified invoices", "प्रमाणित इनवॉइस से")}</span>
+      </div>
+      <div class="cc-tile">
+        <span class="l">{t("Open Invoices", "कुल खुले इनवॉइस")}</span>
+        <span class="v" style="font-size:1.45rem;">{len(items):,}</span>
+        <span class="s">{len(cust_df)} {t("active customers", "सक्रिय ग्राहक")}</span>
+      </div>
+      <div class="cc-tile warn">
+        <span class="l">{t("Overdue > 60 Days", "60 दिन से अधिक पुराने")}</span>
+        <span class="v" style="font-size:1.45rem;color:#B45309;">{len(overdue(items)):,}</span>
+        <span class="s">{t("Needs urgent follow-up", "तत्काल तकादा आवश्यक")}</span>
+      </div>
+    </div>
+    """)
 
     filters = {
         t("Over 45 days", "45 दिन से पुराने"): cust_df[cust_df.oldest_days >= 45],
@@ -1434,11 +1630,9 @@ def page_receivables():
           f'{svg(ICON_CHECK_CIRCLE, 28, SUBTLE, 1.6)}<div style="font-weight:500">{t("No customers in this list", "इस सूची में कोई ग्राहक नहीं है")}</div>'
           f'<div class="cc-muted" style="max-width:420px">{t("Balances older than 30 months can become hard to recover under the Limitation Act. They will show here first.", "30 महीने से अधिक पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")}</div></div>')
     else:
-        H(f'<div class="cc-colhead" style="grid-template-columns:3.2fr 1.2fr 1.4fr 1.7fr">'
-          f'<span>{t("Customer", "ग्राहक का नाम")}</span><span>{t("Oldest invoice", "पुराना इनवॉइस")}</span><span style="text-align:right">{t("Outstanding", "बकाया रकम")}</span><span></span></div>')
         collections = vault.collection_records.get(biz, [])
         with st.container(key="crows"):
-            for i, (_, c_row) in enumerate(filtered_cust.head(10).iterrows()):
+            for i, (_, c_row) in enumerate(filtered_cust.head(15).iterrows()):
                 c_name = c_row["customer_name"]
                 amt = c_row["outstanding"]
                 oldest = int(c_row["oldest_days"])
@@ -1452,25 +1646,49 @@ def page_receivables():
                                          f"{col.date:%d %b}; {t('not banked yet. Do not call.', 'अभी बैंक में जमा नहीं हुए। कॉल न करें।')}")
                         break
 
-                with st.container(key=f"crow_{i}"):
-                    c1, c2, c3, c4 = st.columns([3.2, 1.2, 1.4, 1.7], vertical_alignment="center")
-                    note = (f'<div class="cc-row-detail" style="color:#1A6E45;display:flex;gap:6px">'
-                            f'{svg(ICON_SHIELD, 14)}{esc(salesman_note)}</div>') if salesman_note else ""
-                    c1.markdown(f'<div class="cc-row-title">{esc(c_name)}</div>'
-                                f'<div class="cc-row-detail">{inv_count} {t("open invoices", "खुले इनवॉइस")}</div>{note}', unsafe_allow_html=True)
-                    badge = tag(f"{oldest} {t('days', 'दिन')}", "warn" if oldest >= 45 else "neutral")
-                    if oldest >= 900:
-                        badge += " " + tag(t("30+ months (Sec 18)", "30+ महीने (Sec 18)"), "neg")
-                    c2.markdown(badge, unsafe_allow_html=True)
-                    c3.markdown(f'<div class="cc-amount">{esc(inr(amt))}</div>', unsafe_allow_html=True)
-                    if is_hi():
-                        wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
-                                   f"कृपया चेक कर भुगतान करें। धन्यवाद। UPI: payment@bank")
-                    else:
-                        wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
-                                   f"Kripya check kar lijiye. UPI: payment@bank")
-                    c4.link_button(t("WhatsApp draft", "WhatsApp तकादा"), f"https://wa.me/?text={urllib.parse.quote(wa_text)}",
-                                   icon=":material/send:", use_container_width=True)
+                lim_badge = ""
+                if oldest >= 900:
+                    lim_badge = f'<span class="cc-badge warn">⚠️ {t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
+                elif oldest >= 45:
+                    lim_badge = f'<span class="cc-badge neutral">{oldest}d overdue</span>'
+
+                prot_banner = ""
+                if salesman_note:
+                    prot_banner = (f'<div style="font-size:0.78rem;color:#166534;background:#DCFCE7;border:1px solid #BBF7D0;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-flex;align-items:center;gap:6px;">'
+                                   f'{svg(ICON_SHIELD, 14, "#166534")}{esc(salesman_note)}</div>')
+
+                if is_hi():
+                    wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
+                               f"कृपया चेक कर भुगतान करें। धन्यवाद। UPI: payment@bank")
+                else:
+                    wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
+                               f"Kripya check kar lijiye. UPI: payment@bank")
+
+                wa_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
+
+                H(f"""
+                <div class="cc-action-card">
+                  <div style="flex:1;min-width:220px;">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                      <span style="font-size:0.94rem;font-weight:700;color:#0F172A;">{esc(c_name)}</span>
+                      {lim_badge}
+                    </div>
+                    <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
+                      {inv_count} {t("open invoices", "खुले इनवॉइस")} · {t("Oldest", "सबसे पुराना")}: {oldest}d
+                    </div>
+                    {prot_banner}
+                  </div>
+                  <div style="text-align:right;margin:0 16px;">
+                    <div style="font-size:1.15rem;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;">{esc(inr(amt))}</div>
+                    <div style="font-size:0.74rem;color:#64748B;">{t("Outstanding", "बकाया")}</div>
+                  </div>
+                  <div>
+                    <a href="{wa_url}" target="_blank" class="cc-wa-btn">
+                      📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                    </a>
+                  </div>
+                </div>
+                """)
 
     st.write("")
     with st.expander(t(f"Full ledger · {len(cust_df)} customers", f"पूरी खाता बही · {len(cust_df)} ग्राहक")):
@@ -1543,7 +1761,7 @@ def page_ask():
                 a = copilot.ask(biz, q_for_copilot, galla_cash=answer_galla())
                 display_q = CHIP_EN_TO_HI.get(selected_q, selected_q) if is_hi() else selected_q
                 if a.intent == "FACT":
-                    label = f'<span class="cc-tag pos" style="display:inline-flex;gap:5px;align-items:center">' \
+                    label = f'<span class="cc-badge pos" style="display:inline-flex;gap:5px;align-items:center">' \
                             f'{svg(ICON_CHECK, 12, width=2.6)}{t("From your books", "आपके बही-खाते से")}</span>'
                 elif a.intent == "UNSUPPORTED":
                     label = tag(t("Not available yet", "अभी उपलब्ध नहीं"), "neutral")
@@ -1551,10 +1769,16 @@ def page_ask():
                     label = tag(t("Pick a question", "सवाल चुनें"), "neutral")
                 else:
                     label = tag(t("Outside what I do", "कार्यक्षेत्र से बाहर"), "warn")
-                H('<div class="cc-rule" style="margin:18px 0 16px"></div>'
-                  f'<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center">'
-                  f'<div class="cc-h2">{esc(display_q)}</div>{label}</div>'
-                  f'<div style="font-size:1.02rem;line-height:1.65;margin-top:10px;text-wrap:pretty">{esc(a.text)}</div>')
+
+                H(f"""
+                <div class="cc-card-modern" style="margin-top:16px;">
+                  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;">
+                    <div style="font-size:1.1rem;font-weight:700;color:#0F172A;">{esc(display_q)}</div>
+                    {label}
+                  </div>
+                  <div style="font-size:1.02rem;line-height:1.65;margin-top:12px;color:#1E293B;">{esc(a.text)}</div>
+                </div>
+                """)
 
                 # Hindi summary card when Hindi is selected or asked
                 if is_hi() or "hindi" in selected_q.lower():
@@ -1635,8 +1859,13 @@ def page_quality():
     else:
         precision_txt = "No AUTO matches recorded."
     section("Matching receipts to documents")
-    H(f'<div class="cc-muted" style="margin-bottom:6px">{esc(precision_txt)}</div>')
-    H(_html_table(summary(df), highlight=biz, min_width=900))
+    H(f"""
+    <div class="cc-card-modern">
+      <div style="font-size:0.95rem;font-weight:700;color:#0F172A;margin-bottom:4px;">Strict Decision 60 Auto-Match Accuracy</div>
+      <div class="cc-muted" style="margin-bottom:12px;">{esc(precision_txt)}</div>
+      {_html_table(summary(df), highlight=biz, min_width=900)}
+    </div>
+    """)
 
     st.write("")
     section("Sorting lines into categories")

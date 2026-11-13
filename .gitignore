@@ -24,4 +24,6 @@ scripts/out/
 .copilot_state/
 *.json
 !pyproject.json
+!docs/ps11-architecture.json
+graphify-out/
 .DS_Store

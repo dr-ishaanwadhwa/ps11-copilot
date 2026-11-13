@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SME Cash Copilot · Modern UX Preview</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .metric-value { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="bg-transparent text-[var(--foreground)] antialiased p-4">
+  <div class="max-w-4xl mx-auto space-y-4">
+
+    <!-- Header & Persona Switcher -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xl font-bold tracking-tight text-[var(--foreground)]">Kaveri Distributors</span>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium border border-blue-500/20">FMCG · Pune</span>
+        </div>
+        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">As of 30 Sep 2026 · Local-First Read-Only Vault</p>
+      </div>
+
+      <!-- Role Selector -->
+      <div class="flex items-center bg-[var(--background)] p-1 rounded-xl border border-[var(--border)] text-xs">
+        <button id="btn-owner" onclick="setRole('owner')" class="px-3 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm">👑 Prakash (Owner)</button>
+        <button id="btn-staff" onclick="setRole('staff')" class="px-3 py-1.5 rounded-lg font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition">🪙 Counter Staff</button>
+        <button id="btn-acct" onclick="setRole('acct')" class="px-3 py-1.5 rounded-lg font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition">🏛️ CA / Munim</button>
+      </div>
+    </div>
+
+    <!-- OWNER VIEW -->
+    <div id="view-owner" class="space-y-4">
+      <!-- 1. Executive Morning Briefing Hero -->
+      <div class="bg-gradient-to-br from-emerald-500/10 via-[var(--card)] to-[var(--card)] border border-emerald-500/30 rounded-2xl p-5 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-emerald-600">☀️ Aaj Ka Hisaab · Morning Briefing</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-semibold">Surplus · Safe Runway</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-3">
+              <h1 class="text-3xl font-extrabold metric-value text-[var(--foreground)]">₹41,58,950</h1>
+              <span class="text-sm text-[var(--muted-foreground)] font-medium">Net Usable Liquidity</span>
+            </div>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Covers 30-day commitments (₹10.95L) with a safe operating runway of <span class="font-semibold text-emerald-600">3.8 months</span>.</p>
+          </div>
+
+          <div class="flex gap-2">
+            <button onclick="alert('Salaries of ₹3,80,160 on 1 Oct 2026 are 100% funded with ₹37.38L headroom remaining.')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl transition shadow-sm flex items-center gap-1.5">
+              <span>✓ Payroll Check</span>
+            </button>
+            <button onclick="document.getElementById('khata-section').scrollIntoView({behavior: 'smooth'})" class="px-3 py-2 bg-[var(--background)] hover:bg-[var(--card)] border border-[var(--border)] text-xs font-medium rounded-xl transition">
+              <span>Chasing List (19)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric Quadrant -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-[var(--border)]">
+          <div class="bg-[var(--background)]/60 p-3 rounded-xl border border-[var(--border)]/60">
+            <span class="text-xs text-[var(--muted-foreground)] block">Bank Headroom</span>
+            <span class="text-base font-bold metric-value text-[var(--foreground)]">₹37,38,950</span>
+            <span class="text-[11px] text-[var(--muted-foreground)] block mt-0.5">Incl. ₹25L CC limit</span>
+          </div>
+          <div class="bg-[var(--background)]/60 p-3 rounded-xl border border-[var(--border)]/60">
+            <span class="text-xs text-[var(--muted-foreground)] block">Physical Galla Cash</span>
+            <span class="text-base font-bold metric-value text-[var(--foreground)]">₹4,20,000</span>
+            <span class="text-[11px] text-emerald-600 block mt-0.5">In shop drawer (balanced)</span>
+          </div>
+          <div class="bg-[var(--background)]/60 p-3 rounded-xl border border-[var(--border)]/60">
+            <span class="text-xs text-[var(--muted-foreground)] block">Expected Khata Inflow</span>
+            <span class="text-base font-bold metric-value text-[var(--foreground)]">₹2,21,850</span>
+            <span class="text-[11px] text-[var(--muted-foreground)] block mt-0.5">At α = 85% haircut</span>
+          </div>
+          <div class="bg-[var(--background)]/60 p-3 rounded-xl border border-[var(--border)]/60">
+            <span class="text-xs text-[var(--muted-foreground)] block">Upcoming Outflows</span>
+            <span class="text-base font-bold metric-value text-amber-500">₹10,95,826</span>
+            <span class="text-[11px] text-[var(--muted-foreground)] block mt-0.5">Salaries + GST + Suppliers</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Interactive Cash Trajectory Fan Chart -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--foreground)]">90-Day Projected Cash Runway (Monte Carlo Fan Chart)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">P10–P90 probability envelope calibrated without lookahead leaks</p>
+          </div>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-blue-500/20 border border-blue-500/40 rounded-sm"></span> P10–P90 Range</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-blue-600 rounded"></span> P50 Median</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-red-500 border-dashed border-b border-red-500"></span> Floor</span>
+          </div>
+        </div>
+
+        <!-- Canvas simulation representation -->
+        <div class="relative bg-[var(--background)] border border-[var(--border)] rounded-xl p-3 h-48 flex items-center justify-center overflow-hidden">
+          <svg class="w-full h-full" viewBox="0 0 600 160" preserveAspectRatio="none">
+            <!-- P10-P90 Confidence Band -->
+            <path d="M 0,90 Q 150,110 300,85 T 600,60 L 600,120 Q 450,145 300,135 T 0,115 Z" fill="rgba(59, 130, 246, 0.15)" />
+            <!-- Median P50 Line -->
+            <path d="M 0,102 Q 150,122 300,105 T 600,85" fill="none" stroke="#2563eb" stroke-width="3" />
+            <!-- Floor / CC Limit Line -->
+            <line x1="0" y1="140" x2="600" y2="140" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4" />
+            <text x="10" y="135" fill="#ef4444" font-size="10" font-weight="600">₹25L Cash-Credit Threshold</text>
+            <!-- Key events -->
+            <circle cx="140" cy="120" r="4" fill="#f59e0b" />
+            <text x="140" y="105" fill="#f59e0b" font-size="9" text-anchor="middle" font-weight="600">1 Oct: Salaries</text>
+            <circle cx="430" cy="98" r="4" fill="#10b981" />
+            <text x="430" y="85" fill="#10b981" font-size="9" text-anchor="middle" font-weight="600">Diwali Inflow</text>
+          </svg>
+        </div>
+        <p class="text-xs text-emerald-600 font-medium">✓ No projected breach: Headroom remains ₹12.5L+ above the sanctioned CC limit throughout the quarter.</p>
+      </div>
+
+      <!-- 3. Smart Khata Chaser & WhatsApp Reminders -->
+      <div id="khata-section" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--foreground)]">Pending Khata & WhatsApp Chaser</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">Polite reminders with client-side UPI deep links</p>
+          </div>
+          <span class="text-xs px-2.5 py-1 bg-amber-500/10 text-amber-600 rounded-full font-medium border border-amber-500/20">19 Retailers > 45 Days</span>
+        </div>
+
+        <div class="space-y-2 mt-2">
+          <!-- Card 1 (Limitation alert) -->
+          <div class="p-3 bg-[var(--background)] border border-amber-500/30 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-[var(--foreground)]">Matoshree Supermarket</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 font-semibold">⚠️ 31 Months Open</span>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Balance: <span class="font-bold metric-value text-[var(--foreground)]">₹1,14,000</span> · Last payment: Feb 2024</p>
+              <p class="text-[11px] text-amber-600 mt-1">Section 18 Limitation Act: Written acknowledgement needed to keep debt legally enforceable. Confirm with your CA.</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a href="https://wa.me/910000000003?text=Namaste%20Matoshree%20Supermarket" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                <span>📲 Draft WhatsApp</span>
+              </a>
+              <button onclick="navigator.clipboard.writeText('Namaste Matoshree Supermarket, Kaveri Distributors balance of ₹1,14,000 is overdue.'); alert('Copied message to clipboard!')" class="px-2.5 py-1.5 bg-[var(--card)] hover:bg-[var(--border)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] transition">
+                📋
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="p-3 bg-[var(--background)] border border-[var(--border)] rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-[var(--foreground)]">Laxmi Kirana Stores</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">12 Months Open</span>
+              </div>
+              <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Balance: <span class="font-bold metric-value text-[var(--foreground)]">₹85,000</span> · Promised by Friday</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a href="https://wa.me/910000000001?text=Namaste%20Laxmi%20Kirana" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                <span>📲 Draft WhatsApp</span>
+              </a>
+              <button onclick="alert('Copied message to clipboard!')" class="px-2.5 py-1.5 bg-[var(--card)] hover:bg-[var(--border)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] transition">
+                📋
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAFF VIEW (Hidden by default, shown when staff clicked) -->
+    <div id="view-staff" class="space-y-4 hidden">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-[var(--foreground)]">🪙 Galla Day-Close (Under 1 Minute)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">Neutral reconciliation for counter staff</p>
+          </div>
+          <span class="text-xs px-2.5 py-1 bg-emerald-500/10 text-emerald-600 rounded-full font-semibold">Ties Exactly ✓</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-3 bg-[var(--background)] rounded-xl border border-[var(--border)]">
+            <span class="text-xs text-[var(--muted-foreground)]">Opening Till</span>
+            <div class="text-base font-bold metric-value">₹10,000</div>
+          </div>
+          <div class="p-3 bg-[var(--background)] rounded-xl border border-[var(--border)]">
+            <span class="text-xs text-[var(--muted-foreground)]">Cash Takings</span>
+            <div class="text-base font-bold metric-value text-emerald-600">+₹25,000</div>
+          </div>
+          <div class="p-3 bg-[var(--background)] rounded-xl border border-[var(--border)]">
+            <span class="text-xs text-[var(--muted-foreground)]">Petty Expenses</span>
+            <div class="text-base font-bold metric-value text-amber-600">−₹2,500</div>
+          </div>
+          <div class="p-3 bg-[var(--background)] rounded-xl border border-[var(--border)]">
+            <span class="text-xs text-[var(--muted-foreground)]">Banked Deposit</span>
+            <div class="text-base font-bold metric-value text-blue-600">−₹20,000</div>
+          </div>
+        </div>
+
+        <div class="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex justify-between items-center">
+          <div>
+            <span class="text-xs text-emerald-700 font-semibold uppercase block">Counted at Close</span>
+            <span class="text-2xl font-black metric-value text-emerald-700">₹12,500</span>
+          </div>
+          <button onclick="alert('Day close successfully logged to local vault!')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition">
+            Close Day (8:00 PM)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CA / MUNIM VIEW (Hidden by default) -->
+    <div id="view-acct" class="space-y-4 hidden">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-[var(--foreground)]">🏛️ CA Reconciliation Queue (Strict D60)</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">Formal books only · 0 Unvetted Auto-Accepts</p>
+          </div>
+          <span class="text-xs px-2.5 py-1 bg-blue-500/10 text-blue-600 rounded-full font-medium">437 Items in Review</span>
+        </div>
+
+        <!-- Review Card -->
+        <div class="p-4 bg-[var(--background)] border border-[var(--border)] rounded-xl space-y-2">
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="text-xs font-semibold text-blue-600">SUGGESTION · CASH_DEPOSIT</span>
+              <h3 class="text-base font-bold metric-value text-[var(--foreground)]">₹77,712 · Bank Cash Deposit</h3>
+              <p class="text-xs text-[var(--muted-foreground)]">Matched to 3 collection slips across 3 kirana shops (D55 salesman log)</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="alert('Allocated ₹77,712 across the 3 invoices in Tally match ledger!')" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg">Verify & Allocate</button>
+              <button class="px-3 py-1.5 bg-[var(--card)] border border-[var(--border)] text-xs text-[var(--muted-foreground)] rounded-lg">Park</button>
+            </div>
+          </div>
+          <div class="text-xs bg-[var(--card)] p-2 rounded border border-[var(--border)] text-[var(--muted-foreground)]">
+            Invoices: KD/24-25/00109 (₹29,295), KD/24-25/00298 (₹28,252), KD/24-25/00324 (₹20,165)
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function setRole(role) {
+      document.getElementById('view-owner').classList.add('hidden');
+      document.getElementById('view-staff').classList.add('hidden');
+      document.getElementById('view-acct').classList.add('hidden');
+
+      document.getElementById('btn-owner').className = "px-3 py-1.5 rounded-lg font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition";
+      document.getElementById('btn-staff').className = "px-3 py-1.5 rounded-lg font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition";
+      document.getElementById('btn-acct').className = "px-3 py-1.5 rounded-lg font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition";
+
+      if (role === 'owner') {
+        document.getElementById('view-owner').classList.remove('hidden');
+        document.getElementById('btn-owner').className = "px-3 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm";
+      } else if (role === 'staff') {
+        document.getElementById('view-staff').classList.remove('hidden');
+        document.getElementById('btn-staff').className = "px-3 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm";
+      } else if (role === 'acct') {
+        document.getElementById('view-acct').classList.remove('hidden');
+        document.getElementById('btn-acct').className = "px-3 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm";
+      }
+    }
+  </script>
+</body>
+</html>

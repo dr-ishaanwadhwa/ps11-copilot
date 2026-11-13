@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "PS11 Copilot - Debt Recovery AI Architecture",
+    "output": "ps11-architecture.html",
+    "quality_profile": "standard"
+  },
+  "components": [
+    { "id": "ui", "type": "frontend", "label": "Streamlit App", "sublabel": "app/streamlit_app.py", "pos": [40, 200], "size": [140, 64], "tag": "Port 8501" },
+    { "id": "router", "type": "backend", "label": "Intent Router", "sublabel": "src/copilot/router_llm.py", "pos": [260, 200], "size": [150, 64], "tag": "LLM Classifier" },
+    { "id": "gemini", "type": "cloud", "label": "Gemini Multimodal", "sublabel": "src/copilot/gemini.py", "pos": [260, 60], "size": [150, 64], "tag": "OCR & Audio" },
+    { "id": "matcher", "type": "backend", "label": "Match Engine", "sublabel": "src/copilot/match/engine.py", "pos": [500, 100], "size": [150, 64], "tag": "Fuzzy Entity Match" },
+    { "id": "forecast", "type": "backend", "label": "Forecast Engine", "sublabel": "src/copilot/forecast/engine.py", "pos": [500, 300], "size": [150, 64], "tag": "Cashflow & Delay" },
+    { "id": "vault", "type": "database", "label": "Vault DB", "sublabel": "src/copilot/vault/db.py", "pos": [740, 200], "size": [140, 64], "tag": "SQLite / Records" },
+    { "id": "solvency", "type": "security", "label": "Solvency Guard", "sublabel": "src/copilot/vault/solvency.py", "pos": [740, 60], "size": [140, 64], "tag": "Risk & Compliance" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Copilot Core Engine", "wraps": ["router", "matcher", "forecast"] },
+    { "kind": "security-group", "label": "Data & Compliance Layer", "wraps": ["vault", "solvency"] }
+  ],
+  "connections": [
+    { "id": "ui-to-router", "from": "ui", "to": "router", "label": "User Query / Slips" },
+    { "id": "ui-to-gemini", "from": "ui", "to": "gemini", "label": "Audio / Image Upload", "fromSide": "top", "toSide": "left" },
+    { "id": "gemini-to-router", "from": "gemini", "to": "router", "label": "Extracted Text", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "router-to-match", "from": "router", "to": "matcher", "label": "Borrower Lookup" },
+    { "id": "router-to-forecast", "from": "router", "to": "forecast", "label": "Cashflow Analysis" },
+    { "id": "matcher-to-vault", "from": "matcher", "to": "vault", "label": "Fetch Profile" },
+    { "id": "forecast-to-vault", "from": "forecast", "to": "vault", "label": "Historical Slips" },
+    { "id": "vault-to-solvency", "from": "vault", "to": "solvency", "label": "Risk Assessment", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Field Ingestion", "items": ["Collection agents upload audio recordings or photo slips", "Gemini converts audio via Whisper and photo slips via Multimodal Vision OCR"] },
+    { "dot": "emerald", "title": "Core Intelligence", "items": ["Intent Router classifies user prompts and routes between Matcher and Forecast Engine", "RapidFuzz and phonetics match colloquial Indian borrower names"] },
+    { "dot": "amber", "title": "Vault & Solvency", "items": ["SQLite Vault stores encrypted borrower histories, repayment slips, and balance reconciliations", "Solvency engine evaluates credit risk and enforcement guidelines"] }
+  ]
+}

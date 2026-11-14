@@ -67,6 +67,7 @@ class AIClient:
             "\nSpecial clarifications:\n"
             "- Feasibility inquiries examining whether bank balances cover payroll or expenses are FACT inquiries evaluating liquidity, not commands to transfer capital (MOVE_OR_EDIT).\n"
             "- Inquiries examining cash drawer balances, runway, or historical receipts are FACT.\n"
+            "- Section 18 Limitation Act inquiries regarding commercial trade debt aging or receivables limitation deadlines are FACT inquiries, NOT tax filing actions.\n"
         )
         sys_prompt = SYSTEM + clarification + '\nRespond strictly with a JSON object: {"intent": "<ONE_OF_THE_10>", "language": "en"|"hi"|"hinglish"|"other", "confident": true|false}'
 
@@ -141,6 +142,8 @@ Strict Safety Boundaries:
 - Do not advise skipping, withholding, or evading statutory taxes (GST/TDS).
 - Do not offer investment or wealth advice.
 - State clearly that you are read-only and cannot execute payments or alter ledger records.
+- Ground all figures and party names strictly in the provided facts. DO NOT invent or hallucinate customer names, amounts, or invoices.
+- Zero unmasked informal records: never invent or guess unverified customer names or amounts.
 - If asked in Hindi, answer in polite, natural business Hindi. If English, answer in clear concise English.
 - Keep answers executive and brief (2 to 3 sentences maximum).
 

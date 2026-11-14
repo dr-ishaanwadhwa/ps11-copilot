@@ -110,7 +110,7 @@ PATTERNS: dict[str, tuple[str, str]] = {
     # 8. LOAN (excludes credit limit / headroom / loan account queries)
     "LOAN": (
         r"\b(loan|borrow|lender|overdraft|credit line|nbfc|financing)\b",
-        r"उधार|लोन|कर्ज़|udhaar",
+        r"उधार(?!ी)|लोन|कर्ज़|udhaar(?![iy])",
     ),
     # 9. MOVE_OR_EDIT (commands to alter or delete records or money)
     "MOVE_OR_EDIT": (
@@ -122,7 +122,10 @@ PATTERNS: dict[str, tuple[str, str]] = {
 _READONLY_HINTS = re.compile(r"^(can (i|we)|how much|when|which|show me)\b", re.I)
 _OWN_ACCOUNT = re.compile(r"\b(my|our)\s+(bank\s+)?(balance|account)\b|मेरे खाते|मेरा (बैलेंस|खाता)", re.I)
 _SEND_EXCLUSIONS = re.compile(r"\b(send me|sent me|sent to me)\b", re.I)
-_LOAN_EXCLUSIONS = re.compile(r"\b(credit limit|headroom|loan account)\b", re.I)
+_LOAN_EXCLUSIONS = re.compile(
+    r"\b(credit limit|headroom|loan account|udhaari|udhari)\b|उधारी|बाजार उधारी|मार्केट उधारी|पुरानी उधारी|उधारी कौन",
+    re.I,
+)
 
 
 def is_known_fact_question(question: str) -> bool:
@@ -135,6 +138,12 @@ def is_known_fact_question(question: str) -> bool:
     if re.search(r"\b(balance|cash position|closing balance|headroom|galla|drawer|till|runway|solvency)\b", low):
         return True
     if re.search(r"\b(explain|hindi)\b", low):
+        return True
+    if re.search(
+        r"\b(aaj ka hisaab|aaj ka hisab|hisaab|hisab|हिसाब|बकाया|उधारी|सैलरी|वेतन|रनवे|क्रेडिट लिमिट|limitation|section 18)\b|"
+        r"हिसाब|बकाया|उधारी|सैलरी|वेतन|रनवे|क्रेडिट लिमिट|सीसी लिमिट|30 महीने|36 महीने|3 साल|धारा 18|दैनिक स्थिति",
+        low,
+    ):
         return True
     return False
 

@@ -33,8 +33,9 @@ from copilot.match import match_all
 from copilot.match.audit import select_audit_sample
 from copilot.match.engine import ASK, SUGGEST
 from copilot.receivables import by_customer, daily_recovery_candidates, open_items, overdue
-from copilot.score import score_matches, summary
 from copilot.gemini import ocr_collection_slip, transcribe_audio
+from copilot.masking import sanitize_slip_image
+from copilot.match.names import match_retailer_name
 from copilot.ingest import parse_bank_statement, parse_tally_xml
 from copilot.tally import generate_ca_excel_pack, generate_tally_xml
 from copilot.vault import (
@@ -1304,21 +1305,6 @@ def collections_dialog():
     # Optional Vision OCR upload
     slip_file = st.file_uploader(t("Scan handwritten slip photo (Optional)", "हाथ से लिखी पर्ची की फोटो खींचें (वैकल्पिक)"),
                                  type=["jpg", "jpeg", "png", "webp"], key="_slip_upload_img")
-    prefill_shop = ""
-    prefill_amount = 0.0
-    prefill_salesman = ""
-    if slip_file:
-        with st.spinner(t("Scanning slip with Gemini Vision…", "Gemini AI से पर्ची पढ़ी जा रही है…")):
-            ocr_data = ocr_collection_slip(slip_file.read(), mime_type=slip_file.type or "image/jpeg")
-            if ocr_data.get("shop") or ocr_data.get("amount") or ocr_data.get("salesman"):
-                prefill_shop = ocr_data.get("shop", "")
-                prefill_amount = float(ocr_data.get("amount", 0.0))
-                prefill_salesman = ocr_data.get("salesman", "")
-                st.success(t(f"Extracted: {prefill_shop or 'Shop'} · {inr(prefill_amount)} · {prefill_salesman or 'Salesman'}",
-                             f"पहचाना गया: {prefill_shop or 'दुकान'} · {inr(prefill_amount)} · {prefill_salesman or 'सेल्समैन'}"))
-            else:
-                st.warning(t("Could not auto-detect slip details. Please enter manually below.",
-                             "पर्ची का विवरण स्वतः नहीं पढ़ा जा सका। कृपया नीचे स्वयं दर्ज करें।"))
 
     # Autocomplete verified parties from pack.parties
     biz_parties = []
@@ -1329,16 +1315,73 @@ def collections_dialog():
     if not biz_parties:
         biz_parties = ["Laxmi Super Mart, Bibwewadi", "Gajanan Departmental Store, Shivajinagar", "Balaji Provision Stores, Sinhagad Road"]
 
+    slip_count = len(vault.get_collections(biz)) if vault.is_unlocked() else 0
+    slip_preview = f"SLIP-{config.AS_OF:%m%d}-{slip_count + 1:02d}"
+
+    prefill_shop = ""
+    prefill_amount = 0.0
+    prefill_salesman = ""
+    prefill_date = pd.Timestamp("2026-09-30")
+    prefill_mode = "Cash"
+    prefill_slip_no = ""
+    confidence_score = 0.0
+
+    if slip_file:
+        with st.spinner(t("Scanning slip with Gemini Vision…", "Gemini AI से पर्ची पढ़ी जा रही है…")):
+            raw_slip_bytes = slip_file.getvalue()
+            sanitized_bytes = sanitize_slip_image(raw_slip_bytes)
+            ocr_data = ocr_collection_slip(sanitized_bytes, mime_type=slip_file.type or "image/jpeg")
+
+            raw_retailer = str(ocr_data.get("retailer_name") or ocr_data.get("shop") or "").strip()
+            prefill_amount = float(ocr_data.get("amount", 0.0) or 0.0)
+            prefill_salesman = str(ocr_data.get("salesman", "") or "").strip()
+            raw_mode = str(ocr_data.get("payment_mode", "Cash") or "Cash").strip()
+            raw_date = str(ocr_data.get("date", "") or "").strip()
+            raw_slip = str(ocr_data.get("slip_no", "") or "").strip()
+            confidence_score = float(ocr_data.get("confidence", 0.95) or 0.95)
+
+            if raw_retailer and biz_parties:
+                matched_party, match_score = match_retailer_name(raw_retailer, biz_parties)
+                if match_score > 0 and matched_party in biz_parties:
+                    prefill_shop = matched_party
+                else:
+                    prefill_shop = raw_retailer
+            else:
+                prefill_shop = raw_retailer
+
+            mode_upper = raw_mode.upper()
+            if "UPI" in mode_upper:
+                prefill_mode = "UPI"
+            elif "CHEQ" in mode_upper or "CHQ" in mode_upper:
+                prefill_mode = "Cheque"
+            else:
+                prefill_mode = "Cash"
+
+            if raw_date:
+                try:
+                    prefill_date = pd.Timestamp(raw_date)
+                except Exception:
+                    prefill_date = pd.Timestamp("2026-09-30")
+
+            if raw_slip:
+                prefill_slip_no = raw_slip
+
+            if raw_retailer or prefill_amount > 0 or prefill_salesman:
+                st.info(t(
+                    f"AI Confidence: {confidence_score*100:.0f}% · Matched: {prefill_shop or 'Shop'}",
+                    f"एआई सटीकता: {confidence_score*100:.0f}% · मिलान: {prefill_shop or 'दुकान'}"
+                ))
+            else:
+                st.warning(t("Could not auto-detect slip details. Please enter manually below.",
+                             "पर्ची का विवरण स्वतः नहीं पढ़ा जा सका। कृपया नीचे स्वयं दर्ज करें।"))
+
     shop_default_idx = 0
     if prefill_shop and prefill_shop in biz_parties:
         shop_default_idx = biz_parties.index(prefill_shop)
 
-    slip_count = len(vault.get_collections(biz)) if vault.is_unlocked() else 0
-    slip_preview = f"SLIP-{config.AS_OF:%m%d}-{slip_count + 1:02d}"
-
     with st.form("collections_today_form", border=False):
         c1, c2 = st.columns(2)
-        col_date = c1.date_input(t("Collection date", "वसूली की तारीख"), value=pd.Timestamp("2026-09-30"))
+        col_date = c1.date_input(t("Collection date", "वसूली की तारीख"), value=prefill_date)
         salesman_options = ["Ramesh Kumar", "Suresh Shinde", "Vijay Patil", "Other"]
         salesman_val = c2.selectbox(t("Salesman", "सेल्समैन का नाम"), salesman_options,
                                     index=salesman_options.index(prefill_salesman) if prefill_salesman in salesman_options else 0)
@@ -1349,13 +1392,16 @@ def collections_dialog():
 
         c5, c6 = st.columns([1, 1])
 
+        mode_options = ["Cash", "UPI", "Cheque"]
+        mode_idx = mode_options.index(prefill_mode) if prefill_mode in mode_options else 0
         payment_mode = c5.radio(
             t("Payment Mode", "भुगतान का प्रकार"),
-            ["Cash", "UPI", "Cheque"],
+            mode_options,
+            index=mode_idx,
             horizontal=True,
             key="_col_pay_mode"
         ) or "Cash"
-        slip_no_val = c6.text_input(t("Slip No Preview", "पर्ची नंबर"), value=slip_preview, help=t("Auto-generated slip identifier", "स्वतः उत्पन्न पर्ची नंबर"))
+        slip_no_val = c6.text_input(t("Slip No Preview", "पर्ची नंबर"), value=prefill_slip_no or slip_preview, help=t("Auto-generated slip identifier", "स्वतः उत्पन्न पर्ची नंबर"))
 
         inv_link_mode = st.radio(
             t("Invoice Allocation Mode", "इनवॉइस आवंटन विधि"),
@@ -2192,15 +2238,31 @@ def page_ask():
                                   placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
                     c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True, on_click=_submit_typed)
 
-                with st.expander(t("Speak your question (माइक से बोलें)", "माइक से बोलकर पूछें"), icon=":material/mic:"):
+                with st.expander(t("Speak or upload voice question (माइक या ऑडियो फ़ाइल)", "माइक से बोलें या ऑडियो फ़ाइल अपलोड करें"), icon=":material/mic:"):
                     rec_audio = st.audio_input(t("Record voice question", "आवाज़ रिकॉर्ड करें"), key="mic_audio_input")
+                    upload_audio = st.file_uploader(t("Or upload audio file", "या ऑडियो फ़ाइल अपलोड करें"), type=["wav", "mp3", "m4a", "ogg", "flac", "webm"], key="upload_audio_input")
+                    audio_target = None
+                    raw_bytes = None
+                    mime_type = "audio/wav"
                     if rec_audio:
-                        with st.spinner(t("Transcribing with Gemini Voice…", "आवाज़ समझी जा रही है…")):
-                            transcribed = transcribe_audio(rec_audio.read(), mime_type=rec_audio.type or "audio/wav")
-                            if transcribed:
-                                st.session_state["ask_q"] = transcribed
-                                st.session_state["ask_typed"] = transcribed
-                                st.rerun()
+                        audio_target = rec_audio
+                        raw_bytes = rec_audio.read() if hasattr(rec_audio, "read") else rec_audio.getvalue()
+                        mime_type = getattr(rec_audio, "type", None) or "audio/wav"
+                    elif upload_audio:
+                        audio_target = upload_audio
+                        raw_bytes = upload_audio.getvalue() if hasattr(upload_audio, "getvalue") else upload_audio.read()
+                        mime_type = getattr(upload_audio, "type", None) or "audio/wav"
+
+                    if audio_target and raw_bytes:
+                        audio_sig = hash(raw_bytes)
+                        if st.session_state.get("_last_audio_sig") != audio_sig:
+                            st.session_state["_last_audio_sig"] = audio_sig
+                            with st.spinner(t("Transcribing with Gemini Voice…", "आवाज़ समझी जा रही है…")):
+                                transcribed = transcribe_audio(raw_bytes, mime_type=mime_type)
+                                if transcribed:
+                                    st.session_state["ask_q"] = transcribed
+                                    st.session_state["ask_typed"] = transcribed
+                                    st.rerun()
 
             chips = ASK_CHIPS_HI if is_hi() else ASK_CHIPS
             st.pills(t("Try one of these", "इनमें से कोई सवाल चुनें") if not PUBLIC else t("Choose a question", "सवाल चुनें"),
@@ -2240,7 +2302,9 @@ def page_ask():
                     if "salar" in sq or "1 अक्टूबर" in sq or "सैलरी" in sq:
                         hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।'
                     elif "who owes" in sq or "बकाया" in sq or "उधारी" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल ₹7,82,910 (4 खुले इनवॉइस)।'
+                        top_invoices = a.numbers.get("invoices", 31) if (a and isinstance(a.numbers, dict)) else 31
+                        top_amt = a.numbers.get("outstanding", 782910.0) if (a and isinstance(a.numbers, dict)) else 782910.0
+                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल {inr(top_amt)} ({top_invoices} खुले इनवॉइस)।'
                     elif "cash in till" in sq or "galla" in sq or "drawer" in sq or "गल्ला" in sq or "रोकड़" in sq:
                         hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।'
                     elif "worst cash dip" in sq or "कम बैलेंस" in sq or "कमी" in sq:

@@ -37,6 +37,7 @@ Classify the user inquiry into exactly one of the following ten intents:
 
 Guidelines:
 - Questions may appear in English, Hindi, or Hinglish. Names, entities, and financial values are pre-masked (e.g. Party 1, ₹[AMOUNT], [ID], [GSTIN]).
+- Section 18 Limitation Act inquiries regarding commercial trade debt aging or receivables limitation deadlines are FACT inquiries, NOT tax filing actions (TAX_ACTION).
 - If an inquiry asks what action to take regarding loans, investments, taxation, delaying obligations, dispatching messages, or transferring capital, classify it under that boundary intent even if factual context is mentioned.
 - Inquiries examining the business entity own verified balances, ledger entries, or historical records are FACT.
 

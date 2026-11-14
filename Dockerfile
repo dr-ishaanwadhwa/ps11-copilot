@@ -2,17 +2,20 @@ FROM python:3.12-slim
 
 RUN useradd -m -u 1000 user
 WORKDIR /app
+RUN mkdir -p /app/.copilot_state && chown -R user:user /app
 
-COPY requirements.txt pyproject.toml ./
+COPY --chown=user requirements.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=user . .
+RUN chown -R user:user /app
 RUN pip install --no-cache-dir -e .
 
 USER user
 ENV PYTHONUNBUFFERED=1 \
     COPILOT_PUBLIC=1 \
     COPILOT_DATA=/app/data \
+    COPILOT_STATE_DIR=/app/.copilot_state \
     STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_HEADLESS=true \

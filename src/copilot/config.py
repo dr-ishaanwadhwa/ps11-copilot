@@ -8,7 +8,30 @@ DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DATA_DIR = Path(os.environ.get("COPILOT_DATA", DEFAULT_DATA_DIR))
 
 DEFAULT_STATE_DIR = Path(__file__).resolve().parent.parent.parent / ".copilot_state"
-STATE_DIR = Path(os.environ.get("COPILOT_STATE_DIR", DEFAULT_STATE_DIR))
+
+def _resolve_state_dir() -> Path:
+    env_dir = os.environ.get("COPILOT_STATE_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except (PermissionError, OSError):
+            pass
+    try:
+        DEFAULT_STATE_DIR.mkdir(parents=True, exist_ok=True)
+        return DEFAULT_STATE_DIR
+    except (PermissionError, OSError):
+        home_dir = Path.home() / ".copilot_state"
+        try:
+            home_dir.mkdir(parents=True, exist_ok=True)
+            return home_dir
+        except (PermissionError, OSError):
+            tmp_dir = Path("/tmp/.copilot_state")
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            return tmp_dir
+
+STATE_DIR = _resolve_state_dir()
 
 BANK_XLSX = "PS-11_bank_statements.xlsx"
 DOCS_XLSX = "PS-11_invoices_and_reconciliation.xlsx"

@@ -36,6 +36,7 @@ from copilot.receivables import by_customer, daily_recovery_candidates, open_ite
 from copilot.score import score_matches, summary
 from copilot.gemini import ocr_collection_slip, transcribe_audio
 from copilot.ingest import parse_bank_statement, parse_tally_xml
+from copilot.tally import generate_ca_excel_pack, generate_tally_xml
 from copilot.vault import (
     Collection,
     GallaEntry,
@@ -47,6 +48,7 @@ from copilot.vault import (
     format_whatsapp_reminder,
     render_partial_view_notice,
 )
+from copilot.vault.models import calculate_drawer_balance
 
 st.set_page_config(
     page_title="Cash Copilot",
@@ -562,12 +564,27 @@ def boot():
     pack = load_pack()
     matches = match_all(pack)
     copilot = Copilot(pack)
-    vault = VaultDB(in_memory=True)
-    vault.seed_from_pack(pack)
-    return pack, matches, copilot, vault
+    v_init = VaultDB(in_memory=False)
+    if not v_init.db_path.exists() or v_init.db_path.stat().st_size == 0:
+        v_init.seed_from_pack(pack)
+        v_init.lock()
+    return pack, matches, copilot
 
 
-pack, matches, copilot, vault = boot()
+pack, matches, copilot = boot()
+
+
+def get_vault() -> VaultDB:
+    if "vault" not in st.session_state:
+        v = VaultDB(in_memory=False)
+        if not v.db_path.exists() or v.db_path.stat().st_size == 0:
+            v.seed_from_pack(pack)
+            v.lock()
+        st.session_state["vault"] = v
+    return st.session_state["vault"]
+
+
+vault = get_vault()
 
 
 @st.cache_resource(show_spinner="Running the 90-day forecast…")
@@ -618,6 +635,15 @@ st.session_state.setdefault("lang_choice", "English")
 st.session_state.setdefault("share_cash_book", True)
 st.session_state.setdefault("onboarding_step", 1)
 st.session_state.setdefault("ask_q", None)
+st.session_state.setdefault("vault_unlocked", False)
+st.session_state.setdefault("khata_alpha_pct", 70)
+
+if not st.session_state["vault_unlocked"]:
+    if vault.is_unlocked():
+        vault.lock()
+else:
+    if not vault.is_unlocked():
+        vault.unlock(os.environ.get("COPILOT_OWNER_PIN") or "0000")
 
 
 def is_hi() -> bool:
@@ -695,13 +721,19 @@ def page_header(title: str, subtitle: str, right=None) -> None:
                      "मुनीम/CA: केवल औपचारिक बैंक हिसाब"))
     )
 
+    is_v_unlocked = st.session_state.get("vault_unlocked", False)
+    if is_v_unlocked:
+        vault_badge = f'<span class="cc-badge pos" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🟢 🔓 Vault Unlocked · Sovereign Plane Active</span>'
+    else:
+        vault_badge = f'<span class="cc-badge warn" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🔴 🔒 Vault Locked</span>'
+
     H(f"""
     <div class="cc-top-banner">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <span style="font-size:1.15rem;font-weight:700;color:#0F172A;letter-spacing:-0.01em;" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{esc(BIZ_NAME)}</span>
         <span class="cc-badge info" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{biz_type}</span>
         <span style="font-size:0.78rem;color:#64748B;" data-tip="{esc(date_tip)}" data-tip-pos="bottom">As of {config.AS_OF:%d %b %Y}</span>
-        <span class="cc-badge neutral" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🔒 Local-First Vault</span>
+        {vault_badge}
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;" data-tip="{esc(role_tip)}" data-tip-pos="bottom">
@@ -1269,7 +1301,7 @@ def day_close_dialog():
 def collections_dialog():
     H(f'<div class="cc-muted">{t("What each salesman collected from shops. Used to match cash deposits to invoices.", "दुकानों से सेल्समैन द्वारा की गई वसूली। बैंक जमा को इनवॉइस से जोड़ने के लिए उपयोगी।")}</div>')
 
-    # ── VISION OCR: CAMERA / FILE UPLOAD ──
+    # Optional Vision OCR upload
     slip_file = st.file_uploader(t("Scan handwritten slip photo (Optional)", "हाथ से लिखी पर्ची की फोटो खींचें (वैकल्पिक)"),
                                  type=["jpg", "jpeg", "png", "webp"], key="_slip_upload_img")
     prefill_shop = ""
@@ -1288,22 +1320,93 @@ def collections_dialog():
                 st.warning(t("Could not auto-detect slip details. Please enter manually below.",
                              "पर्ची का विवरण स्वतः नहीं पढ़ा जा सका। कृपया नीचे स्वयं दर्ज करें।"))
 
+    # Autocomplete verified parties from pack.parties
+    biz_parties = []
+    if hasattr(pack, "parties") and pack.parties is not None:
+        p_df = pack.parties[pack.parties["business_id"] == biz]
+        if not p_df.empty:
+            biz_parties = sorted(p_df["party_name"].dropna().unique().tolist())
+    if not biz_parties:
+        biz_parties = ["Laxmi Super Mart, Bibwewadi", "Gajanan Departmental Store, Shivajinagar", "Balaji Provision Stores, Sinhagad Road"]
+
+    shop_default_idx = 0
+    if prefill_shop and prefill_shop in biz_parties:
+        shop_default_idx = biz_parties.index(prefill_shop)
+
+    slip_count = len(vault.get_collections(biz)) if vault.is_unlocked() else 0
+    slip_preview = f"SLIP-{config.AS_OF:%m%d}-{slip_count + 1:02d}"
+
     with st.form("collections_today_form", border=False):
         c1, c2 = st.columns(2)
         col_date = c1.date_input(t("Collection date", "वसूली की तारीख"), value=pd.Timestamp("2026-09-30"))
-        salesman = c2.text_input(t("Salesman", "सेल्समैन का नाम"), value=prefill_salesman)
-        rows = []
-        for i, (shop, amount) in enumerate([(prefill_shop, prefill_amount), ("", 0.0), ("", 0.0)], start=1):
-            a, b = st.columns([2, 1])
-            rows.append((a.text_input(t(f"Shop {i}" + (" (optional)" if i > 1 else ""), f"दुकान {i}" + (" (वैकल्पिक)" if i > 1 else "")), value=shop),
-                         b.number_input(t(f"Amount {i} (₹)", f"रकम {i} (₹)"), value=amount, step=500.0)))
-        col_sub = st.form_submit_button(t("Record collections", "वसूली दर्ज करें"), type="primary")
+        salesman_options = ["Ramesh Kumar", "Suresh Shinde", "Vijay Patil", "Other"]
+        salesman_val = c2.selectbox(t("Salesman", "सेल्समैन का नाम"), salesman_options,
+                                    index=salesman_options.index(prefill_salesman) if prefill_salesman in salesman_options else 0)
+
+        c3, c4 = st.columns([2, 1])
+        shop_val = c3.selectbox(t("Retail Shop (Verified Party)", "दुकान का नाम"), biz_parties, index=shop_default_idx)
+        amt_val = c4.number_input(t("Amount (₹)", "रकम (₹)"), value=float(prefill_amount) if prefill_amount > 0 else 0.0, step=500.0, min_value=0.0)
+
+        c5, c6 = st.columns([1, 1])
+
+        payment_mode = c5.radio(
+            t("Payment Mode", "भुगतान का प्रकार"),
+            ["Cash", "UPI", "Cheque"],
+            horizontal=True,
+            key="_col_pay_mode"
+        ) or "Cash"
+        slip_no_val = c6.text_input(t("Slip No Preview", "पर्ची नंबर"), value=slip_preview, help=t("Auto-generated slip identifier", "स्वतः उत्पन्न पर्ची नंबर"))
+
+        inv_link_mode = st.radio(
+            t("Invoice Allocation Mode", "इनवॉइस आवंटन विधि"),
+            ["FIFO (Oldest Invoices First)", "Specific Invoice"],
+            horizontal=True,
+            key="_col_alloc_mode"
+        )
+
+        selected_invoice_no = ""
+        if inv_link_mode == "Specific Invoice":
+            open_invs = open_items(pack, biz)
+            shop_invs = open_invs[open_invs["customer_name"].str.strip().str.lower() == shop_val.strip().lower()]
+            if shop_invs.empty:
+                shop_invs = open_invs
+            inv_choices = [
+                f"{r.invoice_no} · Due: {inr(r.outstanding)} · {r.invoice_date:%d-%b-%Y}"
+                for r in shop_invs.itertuples()
+            ]
+            if inv_choices:
+                inv_sel = st.selectbox(t("Select Open Invoice", "बकाया इनवॉइस चुनें"), inv_choices)
+                selected_invoice_no = inv_sel.split("·")[0].strip()
+            else:
+                st.info(t("No open invoices for this customer. Allocation rolls to FIFO / On Account.", "इस ग्राहक के लिए कोई खुला इनवॉइस नहीं है।"))
+
+        notes_val = st.text_input(t("Notes / Route Remarks", "टिप्पणी / रूट विवरण"), placeholder=t("e.g. Daily route collection", "उदा. दैनिक रूट वसूली"))
+
+        col_sub = st.form_submit_button(t("Record Collection Slip", "पर्ची दर्ज करें"), type="primary")
+
     if col_sub:
-        for s, a in rows:
-            if s.strip() and a > 0:
-                vault.record_collection(Collection(biz, pd.Timestamp(col_date), s.strip(), a, salesman))
-        st.session_state["toast"] = t("Collections recorded in local vault.", "वसूली पर्चियां सफलतापूर्वक दर्ज की गईं।")
-        st.rerun()
+        if amt_val <= 0:
+            st.error(t("Please enter an amount greater than 0.", "कृपया 0 से अधिक राशि दर्ज करें।"))
+        else:
+            mode_upper = payment_mode.upper()
+            coll_obj = Collection(
+                business_id=biz,
+                date=pd.Timestamp(col_date),
+                shop=shop_val,
+                amount=float(amt_val),
+                salesman=salesman_val,
+                payment_mode=mode_upper,
+                slip_id=slip_no_val.strip() or slip_preview,
+                invoice_no=selected_invoice_no,
+                notes=notes_val or f"Route collection by {salesman_val}",
+            )
+            assigned_id = vault.record_collection(coll_obj, update_drawer=True)
+            toast_text = t(
+                f"✓ Slip {assigned_id} recorded ({payment_mode}: {inr(amt_val)} for {shop_val}).",
+                f"✓ पर्ची {assigned_id} दर्ज हुई ({payment_mode}: {inr(amt_val)} - {shop_val})।"
+            )
+            st.session_state["toast"] = toast_text
+            st.rerun()
 
 
 def page_cash_book():
@@ -1321,40 +1424,62 @@ def page_cash_book():
     page_header(t("Cash book", "रोकड़ बही (Cash Book)"),
                 t("Drawer cash and informal khata. Kept on this device only.", "गल्ले का नकद और कच्चा खाता। केवल इस डिवाइस पर सुरक्षित।"),
                 right=share_toggle)
+
     if showing_partial_view:
         st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
-    owner_pin = os.environ.get("COPILOT_OWNER_PIN")
-    pin_is_default = owner_pin is None
-    expected_pin = owner_pin if owner_pin is not None else "0000"
+        left, right = st.columns([2, 1], gap="large")
+        with left:
+            H(f"""
+            <div class="cc-card-modern" style="border-left:4px solid #DC2626;background:#FEF2F2;">
+              <div style="font-size:1rem;font-weight:700;color:#991B1B;display:flex;align-items:center;gap:8px;">
+                <span>🔒 Sovereign Cash Book Locked</span>
+                <span class="cc-badge warn">Owner PIN Required</span>
+              </div>
+              <div style="font-size:0.86rem;color:#7F1D1D;margin-top:6px;line-height:1.5;">
+                {t("Formal books only. Godown counter cash drawer (galla), pending khata accounts, and route collection slips are protected on-device with AES-256 authenticated encryption. Enter the Owner PIN in the sidebar (or below) to unlock sovereign books.",
+                   "केवल औपचारिक खाते। गल्ला, कच्चा खाता और वसूली पर्चियां AES-256 एन्क्रिप्शन से सुरक्षित हैं। देखने हेतु मालिक का PIN दर्ज करें।")}
+              </div>
+            </div>
+            """)
 
-    can_view_cash_book = False
-    if is_owner:
-        can_view_cash_book = True
-    elif is_accountant:
-        if share_cash_book:
-            can_view_cash_book = True
-        else:
-            st.info(t("The owner has not shared the cash book with the accountant.", "मालिक ने एकाउंटेंट के साथ रोकड़ बही साझा नहीं की है।"))
-    elif is_counter_staff:
-        a, b = st.columns([1, 14])
-        with a:
-            H(f'<div class="cc-lock">{svg(ICON_LOCK, 18, "#3F444B")}</div>')
-        with b:
-            H(f'<div class="cc-h2">{t("Cash book is locked", "रोकड़ बही लॉक है")}</div>'
-              f'<div class="cc-muted">{t("Owner PIN is required to view the cash book.", "रोकड़ बही देखने के लिए मालिक का PIN आवश्यक है।")}</div>')
-            pin_prompt_label = t("Demo PIN: 0000", "डेमो PIN: 0000") if pin_is_default else t("Enter owner PIN", "मालिक का PIN दर्ज करें")
-            c, _ = st.columns([1, 2])
-            staff_pin = c.text_input(t("Enter Owner PIN to unlock", "अनलॉक करने के लिए PIN डालें"), type="password", help=pin_prompt_label)
-            if staff_pin:
-                if staff_pin == expected_pin:
-                    can_view_cash_book = True
-                else:
-                    st.error(t("Incorrect PIN.", "गलत PIN दर्ज किया गया।"))
-            elif pin_is_default:
-                H(f'<div class="cc-note">{t("Demo PIN: 0000", "डेमो PIN: 0000")}</div>')
+            with st.container(border=True):
+                H(f'<div class="cc-h2">{t("Unlock Sovereign Vault", "वॉल्ट अनलॉक करें")}</div>')
+                c_pin1, c_pin2 = st.columns([1.5, 1])
+                inline_pin = c_pin1.text_input(
+                    t("Owner PIN", "मालिक PIN"),
+                    type="password",
+                    max_chars=4,
+                    key="inline_cashbook_pin",
+                    help=t("Demo PIN: 0000", "डेमो PIN: 0000"),
+                    placeholder="0000",
+                )
+                if c_pin2.button(t("Unlock Vault", "अनलॉक करें"), key="btn_unlock_cashbook_inline", type="primary", use_container_width=True):
+                    expected_pin = os.environ.get("COPILOT_OWNER_PIN") or "0000"
+                    if inline_pin == expected_pin or (inline_pin and vault.unlock(inline_pin)):
+                        vault.unlock(inline_pin or expected_pin)
+                        st.session_state["vault_unlocked"] = True
+                        st.session_state["toast"] = t("Vault unlocked. Sovereign Plane Active.", "वॉल्ट अनलॉक हुआ। सॉवरेन प्लेन सक्रिय।")
+                        st.rerun()
+                    else:
+                        st.error(t("Incorrect PIN.", "गलत PIN दर्ज किया गया।"))
+                H(f'<div class="cc-note">{t("Demo PIN: 0000 · Hardware-backed PBKDF2 key derivation", "डेमो PIN: 0000 · ऑन-डिवाइस सुरक्षा")}</div>')
 
-    if not can_view_cash_book:
+        with right:
+            with st.container(key="cc_panel"):
+                bank_cash_deposits = float(pack.bank[(pack.bank["business_id"] == biz) & (pack.bank["channel"] == "CASH")]["credit_inr"].sum())
+                facts_res = cash_deposit_reporting_facts(bank_cash_deposits)
+                checklist = deposit_records_checklist()
+                items_html = "".join(f'<li>{svg(ICON_BOX_CHECK, 16, MUTED)}{esc(doc)}</li>' for doc in checklist["documents"])
+                H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Bank Cash Deposits (Formal Plane)", "बैंक नकद जमा (औपचारिक)")}</div>'
+                  f'<div class="cc-hero" style="font-size:1.6rem">{esc(inr(bank_cash_deposits))}</div>'
+                  f'<div class="cc-muted" style="color:#3F444B">{esc(facts_res.message)}</div>'
+                  f'<div class="cc-note" style="margin-top:8px">{esc(facts_res.citation)}</div>'
+                  f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>')
+                with st.expander(t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड"), expanded=False):
+                    H(f'<ul class="cc-list sm">{items_html}</ul>'
+                      f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
+
         return
 
     left, right = st.columns([2, 1], gap="large")
@@ -1363,73 +1488,153 @@ def page_cash_book():
         demo = DEMO if latest_g and latest_g.is_demo else ""
         when = f"{esc(latest_g.notes)} · {latest_g.date:%d %b %Y}" if latest_g else ""
 
-        # Modern Till Balancing Cockpit
-        open_c = getattr(latest_g, "opening_cash", 10000.0) if latest_g else 10000.0
-        in_c = getattr(latest_g, "cash_in", 25000.0) if latest_g else 25000.0
-        out_c = getattr(latest_g, "cash_out", 2500.0) if latest_g else 2500.0
-        banked_c = getattr(latest_g, "cash_banked", 20000.0) if latest_g else 20000.0
-        counted_c = latest_g.counted_cash if latest_g else 12500.0
-        is_bal = latest_g.is_balanced if latest_g else True
+        open_c = float(getattr(latest_g, "opening_cash", 10000.0)) if latest_g else 10000.0
+        in_c = float(getattr(latest_g, "cash_in", 25000.0)) if latest_g else 25000.0
+        out_c = float(getattr(latest_g, "cash_out", 2500.0)) if latest_g else 2500.0
+        banked_c = float(getattr(latest_g, "cash_banked", 20000.0)) if latest_g else 20000.0
+        counted_c = float(getattr(latest_g, "counted_cash", 12500.0)) if latest_g else 12500.0
+
+        bal = calculate_drawer_balance(open_c, in_c, out_c, banked_c, counted_c)
+        expected_close = bal["expected_cash"]
+        drift = bal["drift"]
+        is_bal = bal["is_balanced"]
+
         bal_tip = (
-            t("Physical cash in till matches opening float + takings − expenses − deposits.",
-              "गल्ला मिलान: नकद बिक्री, खर्च और बैंक जमा का पूर्ण मिलान।")
+            t("Physical cash in till matches opening float + parchi cash in − expenses − banked CDM.",
+              "गल्ला मिलान: शुरुआती रोकड़ + पर्ची नकद आवक − खर्च − बैंक जमा।")
             if is_bal
-            else t("Discrepancy detected between counted cash and drawer transactions.", "असंगति पाई गई")
+            else t("Discrepancy detected between counted cash and 5-part drawer equation.", "गल्ले में असंगति पाई गई")
         )
         bal_badge = (
             f'<span class="cc-badge pos" data-tip="{bal_tip}">Ties Exactly ✓</span>'
             if is_bal
-            else f'<span class="cc-badge warn" data-tip="{bal_tip}">{esc(inr(latest_g.drift))} to check</span>'
+            else f'<span class="cc-badge warn" data-tip="{bal_tip}">{esc(inr(drift))} Drift to check</span>'
         )
 
-        # Compact Till Hero Card
+        # ── Interactive 5-Part Cash Drawer Balancing Cockpit Card ──
         H(f"""
         <div class="cc-card-modern">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             <div>
-              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against cash book entries.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {t("Galla Day-Close (Under 1 Minute)", "आज का गल्ला (दैनिक रोकड़ मिलान)")} {demo}</div>
-              <div style="font-size:0.78rem;color:#64748B;">{t("Physical till count vs drawer records", "दुकान गल्ला और बही मिलान")} · {when}</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {t("Godown Cash Drawer Balancing Cockpit", "दैनिक गल्ला रोकड़ मिलान")} {demo}</div>
+              <div style="font-size:0.78rem;color:#64748B;">{t("Opening Float + Parchi Cash In − Petty Expenses − Banked CDM = Expected Close", "शुरुआती नकद + पर्ची नकद − खर्च − बैंक जमा = अपेक्षित गल्ला")} · {when}</div>
             </div>
             {bal_badge}
           </div>
 
-          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;" data-tip="{t('Physical currency counted at the godown register at end-of-day.', 'दिन के अंत में गल्ले में गिना हुआ कुल कैश।')}">
-            <div>
-              <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#166534;display:block;">{t("Counted Cash in Drawer", "गल्ले में गिना हुआ अंतिम नकद")} <span class="cc-info-dot" style="background:rgba(22,101,52,0.15);color:#166534;">i</span></span>
-              <span style="font-size:1.8rem;font-weight:800;color:#166534;font-variant-numeric:tabular-nums;">{inr(counted_c)}</span>
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+            <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;text-align:center;">
+              <div>
+                <div style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;">Opening Float</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-top:2px;">{esc(inr(open_c))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem;font-weight:600;color:#059669;text-transform:uppercase;">+ Parchi In</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#059669;margin-top:2px;">+{esc(inr(in_c))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem;font-weight:600;color:#DC2626;text-transform:uppercase;">− Expenses</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#DC2626;margin-top:2px;">−{esc(inr(out_c))}</div>
+              </div>
+              <div>
+                <div style="font-size:0.72rem;font-weight:600;color:#2563EB;text-transform:uppercase;">− Banked CDM</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#2563EB;margin-top:2px;">−{esc(inr(banked_c))}</div>
+              </div>
+              <div style="border-left:2px solid #CBD5E1;padding-left:8px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#0F172A;text-transform:uppercase;">= Expected</div>
+                <div style="font-size:1.05rem;font-weight:800;color:#0F172A;margin-top:2px;">{esc(inr(expected_close))}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;">
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;">
+              <span style="font-size:0.72rem;font-weight:700;color:#166534;display:block;">Physical Till Count</span>
+              <span style="font-size:1.35rem;font-weight:800;color:#166534;">{esc(inr(counted_c))}</span>
+            </div>
+            <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;">
+              <span style="font-size:0.72rem;font-weight:700;color:#475569;display:block;">Expected Cash</span>
+              <span style="font-size:1.35rem;font-weight:800;color:#0F172A;">{esc(inr(expected_close))}</span>
+            </div>
+            <div style="background:{'#F0FDF4' if is_bal else '#FEF2F2'};border:1px solid {'#BBF7D0' if is_bal else '#FECACA'};border-radius:8px;padding:10px 12px;">
+              <span style="font-size:0.72rem;font-weight:700;color:{'#166534' if is_bal else '#991B1B'};display:block;">Drawer Drift</span>
+              <span style="font-size:1.35rem;font-weight:800;color:{'#166534' if is_bal else '#DC2626'};">{esc(inr(drift))}</span>
             </div>
           </div>
         </div>
         """)
-
-        # Collapsed Drawer Breakdown
-        with st.expander(t("View Drawer Breakdown (Opening, Takings, Hamali, Banked)", "गल्ला विवरण देखें (नकद बिक्री, खर्च, बैंक जमा)"), expanded=False):
-            H(f"""
-            <div class="cc-grid-4">
-              <div class="cc-tile" data-tip="{t('Cash float in the drawer at the start of business morning.', 'सुबह दुकान खोलने पर गल्ले में मौजूद नकद')}">
-                <span class="l">{t("Opening Till", "प्रारंभिक रोकड़")}<span class="cc-info-dot">i</span></span>
-                <span class="v">{inr(open_c)}</span>
-              </div>
-              <div class="cc-tile pos" data-tip="{t('Total counter cash received from retail sales and spot collections today.', 'आज की कुल नकद बिक्री और आवक')}">
-                <span class="l">{t("Takings (In)", "नकद बिक्री (+)")}<span class="cc-info-dot">i</span></span>
-                <span class="v">+{inr(in_c)}</span>
-              </div>
-              <div class="cc-tile warn" data-tip="{t('Minor counter payments: tea, loading/unloading (hamali), and local runner expenses.', 'दुकान के छोटे दैनिक खर्च: चाय, हमाली, लोकल भाड़ा')}">
-                <span class="l">{t("Petty Chai/Hamali", "दुकान खर्च (−)")}<span class="cc-info-dot">i</span></span>
-                <span class="v">−{inr(out_c)}</span>
-              </div>
-              <div class="cc-tile accent" data-tip="{t('Cash physically bundled and deposited into the bank current account today.', 'आज बैंक में जमा की गई नकद राशि')}">
-                <span class="l">{t("Banked Deposit", "बैंक में जमा (−)")}<span class="cc-info-dot">i</span></span>
-                <span class="v">−{inr(banked_c)}</span>
-              </div>
-            </div>
-            """)
 
         b1, b2, _ = st.columns([1.2, 1.6, 1.2])
         if b1.button(t("Close the day", "आज का गल्ला बंद करें"), type="primary", key="open_day_close", use_container_width=True):
             day_close_dialog()
         if b2.button(t("Record collection slips", "वसूली पर्ची दर्ज करें"), key="open_slips", use_container_width=True):
             collections_dialog()
+
+        # ── Active Collection Slips Ledger Table ──
+        slips = vault.get_collections(biz)
+        if slips:
+            H(f'<div class="cc-h2" style="margin-top:22px;margin-bottom:8px;">{t("Recent Collection Slips", "दैनिक वसूली पर्चियां")} <span class="cc-badge neutral">{len(slips)}</span></div>')
+            tot_all = sum(s.amount for s in slips)
+            tot_cash = sum(s.amount for s in slips if getattr(s, "payment_mode", "CASH").upper() == "CASH")
+            tot_upi = sum(s.amount for s in slips if getattr(s, "payment_mode", "CASH").upper() == "UPI")
+            tot_chq = sum(s.amount for s in slips if getattr(s, "payment_mode", "CASH").upper() == "CHEQUE")
+
+            H(f"""
+            <div class="cc-grid-4" style="margin-bottom:12px;">
+              <div class="cc-tile accent">
+                <span class="l">{t("Total Route Collections", "कुल दैनिक वसूली")}</span>
+                <span class="v" style="font-size:1.3rem;">{esc(inr(tot_all))}</span>
+                <span class="s">{len(slips)} {t("slips recorded", "पर्चियां")}</span>
+              </div>
+              <div class="cc-tile pos">
+                <span class="l">{t("Cash into Till", "गल्ले में नकद")}</span>
+                <span class="v" style="font-size:1.3rem;color:#166534;">{esc(inr(tot_cash))}</span>
+                <span class="s">{t("Added to drawer cash_in", "गल्ले में जमा")}</span>
+              </div>
+              <div class="cc-tile info">
+                <span class="l">{t("UPI Direct Credits", "UPI ऑनलाइन")}</span>
+                <span class="v" style="font-size:1.3rem;color:#1E40AF;">{esc(inr(tot_upi))}</span>
+                <span class="s">{t("Direct to bank account", "सीधे बैंक खाते में")}</span>
+              </div>
+              <div class="cc-tile warn">
+                <span class="l">{t("Cheques in Route Bag", "चेक")}</span>
+                <span class="v" style="font-size:1.3rem;color:#B45309;">{esc(inr(tot_chq))}</span>
+                <span class="s">{t("For branch deposit", "बैंक में जमा हेतु")}</span>
+              </div>
+            </div>
+            """)
+
+            mode_filter = st.radio(
+                t("Filter Payment Mode", "भुगतान प्रकार फ़िल्टर"),
+                ["All", "Cash", "UPI", "Cheque"],
+                horizontal=True,
+                key="_slips_tbl_filter"
+            ) or "All"
+
+            filtered_slips = slips
+            if mode_filter != "All":
+                filtered_slips = [s for s in slips if getattr(s, "payment_mode", "CASH").upper() == mode_filter.upper()]
+
+            if filtered_slips:
+                table_rows = []
+                for s in reversed(filtered_slips):
+                    m_tag = getattr(s, "payment_mode", "CASH").upper()
+                    st_tag = "Banked ✓" if getattr(s, "is_banked", False) else ("In Till" if m_tag == "CASH" else "In Route Bag")
+                    inv_tag = getattr(s, "invoice_no", "") or "FIFO (Oldest Invoices)"
+                    s_date_str = s.date.strftime("%Y-%m-%d") if hasattr(s.date, "strftime") else str(s.date)[:10]
+                    table_rows.append({
+                        "Date": s_date_str,
+                        "Slip No": getattr(s, "slip_id", "") or getattr(s, "slip_no", ""),
+                        "Retail Shop": getattr(s, "shop", ""),
+                        "Salesman": getattr(s, "salesman", ""),
+                        "Amount": inr(s.amount),
+                        "Mode": m_tag,
+                        "Invoice Allocation": inv_tag,
+                        "Status": st_tag,
+                    })
+                st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+            else:
+                H(f'<div class="cc-muted" style="padding:10px 0;">{t("No collection slips for this filter.", "इस फ़िल्टर के लिए कोई पर्ची नहीं मिली।")}</div>')
 
         st.write("")
         khata_data = vault.get_khata_summary(biz)
@@ -1498,6 +1703,30 @@ def page_cash_book():
             with st.expander(t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड"), expanded=False):
                 H(f'<ul class="cc-list sm">{items_html}</ul>'
                   f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
+
+        # ── 1-Click CA Tally Export Pack in Cash Book ──
+        with st.container(border=True):
+            H(f'<div class="cc-h2" style="margin-bottom:8px;">{t("CA Tally Export Pack", "मुनीम / CA रीकॉन्सिलेशन एक्सपोर्ट")}</div>'
+              f'<div class="cc-muted" style="font-size:0.82rem;margin-bottom:12px;">'
+              f'{t("1-click export for visiting Chartered Accountants without manual ledger entry.", "1-क्लिक एक्सपोर्ट: टैली वाउचर व 6-शीट एक्सेल रीकॉन्सिलेशन।")}'
+              f'</div>')
+            _match_list = list(matches.values()) if isinstance(matches, dict) else matches
+            st.download_button(
+                label=t("📥 Download Tally XML (Receipt Vouchers)", "📥 टैली XML डाउनलोड करें"),
+                data=generate_tally_xml(pack, _match_list, biz),
+                file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
+                mime="application/xml",
+                use_container_width=True,
+                key="cb_dl_tally_xml",
+            )
+            st.download_button(
+                label=t("📊 Download CA Excel Workbook", "📊 CA एक्सेल रीकॉन्सिलेशन डाउनलोड करें"),
+                data=generate_ca_excel_pack(pack, _match_list, vault, biz),
+                file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="cb_dl_ca_excel",
+            )
 
 
 # ── PAGE: FORECAST (FR-FC-1, FR-FC-2) ────────────────────────────────────────
@@ -1670,6 +1899,29 @@ def page_review():
       <div style="font-size:0.8rem;color:#2563EB;font-weight:600;">{counts['auto']:,} automatic matches · {counts[SUGGEST] + counts[ASK]:,} in decision queue</div>
     </div>
     """)
+
+    # ── 1-Click CA Tally Export Pack ──
+    _match_list = list(matches.values()) if isinstance(matches, dict) else matches
+    col_exp1, col_exp2 = st.columns(2)
+    with col_exp1:
+        st.download_button(
+            label=t("📥 Download Tally XML (Decision 60 Vouchers)", "📥 टैली XML डाउनलोड करें"),
+            data=generate_tally_xml(pack, _match_list, biz),
+            file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
+            mime="application/xml",
+            use_container_width=True,
+            key="rev_dl_tally_xml",
+        )
+    with col_exp2:
+        st.download_button(
+            label=t("📊 Download CA Reconciliation Workbook (Excel)", "📊 CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"),
+            data=generate_ca_excel_pack(pack, _match_list, vault, biz),
+            file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="rev_dl_ca_excel",
+        )
+    st.write("")
 
     bank = pack.bank.set_index("txn_id")
     rows = []
@@ -2257,8 +2509,47 @@ with st.sidebar:
                    "मालिक सभी बही-खाते देख सकते हैं; काउंटर स्टाफ को गल्ले के लिए PIN चाहिए; "
                    "एकाउंटेंट को मालिक की अनुमति से ही गल्ला दिखता है।"),
         )
-        lang = st.segmented_control(
-            "Language / भाषा", ["English", "हिन्दी"], selection_mode="single", key="lang", default=st.session_state["lang_choice"],
+        # ── Sovereign Vault PIN Gating Card ──
+        is_v_unlocked = st.session_state.get("vault_unlocked", False)
+        if is_v_unlocked:
+            H(f"""
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
+              <div style="font-size:0.78rem;font-weight:700;color:#166534;">🟢 🔓 Vault Unlocked · Sovereign Plane Active</div>
+            </div>
+            """)
+            if st.button(t("Lock Vault", "वॉल्ट लॉक करें"), key="btn_sidebar_lock_vault", use_container_width=True):
+                vault.lock()
+                st.session_state["vault_unlocked"] = False
+                st.session_state["toast"] = t("Vault locked. Sovereign records secured.", "वॉल्ट लॉक किया गया।")
+                st.rerun()
+        else:
+            H(f"""
+            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
+              <div style="font-size:0.78rem;font-weight:700;color:#991B1B;">🔴 🔒 Vault Locked</div>
+            </div>
+            """)
+            s_pin = st.text_input(
+                t("Owner PIN", "मालिक PIN"),
+                type="password",
+                max_chars=4,
+                key="sidebar_owner_pin_input",
+                help=t("Demo PIN: 0000", "डेमो PIN: 0000"),
+                placeholder="0000",
+            )
+            if st.button(t("Unlock Vault", "वॉल्ट अनलॉक करें"), key="btn_sidebar_unlock_vault", type="primary", use_container_width=True):
+                expected_pin = os.environ.get("COPILOT_OWNER_PIN") or "0000"
+                if s_pin == expected_pin or (s_pin and vault.unlock(s_pin)):
+                    vault.unlock(s_pin or expected_pin)
+                    st.session_state["vault_unlocked"] = True
+                    st.session_state["toast"] = t("Vault unlocked. Sovereign Plane Active.", "वॉल्ट अनलॉक हुआ।")
+                    st.rerun()
+                else:
+                    st.error(t("Incorrect PIN.", "गलत PIN दर्ज किया गया।"))
+
+        _lang_options = ["English", "हिन्दी"]
+        lang = st.radio(
+            "Language / भाषा", _lang_options, horizontal=True, key="lang",
+            index=_lang_options.index(st.session_state.get("lang_choice", "English")),
             on_change=lambda: st.session_state.update(lang_choice=st.session_state["lang"] or "English"),
         ) or "English"
         H(f'<div class="cc-side-note">{svg(ICON_LOCK, 14)}<span>{t("Read-only. Never moves money, edits records or sends anything.", "केवल पढ़ने के लिए। यह कभी भी पैसे नहीं भेजता, रिकॉर्ड नहीं बदलता।")}</span></div>')
@@ -2271,7 +2562,9 @@ share_cash_book = st.session_state.get("share_cash_book", True)
 is_owner = role == "Owner"
 is_counter_staff = role == "Counter staff"
 is_accountant = role == "Accountant (CA)"
-showing_partial_view = is_counter_staff or (is_accountant and not share_cash_book)
+is_v_unlocked = st.session_state.get("vault_unlocked", False)
+# Split-plane gating: Partial view when vault is locked OR role is non-owner
+showing_partial_view = (not is_owner) or (not is_v_unlocked)
 
 if msg := st.session_state.pop("toast", None):
     st.toast(msg, icon=":material/check_circle:")

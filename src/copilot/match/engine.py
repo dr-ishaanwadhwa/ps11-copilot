@@ -128,7 +128,12 @@ class Matcher:
             self.vault.record_collection(col)
 
     def _get_collections(self, biz: str, since: pd.Timestamp | None, up_to: pd.Timestamp) -> list[Any]:
-        vault_cols = self.vault.get_collections_since(biz, since, up_to) if (self.vault and hasattr(self.vault, "get_collections_since")) else []
+        vault_cols = []
+        if self.vault and hasattr(self.vault, "get_collections_since"):
+            try:
+                vault_cols = self.vault.get_collections_since(biz, since, up_to)
+            except Exception:
+                vault_cols = []
         extra_cols = [
             c for c in self._collections
             if getattr(c, "business_id", None) == biz
@@ -140,6 +145,20 @@ class Matcher:
             if c not in all_cols:
                 all_cols.append(c)
         return all_cols
+
+    def _mark_banked(self, colls: list[Any], txn_id: str) -> None:
+        for c in colls:
+            try:
+                c.is_banked = True
+                c.bank_txn_id = txn_id
+            except Exception:
+                pass
+            slip_id = getattr(c, "slip_id", None) or getattr(c, "slip_no", None)
+            if slip_id and self.vault and hasattr(self.vault, "mark_collection_banked"):
+                try:
+                    self.vault.mark_collection_banked(slip_id, txn_id)
+                except Exception:
+                    pass
 
     # ── documents ───────────────────────────────────────────────────────────
     def _add(self, biz: str, d: Doc) -> None:
@@ -235,22 +254,33 @@ class Matcher:
                 start = self.last_cash_deposit.get(biz)
                 self.last_cash_deposit[biz] = r.txn_date
                 colls = self._get_collections(biz, start, r.txn_date)
-                total_col = sum(c.amount for c in colls)
-                if colls and abs(total_col - amt) <= 1.0:
-                    shops = list(dict.fromkeys(c.shop for c in colls))
+                cash_colls = [c for c in colls if getattr(c, "payment_mode", "CASH") in ("CASH", "")]
+                target_colls = cash_colls if cash_colls and abs(sum(c.amount for c in cash_colls) - amt) <= 1.0 else colls
+                total_col = sum(c.amount for c in target_colls)
+                if target_colls and abs(total_col - amt) <= 1.0:
+                    shops = list(dict.fromkeys(getattr(c, "shop", "") or getattr(c, "shop_name", "") for c in target_colls))
+                    explicit_invs = [(getattr(c, "invoice_no", "") or "").strip() for c in target_colls]
+                    if all(explicit_invs) and all(inv_id in self.by_id for inv_id in explicit_invs):
+                        docs = [(inv_id, min(self.by_id[inv_id].remaining, c.amount)) for inv_id, c in zip(explicit_invs, target_colls)]
+                        note = f"cash deposit matched to {len(target_colls)} collection slips across {len(shops)} shops (D55)"
+                        m = Match(r.txn_id, biz, SUGGEST, "CASH_DEPOSIT", docs, note=note)
+                        self._mark_banked(target_colls, r.txn_id)
+                        return self._finish(m, None, True, r, None)
+
                     pool = []
                     for s in shops:
-                        parties = self.party_idx[biz]["in"].resolve(s)
-                        pool.extend(self._open(biz, parties if parties else [s], profile.doc_kinds, r.txn_date, cap=50))
+                        parties = self.party_idx[biz]["in"].resolve(s) if s else []
+                        pool.extend(self._open(biz, parties if parties else ([s] if s else []), profile.doc_kinds, r.txn_date, cap=50))
                     pool.sort(key=lambda x: (x.date, x.id))
-                    max_size = max(10, len(colls) + 2)
+                    max_size = max(10, len(target_colls) + 2)
                     sols, done = find_subsets(pool, amt, max_size=max_size)
                     if not sols and profile.has_round_off:
                         sols, done = find_subsets(pool, amt, max_size=max_size, slack=config.ROUND_OFF_MAX)
-                    if sols and len(sols) == 1 and done:
+                    if sols and done:
                         docs = [(d.id, d.remaining) for d in sols[0]]
-                        note = f"cash deposit matched to {len(colls)} collection slips across {len(shops)} shops (D55)"
+                        note = f"cash deposit matched to {len(target_colls)} collection slips across {len(shops)} shops (D55)"
                         m = Match(r.txn_id, biz, SUGGEST, "CASH_DEPOSIT", docs, note=note)
+                        self._mark_banked(target_colls, r.txn_id)
                         return self._finish(m, None, True, r, None)
             return Match(r.txn_id, biz, ASK, "CASH_DEPOSIT",
                          note="cash deposit covering several shops: needs the salesman's collection slips")

@@ -169,4 +169,185 @@ def test_streamlit_app_loads_without_exceptions():
     assert not at.exception, f"Streamlit app raised exception: {at.exception[0].message if at.exception else ''}"
 
 
+def test_streamlit_vault_pin_unlock_and_lock():
+    """Verify that Streamlit app starts locked by default and transitions via Owner PIN unlock/lock."""
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
+    at.run()
+    assert not at.exception
+    # Starts locked by default (ADR-001, ADR-004, R5)
+    assert at.session_state["vault_unlocked"] is False
+
+    # Find the PIN input widget in the sidebar and enter correct PIN (0000)
+    pin_inputs = [w for w in at.sidebar.text_input if w.key == "sidebar_owner_pin_input"]
+    assert len(pin_inputs) == 1, "Expected sidebar PIN input widget"
+    pin_inputs[0].input("0000")
+
+    unlock_btns = [b for b in at.sidebar.button if b.key == "btn_sidebar_unlock_vault"]
+    assert len(unlock_btns) == 1, "Expected sidebar unlock button"
+    unlock_btns[0].click()
+    at.run()
+    assert not at.exception
+    assert at.session_state["vault_unlocked"] is True
+
+    # Lock the vault
+    lock_btns = [b for b in at.sidebar.button if b.key == "btn_sidebar_lock_vault"]
+    assert len(lock_btns) == 1, "Expected sidebar lock button"
+    lock_btns[0].click()
+    at.run()
+    assert not at.exception
+    assert at.session_state["vault_unlocked"] is False
+
+
+def test_streamlit_partial_view_notice_when_locked():
+    """Verify that statutory PARTIAL_VIEW_NOTICE warning is displayed when vault is locked."""
+    from streamlit.testing.v1 import AppTest
+    from copilot.vault import PARTIAL_VIEW_NOTICE
+    at = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
+    at.run()
+    assert not at.exception
+    # In overview page when locked, warning banner should be rendered
+    warnings = [w.value for w in at.warning]
+    assert any(PARTIAL_VIEW_NOTICE in w for w in warnings), f"Expected PARTIAL_VIEW_NOTICE in warnings, got {warnings}"
+
+
+def test_streamlit_tally_and_excel_exports(pack, matches):
+    """Verify that 1-click CA Tally export pack generates standard Tally XML and OpenPyXL Excel."""
+    from copilot.tally import generate_ca_excel_pack, generate_tally_xml
+    from copilot.vault import VaultDB
+
+    vault = VaultDB(in_memory=True)
+    vault.seed_from_pack(pack)
+
+    # 1. Tally XML generation
+    match_list = list(matches.values()) if isinstance(matches, dict) else matches
+    xml_data = generate_tally_xml(pack, match_list, "SME-1")
+    assert "<ENVELOPE>" in xml_data
+    assert "<TALLYREQUEST>Import Data</TALLYREQUEST>" in xml_data
+    assert "<REPORTNAME>Vouchers</REPORTNAME>" in xml_data
+    assert "VOUCHERTYPE=\"Receipt\"" in xml_data
+
+    # 2. CA Excel workbook generation
+    excel_bytes = generate_ca_excel_pack(pack, match_list, vault, "SME-1")
+    assert isinstance(excel_bytes, bytes)
+    assert len(excel_bytes) > 10_000
+    assert excel_bytes.startswith(b"PK\x03\x04"), "Excel workbook must be valid zipped openpyxl package"
+
+
+def test_streamlit_collection_slip_and_drawer_balance(pack):
+    """Verify Streamlit cash book collection slip dialog opens without crashing,
+    renders form controls, and integrates with godown cash drawer balancing.
+    """
+    import hashlib
+    from streamlit.testing.v1 import AppTest
+    from copilot.vault import Collection, VaultDB
+    from copilot.vault.models import calculate_drawer_balance
+
+    # 1. Genuine Streamlit UI verification via AppTest
+    at = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
+    # Direct navigation to Cash Book page via st.Page hash
+    at._page_hash = hashlib.md5("cash-book".encode()).hexdigest()
+    at.run()
+    assert not at.exception, f"Cash Book page load failed: {at.exception[0].message if at.exception else ''}"
+
+    # Unlock vault via Owner PIN (0000)
+    pin_inputs = [w for w in at.sidebar.text_input if w.key == "sidebar_owner_pin_input"]
+    assert len(pin_inputs) == 1, "Expected sidebar PIN input widget"
+    pin_inputs[0].input("0000")
+
+    unlock_btns = [b for b in at.sidebar.button if b.key == "btn_sidebar_unlock_vault"]
+    assert len(unlock_btns) == 1, "Expected sidebar unlock button"
+    unlock_btns[0].click()
+    at.run()
+    assert not at.exception
+    assert at.session_state["vault_unlocked"] is True
+
+    # Click 'Record collection slips' to trigger collections_dialog()
+    slip_btns = [b for b in at.button if b.key == "open_slips"]
+    assert len(slip_btns) == 1, "Expected 'open_slips' button on unlocked Cash Book page"
+    slip_btns[0].click()
+    at.run()
+
+    # CRITICAL UI ASSERTION: Dialog must render without NameError or unhandled exceptions
+    assert not at.exception, f"collections_dialog crashed on render: {at.exception[0].message if at.exception else ''}"
+
+    # Verify that dialog form controls are actively instantiated
+    assert any("Cash" in (w.value or "") for w in at.radio), "Expected Payment Mode radio in dialog"
+    assert any("SLIP-" in str(w.value or "") for w in at.text_input), "Expected slip preview text input in dialog"
+
+    # 2. Backend integration verification (5-variable till equation and cash_in update)
+    vault = VaultDB(in_memory=True)
+    vault.seed_from_pack(pack)
+    latest_g = vault.get_latest_galla("SME-1")
+    initial_cash_in = float(latest_g.cash_in)
+
+    coll = Collection(
+        business_id="SME-1",
+        date=latest_g.date,
+        shop="Laxmi Super Mart, Bibwewadi",
+        amount=25_000.0,
+        salesman="Ramesh Kumar",
+        payment_mode="CASH",
+        slip_id="SLIP-TEST-001",
+    )
+    assigned_id = vault.record_collection(coll, update_drawer=True)
+    assert assigned_id == "SLIP-TEST-001"
+
+    updated_g = vault.get_latest_galla("SME-1")
+    assert updated_g.cash_in == initial_cash_in + 25_000.0
+
+    bal = calculate_drawer_balance(
+        updated_g.opening_cash,
+        updated_g.cash_in,
+        updated_g.cash_out,
+        updated_g.cash_banked,
+        updated_g.counted_cash,
+    )
+    assert bal["expected_cash"] == round(updated_g.opening_cash + updated_g.cash_in - updated_g.cash_out - updated_g.cash_banked, 2)
+    assert "is_balanced" in bal
+    assert "drift" in bal
+
+
+def test_streamlit_dialogs_ast_integrity():
+    """Statically verify that in all dialog functions in app/streamlit_app.py,
+    any c1..c6 variables accessed are assigned before use.
+    """
+    import ast
+    from pathlib import Path
+
+    app_path = Path("app/streamlit_app.py")
+    tree = ast.parse(app_path.read_text())
+
+    dialog_count = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and any(
+            isinstance(d, ast.Call) and getattr(d.func, "attr", None) == "dialog" or
+            isinstance(d, ast.Attribute) and d.attr == "dialog"
+            for d in node.decorator_list
+        ):
+            dialog_count += 1
+            loads = {}
+            stores = {}
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Name) and len(sub.id) == 2 and sub.id[0] == "c" and sub.id[1] in "123456":
+                    if isinstance(sub.ctx, ast.Load):
+                        loads.setdefault(sub.id, []).append(sub.lineno)
+                    elif isinstance(sub.ctx, ast.Store):
+                        stores.setdefault(sub.id, []).append(sub.lineno)
+
+            for var, load_lines in loads.items():
+                assert var in stores, (
+                    f"Variable {var} is accessed in dialog '{node.name}' "
+                    f"at line {min(load_lines)} but is never assigned in the function!"
+                )
+                assert min(stores[var]) <= min(load_lines), (
+                    f"Variable {var} is loaded at line {min(load_lines)} "
+                    f"before its assignment at line {min(stores[var])} in dialog '{node.name}'!"
+                )
+
+    assert dialog_count >= 3, f"Expected at least 3 dialogs to be audited, found {dialog_count}"
+
+
+
+
 

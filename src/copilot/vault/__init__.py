@@ -1,4 +1,4 @@
-"""Vault Package: Local-first dual-plane cash operating system."""
+from .crypto import VaultCrypto, VaultDecryptionError, VaultLockedError
 from .db import VaultDB
 from .guardrails import (
     cash_deposit_reporting_facts,
@@ -14,6 +14,9 @@ from .chase import format_whatsapp_reminder
 
 __all__ = [
     "VaultDB",
+    "VaultCrypto",
+    "VaultLockedError",
+    "VaultDecryptionError",
     "Collection",
     "GallaEntry",
     "RokadEntry",

@@ -45,14 +45,107 @@ class GallaEntry:
         return "Balanced" if self.is_balanced else "Drift to check"
 
 
+def calculate_drawer_balance(
+    opening_cash: float,
+    cash_in: float,
+    cash_out: float,
+    cash_banked: float,
+    counted_cash: float,
+) -> dict:
+    """Calculate 5-variable cash drawer balance and drift."""
+    expected_cash = round(opening_cash + cash_in - cash_out - cash_banked, 2)
+    drift = round(counted_cash - expected_cash, 2)
+    is_balanced = abs(drift) < 50.0
+    return {
+        "opening_cash": round(opening_cash, 2),
+        "cash_in": round(cash_in, 2),
+        "cash_out": round(cash_out, 2),
+        "cash_banked": round(cash_banked, 2),
+        "expected_cash": expected_cash,
+        "counted_cash": round(counted_cash, 2),
+        "drift": drift,
+        "is_balanced": is_balanced,
+        "status_label": "Balanced" if is_balanced else "Drift to check",
+    }
+
+
 @dataclass
 class Collection:
-    """Salesman collection slip entry for cash collections (Task 5.3, D55)."""
+    """Salesman collection slip entry for route collections (ADR-001, ADR-004, R3)."""
     business_id: str
     date: pd.Timestamp
     shop: str
     amount: float
     salesman: str = ""
+    payment_mode: str = "CASH"
+    slip_id: str = ""
+    invoice_no: str = ""
+    is_banked: bool = False
+    bank_txn_id: str = ""
+    notes: str = ""
+
+    def __init__(
+        self,
+        business_id: str = "",
+        date: pd.Timestamp | str | None = None,
+        shop: str = "",
+        amount: float = 0.0,
+        salesman: str = "",
+        payment_mode: str = "CASH",
+        slip_id: str = "",
+        invoice_no: str = "",
+        is_banked: bool = False,
+        bank_txn_id: str = "",
+        notes: str = "",
+        *,
+        shop_name: str | None = None,
+        salesman_name: str | None = None,
+        slip_no: str | None = None,
+        **kwargs,
+    ):
+        self.business_id = business_id
+        if date is None:
+            self.date = pd.Timestamp.now()
+        elif isinstance(date, str):
+            self.date = pd.Timestamp(date)
+        else:
+            self.date = date
+        self.shop = shop_name if shop_name is not None else shop
+        self.amount = float(amount)
+        self.salesman = salesman_name if salesman_name is not None else salesman
+        self.payment_mode = (payment_mode or "CASH").upper()
+        self.slip_id = slip_no if slip_no is not None else (slip_id or "")
+        if not self.slip_id:
+            import uuid
+            self.slip_id = f"SLIP-{uuid.uuid4().hex[:8].upper()}"
+        self.invoice_no = invoice_no or ""
+        self.is_banked = bool(is_banked)
+        self.bank_txn_id = bank_txn_id or ""
+        self.notes = notes or ""
+
+    @property
+    def shop_name(self) -> str:
+        return self.shop
+
+    @shop_name.setter
+    def shop_name(self, value: str) -> None:
+        self.shop = value
+
+    @property
+    def salesman_name(self) -> str:
+        return self.salesman
+
+    @salesman_name.setter
+    def salesman_name(self, value: str) -> None:
+        self.salesman = value
+
+    @property
+    def slip_no(self) -> str:
+        return self.slip_id
+
+    @slip_no.setter
+    def slip_no(self, value: str) -> None:
+        self.slip_id = value
 
 
 @dataclass

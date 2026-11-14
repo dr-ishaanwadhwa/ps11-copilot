@@ -6,3 +6,6 @@ streamlit-aggrid==1.0.5
 rapidfuzz==3.10.1
 anthropic==2.8.0
 pydantic==2.14.3
+cryptography>=42.0.0
+pillow>=10.0.0
+requests>=2.31.0

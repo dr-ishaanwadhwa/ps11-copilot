@@ -60,450 +60,395 @@ st.set_page_config(
 
 PUBLIC = os.environ.get("COPILOT_PUBLIC") == "1"
 
-# ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
-INK = "#17191C"
-MUTED = "#545A63"
-SUBTLE = "#646A72"
-ACCENT = "#24509A"
-NEG = "#A8261D"
-FONT = "IBM Plex Sans"
+# ── DESIGN TOKENS: "Floating Edition" theme (Superdesign draft f38b7488) ──────
+# Inter for text, Lora for headings, JetBrains Mono for figures; near-black ink, one red
+# accent, white floating cards. Status colours (green / amber / red) keep their money meaning.
+INK = "#111827"
+MUTED = "#4B5563"
+SUBTLE = "#6B7280"
+ACCENT = "#FF4B4B"
+NEG = "#DC2626"
+FONT = "Inter"
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Devanagari:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:wght@600;700&family=JetBrains+Mono:wght@500;700;800&family=IBM+Plex+Sans+Devanagari:wght@400;500;600&display=swap');
 
-html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
-.stApp td, .stApp th, .stApp div, .stApp span:not([data-testid="stIconMaterial"]) {
-  font-family: 'IBM Plex Sans', 'IBM Plex Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+:root {
+  --cc-primary: #FF4B4B; --cc-primary-hover: #E53E3E; --cc-primary-wash: #FFF1F1;
+  --cc-ink: #111827; --cc-text: #1F2937; --cc-muted: #4B5563; --cc-soft: #6B7280; --cc-faint: #9CA3AF;
+  --cc-line: #F3F4F6; --cc-line-2: #E5E7EB; --cc-edge: #ECEEF1; --cc-wash: #F9FAFB; --cc-card: #FFFFFF;
+  --cc-canvas: #F4F5F7; --cc-r: 10px; --cc-r-sm: 6px;
+  --cc-pos: #047857; --cc-pos-line: #A7F3D0; --cc-pos-wash: #F3FBF7;
+  --cc-warn: #B45309; --cc-warn-line: #FCD34D; --cc-warn-wash: #FFFBEB;
+  --cc-neg: #DC2626; --cc-neg-line: #FCA5A5; --cc-neg-wash: #FEF5F5;
+  --cc-sans: 'Inter', 'IBM Plex Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cc-serif: 'Lora', 'IBM Plex Sans Devanagari', Georgia, serif;
+  --cc-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --cc-float: 0 1px 2px rgba(17,24,39,0.04), 0 8px 20px rgba(17,24,39,0.07), 0 22px 44px -14px rgba(17,24,39,0.12);
+  --cc-float-hover: 0 2px 4px rgba(17,24,39,0.05), 0 14px 28px rgba(17,24,39,0.10), 0 30px 60px -18px rgba(17,24,39,0.18);
+  --cc-lift: 0 1px 2px rgba(17,24,39,0.05), 0 4px 14px rgba(17,24,39,0.07);
+  --cc-btn: 0 1px 2px rgba(17,24,39,0.06), 0 2px 6px rgba(17,24,39,0.05);
+  --cc-btn-red: 0 1px 2px rgba(255,75,75,0.30), 0 8px 18px -6px rgba(255,75,75,0.55);
 }
-.stApp { color: #17191C; -webkit-font-smoothing: antialiased; }
+
+/* type: Inter everywhere except Streamlit's icon glyphs */
+html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
+.stApp td, .stApp th, .stApp div, .stApp span:not([data-testid*="Icon"]):not([class*="material"]) {
+  font-family: var(--cc-sans);
+}
+/* layout: a soft grey canvas so white cards, the top bar and the sidebar read as separate layers */
+.stApp { color: var(--cc-text); background: var(--cc-canvas); -webkit-font-smoothing: antialiased; }
+/* Streamlit sizes markdown blocks to the parent's outer width; inside padded cards that pushed text past the edge */
+.stApp [data-testid="stMarkdown"] { width: 100% !important; max-width: 100%; }
+.stApp [data-testid="stElementContainer"] > * { max-width: 100%; }
+.cc-muted, .cc-note, .cc-sub, .cc-h2, .cc-row-detail { overflow-wrap: break-word; }
+.stApp h1, .stApp h2, .stApp h3 { font-family: var(--cc-serif) !important; letter-spacing: -0.01em; color: var(--cc-ink); }
 
 /* chrome */
-header[data-testid="stHeader"] { background: transparent; }
+header[data-testid="stHeader"] { background: transparent; pointer-events: none; }
+header[data-testid="stHeader"] * { pointer-events: auto; }
 [data-testid="stDecoration"] { display: none; }
 .stAppDeployButton, [data-testid="stAppDeployButton"] { display: none; }
-[data-testid="stMainBlockContainer"], .block-container {
-  max-width: 1200px; padding: 2.4rem 2.5rem 4rem;
-}
+[data-testid="stMain"] { overflow-x: hidden; }
+[data-testid="stMainBlockContainer"], .block-container { max-width: 1360px; padding: 2.4rem 2.5rem 1.5rem; }
 @media (max-width: 640px) {
-  [data-testid="stMainBlockContainer"], .block-container { padding: 3.5rem 1rem 3rem; }
+  [data-testid="stMainBlockContainer"], .block-container { padding: 3.6rem 1rem 1.5rem; }
 }
 
-/* sidebar */
-[data-testid="stSidebar"] { background: #F3F3F0; border-right: 1px solid #B8B8B0; }
-[data-testid="stSidebarUserContent"] { padding-top: 0.25rem; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 12px; border-radius: 8px; margin-bottom: 4px; transition: background 150ms ease; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover { background: #E5E5DF; }
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p { font-size: 0.92rem; font-weight: 500; }
+/* top bar: brand, page navigation, who is viewing */
+.st-key-topbar { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 20px; padding: 8px 22px; margin-bottom: 34px;
+  box-shadow: var(--cc-lift); }
+@media (max-width: 640px) { .st-key-topbar { padding: 10px 14px; } }
+.cc-brand { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.cc-brand span { font-family: var(--cc-serif) !important; font-size: 1.28rem; font-weight: 700; letter-spacing: -0.015em; color: var(--cc-ink); }
+.cc-brand svg { flex: none; }
+.st-key-tnav { flex-direction: row !important; flex-wrap: nowrap; align-items: center; gap: 0 24px !important;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.st-key-tnav::-webkit-scrollbar { display: none; }
+.st-key-tnav > div, .st-key-tnav [data-testid="stPageLink"], .st-key-tnav [data-testid="stPageLink"] > div { width: auto !important; flex: 0 0 auto !important; }
+.st-key-tnav [data-testid="stPageLink-NavLink"] { position: relative; background: transparent !important; padding: 10px 0 !important;
+  min-height: 44px; border-radius: 0; }
+.st-key-tnav [data-testid="stPageLink-NavLink"] > span:has([data-testid="stIconMaterial"]) { display: none; }
+.st-key-tnav [data-testid="stPageLink-NavLink"] p { font-size: 0.7rem !important; font-weight: 700 !important; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--cc-soft); white-space: nowrap; transition: color 150ms ease; }
+.st-key-tnav [data-testid="stPageLink-NavLink"]:hover p { color: var(--cc-ink); }
+.cc-ident { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.cc-avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 1px solid var(--cc-line-2); background: #FFFFFF;
+  display: grid; place-items: center; font-size: 0.7rem; font-weight: 800; color: var(--cc-ink); letter-spacing: 0.02em; }
+.cc-ident > div:last-child { min-width: 0; }
+.cc-ident .n { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cc-ink); line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-ident .r { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cc-soft); margin-top: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .cc-ident { justify-content: flex-start; } }
+
+/* footer */
+.cc-footer { margin-top: 64px; padding: 26px 0 6px; border-top: 1px solid var(--cc-line-2); display: flex; flex-wrap: wrap;
+  justify-content: space-between; gap: 12px 40px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--cc-faint); }
+.cc-footer .links { display: flex; flex-wrap: wrap; gap: 12px 36px; }
+
+/* sidebar: workspace controls */
+[data-testid="stSidebar"] { background: #FFFFFF; border-right: 1px solid var(--cc-line-2); box-shadow: 8px 0 28px -16px rgba(17,24,39,0.22); }
+[data-testid="stSidebarUserContent"] { padding-top: 0.5rem; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 12px; border-radius: 12px; margin-bottom: 2px; transition: background 150ms ease; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover { background: var(--cc-wash); }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cc-muted); }
+.cc-side-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: var(--cc-primary); padding: 2px 2px 6px; }
 .st-key-nav, .st-key-nav_more { gap: 0px !important; }
-.st-key-nav_more { border-top: 1px solid #B8B8B0; padding-top: 12px; margin-top: 6px; }
-.st-key-side_bottom { border-top: 1px solid #B8B8B0; padding-top: 14px; margin-top: 8px; }
-[data-testid="stSidebar"] [data-baseweb="select"] > div { background: #FFFFFF; border: 1px solid #B8B8B0; border-radius: 8px; }
+.st-key-nav_more { border-top: 1px solid var(--cc-line); padding-top: 14px; margin-top: 8px; }
+.st-key-side_bottom { border-top: 1px solid var(--cc-line); padding-top: 16px; margin-top: 8px; }
+.cc-vault { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin: 10px 0 8px; border: 1px solid; border-radius: var(--cc-r);
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.4; }
+.cc-vault.on { color: var(--cc-pos); border-color: var(--cc-pos-line); background: var(--cc-pos-wash); }
+.cc-vault.off { color: var(--cc-neg); border-color: var(--cc-neg-line); background: var(--cc-neg-wash); }
+.cc-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* widget labels read like the design's small caps */
+.stApp [data-testid="stWidgetLabel"] p { font-size: 0.64rem !important; font-weight: 700 !important; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--cc-soft); }
 
 /* inputs */
-.stMain [data-baseweb="input"], .stMain [data-baseweb="base-input"],
-.stMain [data-baseweb="select"] > div, div[role="dialog"] [data-baseweb="input"],
-div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important; border: 1px solid #B8B8B0 !important; border-radius: 8px !important; }
+.stApp [data-baseweb="input"], .stApp [data-baseweb="base-input"], .stApp [data-baseweb="select"] > div,
+.stApp [data-baseweb="textarea"], div[role="dialog"] [data-baseweb="input"], div[role="dialog"] [data-baseweb="base-input"] {
+  background: #FFFFFF !important; border: 1px solid var(--cc-line-2) !important; border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(17,24,39,0.04); }
+.stApp [data-baseweb="input"] [data-baseweb="base-input"] { border: 0 !important; }
+.stApp [data-baseweb="input"]:focus-within, .stApp [data-baseweb="select"] > div:focus-within { border-color: var(--cc-ink) !important;
+  box-shadow: 0 0 0 3px rgba(17,24,39,0.06); }
+.stApp input::placeholder, .stApp textarea::placeholder { color: var(--cc-faint); }
 
-/* buttons */
-.stButton > button, .stFormSubmitButton > button { min-height: 44px; border-radius: 8px; font-weight: 500; padding: 0 18px; transition: all 150ms ease; }
-.stButton > button p, .stFormSubmitButton > button p { font-weight: 500; white-space: nowrap; }
-.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"] { border: 1px solid #B8B8B0; color: #17191C; }
-.stLinkButton > a { min-height: 44px; border-radius: 8px; border: 1px solid #B8B8B0; color: #17191C; display: inline-flex; align-items: center; padding: 0 14px; }
-.stLinkButton > a p { font-weight: 500; font-size: 0.88rem; white-space: nowrap; }
+/* buttons: softly rounded, uppercase, tracked, with a light shadow */
+.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
+  min-height: 46px; border-radius: var(--cc-r); padding: 6px 22px; box-shadow: var(--cc-btn); transition: all 150ms ease; }
+.stButton > button:hover, .stFormSubmitButton > button:hover, .stDownloadButton > button:hover { transform: translateY(-1px); }
+.stButton > button:active, .stFormSubmitButton > button:active, .stDownloadButton > button:active { transform: translateY(0); }
+.stButton > button p, .stFormSubmitButton > button p, .stDownloadButton > button p {
+  font-size: 0.68rem !important; font-weight: 700 !important; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.5; }
+.stButton > button p, .stFormSubmitButton > button p { white-space: nowrap; }
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"], .stDownloadButton > button[kind="primary"] {
+  background: var(--cc-primary); border: 1px solid var(--cc-primary); color: #FFFFFF; box-shadow: var(--cc-btn-red); }
+.stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover { background: var(--cc-primary-hover); border-color: var(--cc-primary-hover); }
+.stButton > button[kind="secondary"], .stFormSubmitButton > button[kind="secondary"], .stDownloadButton > button[kind="secondary"] {
+  background: #FFFFFF; border: 1px solid var(--cc-ink); color: var(--cc-ink); }
+.stButton > button[kind="secondary"]:hover, .stDownloadButton > button[kind="secondary"]:hover { background: var(--cc-wash); color: var(--cc-ink); border-color: var(--cc-ink); }
+.stLinkButton > a { min-height: 46px; border-radius: var(--cc-r); box-shadow: var(--cc-btn); border: 1px solid var(--cc-ink); color: var(--cc-ink); display: inline-flex; align-items: center; padding: 0 18px; }
+.stLinkButton > a p { font-weight: 700; font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; }
+/* "go to page" links: underlined caps, red arrow */
 [class*="st-key-go_"] .stButton { display: flex; justify-content: flex-end; }
 [class*="st-key-go_"] button { background: transparent !important; border: 0 !important; box-shadow: none !important;
-  min-height: 44px; padding: 0 12px; color: #24509A !important; white-space: nowrap; }
-[class*="st-key-go_"] button p { color: #24509A !important; font-weight: 600; white-space: nowrap; }
-[class*="st-key-go_"] button:hover { background: #EDF1F8 !important; border-radius: 6px; }
+  min-height: 44px; padding: 0 2px !important; white-space: nowrap; }
+[class*="st-key-go_"] button p { color: var(--cc-ink) !important; border-bottom: 1px solid var(--cc-ink); padding-bottom: 3px; }
+[class*="st-key-go_"] button [data-testid="stIconMaterial"] { color: var(--cc-primary); }
+[class*="st-key-go_"] button:hover p { color: var(--cc-primary) !important; border-color: var(--cc-primary); }
+
+/* segmented controls and pills: softly rounded chips */
+.stApp [data-testid^="stBaseButton-segmented_control"], .stApp [data-testid^="stBaseButton-pills"] {
+  border-radius: var(--cc-r) !important; border: 1px solid var(--cc-line-2) !important; background: #FFFFFF !important; min-height: 40px;
+  box-shadow: var(--cc-btn); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.stApp [data-testid^="stBaseButton-pills"]:hover { border-color: var(--cc-ink) !important; box-shadow: var(--cc-lift); }
+/* a segmented control is one joined strip: round only its outer corners */
+.stApp [data-testid^="stBaseButton-segmented_control"]:not(:first-child):not(:last-child) { border-radius: 0 !important; }
+.stApp [data-testid^="stBaseButton-segmented_control"]:first-child:not(:last-child) { border-radius: var(--cc-r) 0 0 var(--cc-r) !important; }
+.stApp [data-testid^="stBaseButton-segmented_control"]:last-child:not(:first-child) { border-radius: 0 var(--cc-r) var(--cc-r) 0 !important; }
+.stApp [data-testid^="stBaseButton-segmented_control"] p, .stApp [data-testid^="stBaseButton-pills"] p {
+  font-size: 0.66rem !important; font-weight: 700 !important; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cc-ink); }
+.stApp [data-testid="stBaseButton-segmented_controlActive"], .stApp [data-testid="stBaseButton-pillsActive"] {
+  background: var(--cc-ink) !important; border-color: var(--cc-ink) !important; }
+.stApp [data-testid="stBaseButton-segmented_controlActive"] p, .stApp [data-testid="stBaseButton-pillsActive"] p { color: #FFFFFF !important; }
+/* question pills are whole sentences: keep them in sentence case so they stay easy to read */
+.stApp [data-testid^="stBaseButton-pills"] p { font-size: 0.84rem !important; font-weight: 500 !important; letter-spacing: 0; text-transform: none; }
 
 /* the "Ask about your cash" field in each page header */
-.st-key-askfield [data-testid="stPageLink-NavLink"] { min-height: 44px; padding: 0 14px; border: 1px solid #B8B8B0;
-  border-radius: 8px; background: #FFFFFF; transition: border-color 150ms ease; }
-.st-key-askfield [data-testid="stPageLink-NavLink"]:hover { border-color: #24509A; background: #FFFFFF; }
-.st-key-askfield [data-testid="stPageLink-NavLink"] p, .st-key-askfield [data-testid="stPageLink-NavLink"] span { color: #646A72; }
+.st-key-askfield [data-testid="stPageLink-NavLink"] { min-height: 48px; padding: 0 16px; border: 1px solid var(--cc-line-2);
+  border-radius: 14px; background: #FFFFFF; box-shadow: var(--cc-lift); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.st-key-askfield [data-testid="stPageLink-NavLink"]:hover { border-color: var(--cc-ink); background: #FFFFFF; }
+.st-key-askfield [data-testid="stPageLink-NavLink"] p, .st-key-askfield [data-testid="stPageLink-NavLink"] span { color: var(--cc-faint); font-size: 0.86rem; }
+
+/* Ask Copilot: the typed-question card */
+.st-key-ask_box { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 24px; padding: 22px 24px 8px; box-shadow: var(--cc-float);
+  gap: 10px !important; margin-bottom: 18px; }
+.cc-ask-head { display: flex; align-items: center; gap: 10px; font-family: var(--cc-serif) !important; font-size: 1.15rem; font-weight: 700; color: var(--cc-ink); }
+.cc-ask-head span { font-family: var(--cc-serif) !important; }
+.st-key-ask_box .cc-note { margin: 6px 0 18px; }
+.st-key-ask_box [data-baseweb="input"] { min-height: 50px; border-radius: var(--cc-r) !important; background: var(--cc-wash) !important; }
+.st-key-ask_box [data-baseweb="input"] input { font-size: 0.98rem; }
+.st-key-ask_box .stFormSubmitButton > button { min-height: 52px; }
 
 /* row lists */
-[class*="st-key-row_"], [class*="st-key-krow_"], [class*="st-key-crow_"] { border-bottom: 1px solid #B8B8B0; padding: 8px 0; gap: 0; }
-.st-key-rows, .st-key-krows, .st-key-crows { border-top: 1px solid #B8B8B0; gap: 0 !important; }
+[class*="st-key-row_"], [class*="st-key-krow_"], [class*="st-key-crow_"] { border-bottom: 1px solid var(--cc-line); padding: 14px 0; gap: 0; }
+.st-key-rows { gap: 0 !important; }
+.st-key-krows, .st-key-crows { gap: 14px !important; }
+/* overview action rows: each one is its own white card */
+[class*="st-key-row_"] { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 20px; padding: 18px 24px;
+  box-shadow: var(--cc-lift); transition: box-shadow 0.25s ease; }
+[class*="st-key-row_"]:hover { box-shadow: var(--cc-float); }
+[class*="st-key-row_"] > * { width: 100% !important; max-width: 100%; }
+/* markdown blocks carry a -1rem bottom margin; in the top bar it pushed the brand and name below centre */
+.st-key-topbar [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 
-/* panels */
-.st-key-cc_panel { background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 10px; padding: 20px; }
-[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 10px; border-color: #B8B8B0 !important; }
-[data-testid="stExpander"] details { border: 1px solid #B8B8B0; border-radius: 8px; }
-[data-testid="stExpander"] summary p { font-weight: 500; }
-[data-testid="stAlert"] { border-radius: 10px; }
+/* surfaces: every card is white, rounded and lifted off the grey canvas */
+.st-key-cc_panel { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 24px; padding: 28px; box-shadow: var(--cc-float); }
+/* Streamlit gives children of a keyed container its outer width in px; inside these padded cards, fit them to the inner width */
+.st-key-cc_panel > *, .st-key-ask_box > * { width: 100% !important; max-width: 100%; }
+.st-key-cc_panel [data-testid="stExpander"] details { box-shadow: none; background: var(--cc-wash); border-radius: 16px; }
+/* st.container(border=True). Streamlit 1.40 gives only bordered wrappers a non-empty style class */
+[data-testid="stVerticalBlockBorderWrapper"] { border-radius: 24px; border-color: var(--cc-edge) !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) { background: #FFFFFF; box-shadow: var(--cc-float); padding: 22px 24px; }
+[data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) [data-testid="stExpander"] details { box-shadow: none; background: var(--cc-wash); }
+[data-testid="stExpander"] details { border: 1px solid var(--cc-edge) !important; border-radius: 24px; background: #FFFFFF; box-shadow: var(--cc-lift); overflow: hidden; }
+[data-testid="stExpander"] summary { padding: 16px 22px; }
+[data-testid="stExpander"] summary:hover { color: var(--cc-ink); }
+[data-testid="stExpander"] summary p { font-family: var(--cc-serif) !important; font-weight: 700; font-size: 1.02rem; color: var(--cc-ink); }
+[data-testid="stExpander"] details[open] > summary { border-bottom: 1px solid var(--cc-line); }
+[data-testid="stExpanderDetails"] { padding: 18px 22px 22px !important; }
+[data-testid="stAlert"] { border-radius: 16px; }
+[data-testid="stDataFrame"] { border: 1px solid var(--cc-edge); border-radius: 16px; overflow: hidden; background: #FFFFFF; box-shadow: var(--cc-lift); }
+div[role="dialog"] { border-radius: 24px !important; }
+div[role="dialog"] h2, div[role="dialog"] [data-testid="stDialogHeader"] div { font-family: var(--cc-serif) !important; }
+
+/* page header */
+.cc-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; color: var(--cc-primary); }
+.cc-title { font-family: var(--cc-serif) !important; font-size: clamp(2rem, 4vw, 2.9rem); font-weight: 700; letter-spacing: -0.02em;
+  line-height: 1.1; color: var(--cc-ink); margin-top: 12px; }
+.cc-sub { font-size: 0.98rem; color: var(--cc-soft); margin-top: 12px; max-width: 640px; line-height: 1.6; }
+.cc-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.cc-rule { border-top: 1px solid var(--cc-line-2); margin: 24px 0 28px; }
 
 /* page parts (rendered with st.markdown) */
-.cc-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 2px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
-.cc-title { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: #17191C; }
-.cc-sub { font-size: 0.85rem; color: #545A63; margin-top: 2px; }
-.cc-rule { border-top: 1px solid #B8B8B0; margin: 6px 0 10px; }
-.cc-h2 { font-size: 1rem; font-weight: 600; color: #17191C; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.cc-label { font-size: 0.875rem; font-weight: 500; color: #545A63; }
-.cc-hero { font-size: clamp(2.1rem, 4.5vw, 2.75rem); font-weight: 600; letter-spacing: -0.025em; line-height: 1.1;
-  font-variant-numeric: tabular-nums; margin: 6px 0; color: #17191C; }
-.cc-muted { font-size: 0.82rem; color: #545A63; }
-.cc-note { font-size: 0.76rem; color: #646A72; }
+.cc-h2 { font-family: var(--cc-serif) !important; font-size: 1.32rem; font-weight: 700; letter-spacing: -0.01em; color: var(--cc-ink);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cc-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cc-soft); }
+.stApp .cc-hero { font-family: var(--cc-mono) !important; font-size: clamp(2rem, 4.5vw, 2.6rem); font-weight: 700; letter-spacing: -0.04em;
+  line-height: 1.1; font-variant-numeric: tabular-nums; margin: 8px 0; color: var(--cc-ink); }
+.cc-muted { font-size: 0.84rem; color: var(--cc-soft); line-height: 1.55; }
+.cc-note { font-size: 0.74rem; color: var(--cc-soft); line-height: 1.5; }
 .cc-num { font-variant-numeric: tabular-nums; }
-.cc-tiles {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(160px, 1fr));
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory;
-}
+
+.cc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; padding: 8px 2px 16px; }
 @media (max-width: 900px) {
-  .cc-tiles {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-  }
-  .cc-tile {
-    min-width: 190px;
-    flex-shrink: 0;
-    scroll-snap-align: start;
-  }
+  .cc-tiles { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+  .cc-tile { min-width: 200px; flex-shrink: 0; scroll-snap-align: start; }
 }
-.cc-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #FFFFFF; border: 1px solid #B8B8B0; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 150ms ease; }
-.cc-tile:hover { border-color: #24509A; box-shadow: 0 4px 12px rgba(36, 80, 154, 0.08); }
-.cc-tile .l { font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: #545A63; }
-.cc-tile .v { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #0F172A; }
-.cc-tile .s { font-size: 0.76rem; color: #646A72; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.cc-tile.big .v { font-size: 1.4rem; }
-.cc-tile.accent { background: #F8FAFC; border-color: #CBD5E1; }
-.cc-tile.accent .l { color: #24509A; font-weight: 600; }
-.cc-tile.accent .v { color: #1C407D; }
-.cc-tile.accent .s { color: #2F4F86; }
-.cc-tile.pos { background: #F0FDF4; border-color: #BBF7D0; }
-.cc-tile.pos .l, .cc-tile.pos .v, .cc-tile.pos .s { color: #166534; }
-.cc-tile.warn { background: #FFFBEB; border-color: #FDE68A; }
-.cc-tile.warn .l, .cc-tile.warn .v, .cc-tile.warn .s { color: #92400E; }
-.cc-tile.neg { background: #FEF2F2; border-color: #FECACA; }
-.cc-tile.neg .l, .cc-tile.neg .v, .cc-tile.neg .s { color: #B91C1C; }
-.cc-demo { font-size: 0.75rem; font-weight: 600; color: #545A63; border: 1px solid #B8B8B0; border-radius: 4px; padding: 1px 6px; line-height: 1.5; letter-spacing: 0.02em; }
-.cc-tag { display: inline-block; font-size: 0.78rem; font-weight: 500; border-radius: 6px; padding: 2px 8px; line-height: 1.5; white-space: nowrap; }
-.cc-tag.pos { color: #1A6E45; background: #EAF4EE; }
-.cc-tag.warn { color: #8A5300; background: #FBF1DF; }
-.cc-tag.info { color: #24509A; background: #EDF1F8; }
-.cc-tag.neutral { color: #545A63; background: #F1F1EC; }
-.cc-tag.neg { color: #A8261D; background: #FBECEA; }
-.cc-status { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; }
-.cc-status .t { font-weight: 600; font-size: 0.9rem; }
+.cc-tile { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 24px 26px; background: #FFFFFF;
+  border: 1px solid var(--cc-edge); border-radius: 24px; box-shadow: var(--cc-float); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.cc-tile:hover { transform: translateY(-4px); box-shadow: var(--cc-float-hover); }
+.cc-tile .l { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cc-soft); line-height: 1.5; }
+.stApp .cc-tile .v { font-family: var(--cc-mono) !important; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.04em; color: var(--cc-ink);
+  font-variant-numeric: tabular-nums; margin-top: 10px; line-height: 1.15; }
+.cc-tile .s { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cc-soft);
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 12px; line-height: 1.5; }
+.stApp .cc-tile.big .v { font-size: 1.85rem; }
+.cc-tile.accent, .cc-tile.dark { background: var(--cc-ink); border-color: var(--cc-ink); }
+.cc-tile.accent .l, .cc-tile.dark .l { color: #9CA3AF; }
+.stApp .cc-tile.accent .v, .stApp .cc-tile.dark .v { color: #FFFFFF !important; }
+.cc-tile.accent .s, .cc-tile.dark .s { color: var(--cc-primary); }
+.cc-tile.pos .l::before, .cc-tile.warn .l::before, .cc-tile.neg .l::before, .cc-tile.info .l::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.cc-tile.pos .l::before { background: var(--cc-pos); }
+.cc-tile.warn .l::before { background: #F59E0B; }
+.cc-tile.neg .l::before { background: var(--cc-neg); }
+.cc-tile.info .l::before { background: var(--cc-ink); }
+.stApp .cc-tile.pos .v { color: var(--cc-pos); }
+.stApp .cc-tile.warn .v { color: var(--cc-warn); }
+.stApp .cc-tile.neg .v { color: var(--cc-neg); }
+.cc-demo { display: inline-flex; align-items: center; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--cc-soft); border: 1px solid var(--cc-line-2); border-radius: 4px; padding: 1px 6px; line-height: 1.5; background: #FFFFFF; }
+
+/* tags and badges: lightly rounded, tracked caps */
+.cc-tag, .cc-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; border: 1px solid var(--cc-line-2); border-radius: var(--cc-r-sm); padding: 4px 10px; line-height: 1.45;
+  white-space: nowrap; color: var(--cc-ink); background: #FFFFFF; }
+.cc-tag.pos, .cc-badge.pos { color: var(--cc-pos); border-color: var(--cc-pos-line); background: #FFFFFF; }
+.cc-tag.warn, .cc-badge.warn { color: var(--cc-warn); border-color: var(--cc-warn-line); background: #FFFFFF; }
+.cc-tag.neg, .cc-badge.neg { color: var(--cc-neg); border-color: var(--cc-neg-line); background: #FFFFFF; }
+.cc-tag.info, .cc-badge.info { color: var(--cc-ink); border-color: var(--cc-ink); background: #FFFFFF; }
+.cc-tag.neutral, .cc-badge.neutral { color: var(--cc-muted); border-color: var(--cc-line-2); background: #FFFFFF; }
+.cc-status { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px; }
+.cc-status .t { font-weight: 700; font-size: 0.9rem; }
 .cc-status .d { font-size: 0.76rem; }
-.cc-status.pos { background: #EAF4EE; color: #1A6E45; }
-.cc-status.warn { background: #FBF1DF; color: #7A4A00; }
-.cc-status.neg { background: #FBECEA; color: #A8261D; }
-.cc-callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 10px; }
-.cc-callout .t { font-weight: 600; }
+.cc-status.pos { background: var(--cc-pos-wash); color: var(--cc-pos); }
+.cc-status.warn { background: var(--cc-warn-wash); color: #7A4A00; }
+.cc-status.neg { background: var(--cc-neg-wash); color: var(--cc-neg); }
+.cc-callout { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 16px; }
+.cc-callout .t { font-weight: 700; }
 .cc-callout .d { font-size: 0.85rem; }
-.cc-callout.pos { background: #EAF4EE; color: #1A6E45; }
-.cc-callout.pos .d { color: #24543B; }
-.cc-callout.warn { background: #FBF1DF; color: #4A3200; }
-.cc-callout.neutral { background: #F4F4F1; color: #3F444B; }
-.cc-row-title { font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: #17191C; }
-.cc-row-detail { font-size: 0.82rem; color: #545A63; }
-.cc-amount { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
-.cc-colhead { display: grid; gap: 16px; font-size: 0.75rem; color: #646A72; padding: 4px 0; }
-.cc-dl { display: flex; flex-direction: column; border-top: 1px solid #ECECE8; margin: 0; }
-.cc-dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0;
-  border-bottom: 1px solid #ECECE8; }
-.stApp .cc-dl dt { color: #545A63; font-weight: 400; margin: 0; padding: 0; }
-.stApp .cc-dl dd { margin: 0; padding: 0; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.cc-callout.pos { background: var(--cc-pos-wash); color: var(--cc-pos); }
+.cc-callout.pos .d { color: #065F46; }
+.cc-callout.warn { background: var(--cc-warn-wash); color: #4A3200; }
+.cc-callout.neutral { background: var(--cc-wash); color: var(--cc-muted); }
+.cc-row-title { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--cc-ink); }
+.cc-row-detail { font-size: 0.82rem; color: var(--cc-soft); margin-top: 2px; }
+.stApp .cc-amount { font-family: var(--cc-mono) !important; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.cc-colhead { display: grid; gap: 16px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cc-soft); padding: 4px 0; }
+.cc-dl { display: flex; flex-direction: column; border-top: 1px solid var(--cc-line); margin: 0; }
+.cc-dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--cc-line); }
+.stApp .cc-dl dt { color: var(--cc-soft); font-weight: 400; margin: 0; padding: 0; }
+.stApp .cc-dl dd { margin: 0; padding: 0; font-family: var(--cc-mono) !important; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--cc-ink); }
 .cc-figs { display: flex; flex-wrap: wrap; gap: 16px 48px; margin: 0; }
-.stApp .cc-figs dt { font-size: 0.82rem; color: #545A63; font-weight: 400; margin: 0; padding: 0; }
-.stApp .cc-figs dd { margin: 0; padding: 0; font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums; }
+.stApp .cc-figs dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cc-soft); margin: 0; padding: 0; }
+.stApp .cc-figs dd { margin: 0; padding: 0; font-family: var(--cc-mono) !important; font-size: 1.7rem; font-weight: 700; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .cc-scroll { overflow-x: auto; }
-.cc-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
-.cc-table th { font-size: 0.75rem; font-weight: 500; color: #646A72; text-align: right; padding: 8px 10px;
-  border-bottom: 1px solid #E2E2DC; white-space: nowrap; }
-.cc-table td { text-align: right; padding: 12px 10px; border-bottom: 1px solid #ECECE8; vertical-align: top; }
+.cc-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.86rem; }
+.cc-table th { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cc-soft); text-align: right;
+  padding: 14px 10px; border-bottom: 1px solid var(--cc-line); white-space: nowrap; }
+.cc-table td { text-align: right; padding: 18px 10px; border-bottom: 1px solid var(--cc-line); vertical-align: top; color: var(--cc-ink); }
+.stApp .cc-table td:not(:first-child) { font-family: var(--cc-mono) !important; font-size: 0.82rem; font-weight: 500; }
 .stApp .cc-table th, .stApp .cc-table td { border-left: 0; border-right: 0; border-top: 0; background: transparent; }
 .stApp .cc-table tr { border: 0; background: transparent; }
+.stApp .cc-table tbody tr:hover td { background: #FAFAFB; }
 .cc-table th:first-child, .cc-table td:first-child { text-align: left; padding-left: 0; }
-.cc-table td:first-child { font-weight: 500; white-space: nowrap; }
-.cc-table tr.hl td { background: #F7F7F4; }
-.cc-table tr.hl td:first-child { padding-left: 8px; }
-.cc-table .range { display: block; font-size: 0.75rem; color: #646A72; }
-.cc-table .up { color: #1A6E45; }
-.cc-table .down { color: #A8261D; }
-.cc-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
-.cc-narr { padding: 10px 12px; background: #F7F7F4; border-radius: 8px; font-size: 0.78rem; line-height: 1.6;
-  color: #3F444B; overflow-wrap: anywhere; }
-.cc-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.76rem; color: #545A63; }
-.cc-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.cc-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
-.cc-steps .bar { height: 3px; border-radius: 2px; background: #E2E2DC; margin-bottom: 8px; }
-.cc-steps .on .bar { background: #24509A; }
-.cc-steps .n { font-size: 0.75rem; color: #646A72; }
-.cc-steps .lbl { font-size: 0.82rem; color: #545A63; }
-.cc-steps .cur .lbl { font-weight: 600; color: #17191C; }
-.cc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; color: #3F444B; }
-.stApp .cc-list li { display: flex; gap: 10px; margin: 0; padding: 0; font-size: 0.9rem; line-height: 1.5; }
+.cc-table td:first-child { font-weight: 700; white-space: nowrap; }
+.stApp .cc-table tr.hl td { background: var(--cc-primary-wash); }
+.cc-table tr.hl td:first-child { padding-left: 10px; box-shadow: inset 3px 0 0 var(--cc-primary); }
+.cc-table .range { display: block; font-size: 0.7rem; color: var(--cc-faint); margin-top: 2px; }
+.cc-table .up { color: var(--cc-pos); }
+.cc-table .down { color: var(--cc-neg); }
+.cc-mono { font-family: var(--cc-mono) !important; }
+.cc-narr { padding: 12px 14px; background: var(--cc-wash); border-radius: 12px; font-size: 0.76rem; line-height: 1.6;
+  color: var(--cc-muted); overflow-wrap: anywhere; }
+.cc-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cc-soft); }
+.cc-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.cc-legend i { display: inline-block; }
+.cc-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.cc-steps .bar { height: 3px; background: var(--cc-line); margin-bottom: 10px; }
+.cc-steps .on .bar { background: var(--cc-primary); }
+.cc-steps .n { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cc-soft); }
+.cc-steps .lbl { font-size: 0.84rem; color: var(--cc-soft); margin-top: 2px; }
+.cc-steps .cur .lbl { font-weight: 700; color: var(--cc-ink); }
+.cc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; color: var(--cc-muted); }
+.stApp .cc-list li { display: flex; gap: 10px; margin: 0; padding: 0; font-size: 0.9rem; line-height: 1.55; }
 .stApp .cc-list.sm li { font-size: 0.84rem; }
 .cc-list svg { flex: none; margin-top: 2px; }
-.cc-side-note { display: flex; gap: 8px; align-items: flex-start; padding: 0 8px; font-size: 0.75rem; line-height: 1.45; color: #646A72; }
-.cc-lock { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #F4F4F1; }
-.cc-onboard { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: #F4F6FB; border: 1px solid #D9E2F2; border-radius: 8px; font-size: 0.85rem; color: #17191C; margin-bottom: 12px; }
-.cc-cockpit-hero {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(255, 255, 255, 0.98) 100%);
-  border: 1.5px solid #10B981;
-  border-radius: 16px;
-  padding: 22px 24px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-  margin-bottom: 16px;
-}
-.cc-cockpit-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #059669;
-}
-.cc-badge-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-.cc-payroll-banner {
-  margin-top: 14px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #F0FDF4;
-  border: 1px solid #BBF7D0;
-  font-size: 0.86rem;
-  color: #166534;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cc-wa-btn {
-  background: #16A34A;
-  color: white !important;
-  text-decoration: none !important;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 150ms ease;
-}
-.cc-wa-btn:hover {
-  background: #15803D;
-  color: white !important;
-}
-.cc-fanchart-card {
-  background: #FFFFFF;
-  border: 1px solid #B8B8B0;
-  border-radius: 14px;
-  padding: 18px 20px;
-  margin-top: 18px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-}
-.cc-card-modern {
-  background: #FFFFFF;
-  border: 1px solid #B8B8B0;
-  border-radius: 14px;
-  padding: 20px 22px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  margin-bottom: 16px;
-  transition: all 150ms ease;
-}
-.cc-card-modern:hover {
-  border-color: #94A3B8;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-.cc-action-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #FFFFFF;
-  border: 1px solid #B8B8B0;
-  border-radius: 10px;
-  margin-bottom: 8px;
-  gap: 12px;
-  transition: all 150ms ease;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-.cc-action-card:hover {
-  background: #F8FAFC;
-  border-color: #24509A;
-  box-shadow: 0 2px 8px rgba(36, 80, 154, 0.06);
-}
-.cc-top-banner {
-  background: #FFFFFF;
-  border: 1px solid #B8B8B0;
-  border-radius: 14px;
-  padding: 12px 18px;
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-}
-.cc-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.cc-badge.warn { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
-.cc-badge.pos { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
-.cc-badge.info { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
-.cc-badge.neutral { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
-.cc-grid-4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 12px 0;
-}
-@media (max-width: 900px) {
-  .cc-grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+.cc-side-note { display: flex; gap: 8px; align-items: flex-start; padding: 0 4px; font-size: 0.72rem; line-height: 1.5; color: var(--cc-soft); }
+.cc-lock { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--cc-wash); }
+.cc-onboard { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #FFFFFF;
+  border: 1px solid var(--cc-line); border-radius: 16px; box-shadow: var(--cc-lift); font-size: 0.84rem; color: var(--cc-muted); margin-bottom: 14px; }
+.cc-onboard b { color: var(--cc-ink); }
 
-/* ── INTUITIVE MOUSE HOVER INFO & TOOLTIPS (DESKTOP CHROME / SAFARI) ── */
-[data-tip] {
-  position: relative;
-  cursor: help;
-}
+/* overview hero: one big floating card */
+.cc-cockpit-hero { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 32px; padding: 34px 40px 30px;
+  box-shadow: var(--cc-float); margin-bottom: 28px; }
+.cc-cockpit-tag { display: inline-flex; align-items: center; gap: 8px; font-size: 0.66rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3em; color: var(--cc-primary); }
+.cc-badge-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--cc-r-sm); font-size: 0.6rem;
+  font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; background: #FFFFFF; color: var(--cc-pos); border: 1px solid var(--cc-pos-line); }
+.cc-payroll-banner { margin-top: 22px; padding: 14px 18px; border-radius: 16px; background: var(--cc-pos-wash); border: 1px solid #D1FAE5;
+  font-size: 0.86rem; color: #065F46; display: flex; align-items: center; gap: 10px; }
+.cc-wa-btn { background: var(--cc-ink); color: #FFFFFF !important; text-decoration: none !important; border-radius: var(--cc-r); padding: 11px 18px;
+  box-shadow: 0 1px 2px rgba(17,24,39,0.20), 0 6px 14px -6px rgba(17,24,39,0.45);
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; display: inline-flex; align-items: center;
+  gap: 8px; white-space: nowrap; transition: background 150ms ease; }
+.cc-wa-btn:hover { background: #000000; color: #FFFFFF !important; }
+.cc-fanchart-card, .cc-card-modern { background: #FFFFFF; border: 1px solid var(--cc-edge); border-radius: 32px; padding: 30px 34px;
+  box-shadow: var(--cc-float); margin-bottom: 24px; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.cc-fanchart-card { margin-top: 18px; }
+.cc-card-modern:hover { transform: translateY(-2px); box-shadow: var(--cc-float-hover); }
+.cc-card-modern[style*="border-left"], .cc-action-card[style*="border-left"] { border-radius: 20px; }
+.cc-action-card { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 18px 24px; background: #FFFFFF;
+  border: 1px solid var(--cc-line); border-radius: 20px; margin-bottom: 12px; gap: 16px; box-shadow: var(--cc-lift);
+  transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.cc-action-card:hover { transform: translateY(-2px); box-shadow: var(--cc-float); }
+.cc-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 12px 0; }
+@media (max-width: 900px) { .cc-grid-4 { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
+@media (max-width: 520px) { .cc-grid-4 { grid-template-columns: 1fr; } .cc-cockpit-hero, .cc-card-modern { padding: 24px 22px; border-radius: 24px; } }
+
+/* ── HOVER INFO TOOLTIPS ── */
+[data-tip] { position: relative; cursor: help; }
 [data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  background: #0F172A;
-  color: #F8FAFC;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 0.76rem;
-  font-weight: 500;
-  line-height: 1.4;
-  white-space: normal;
-  width: max-content;
-  max-width: 280px;
-  text-align: left;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35), 0 4px 6px -2px rgba(15, 23, 42, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
-  z-index: 99999;
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px);
+  background: #111827; color: #F9FAFB; padding: 9px 12px; border-radius: 10px; font-size: 0.74rem; font-weight: 500;
+  letter-spacing: 0; text-transform: none; line-height: 1.45; white-space: normal; width: max-content; max-width: 280px; text-align: left;
+  box-shadow: 0 10px 25px -5px rgba(17, 24, 39, 0.35), 0 4px 6px -2px rgba(17, 24, 39, 0.1);
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease, visibility 140ms; z-index: 99999;
 }
 [data-tip]::before {
-  content: "";
-  position: absolute;
-  bottom: calc(100% + 2px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  border-width: 6px 6px 0 6px;
-  border-style: solid;
-  border-color: #0F172A transparent transparent transparent;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
-  z-index: 99999;
+  content: ""; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%) translateY(4px);
+  border-width: 6px 6px 0 6px; border-style: solid; border-color: #111827 transparent transparent transparent;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease, visibility 140ms; z-index: 99999;
 }
-[data-tip]:hover::after,
-[data-tip]:hover::before {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
+[data-tip]:hover::after, [data-tip]:hover::before { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+[data-tip-pos="bottom"]::after { bottom: auto; top: calc(100% + 8px); transform: translateX(-50%) translateY(-4px); }
+[data-tip-pos="bottom"]::before { bottom: auto; top: calc(100% + 2px); border-width: 0 6px 6px 6px;
+  border-color: transparent transparent #111827 transparent; transform: translateX(-50%) translateY(-4px); }
+[data-tip-pos="bottom"]:hover::after, [data-tip-pos="bottom"]:hover::before { transform: translateX(-50%) translateY(0); }
+[data-tip-pos="left"]::after { left: 0; transform: translateY(4px); }
+[data-tip-pos="left"]::before { left: 16px; transform: translateY(4px); }
+[data-tip-pos="left"]:hover::after, [data-tip-pos="left"]:hover::before { transform: translateY(0); }
+[data-tip-pos="right"]::after { left: auto; right: 0; transform: translateY(4px); }
+[data-tip-pos="right"]::before { left: auto; right: 16px; transform: translateY(4px); }
+[data-tip-pos="right"]:hover::after, [data-tip-pos="right"]:hover::before { transform: translateY(0); }
+.cc-tile[data-tip]::after { left: 24px; transform: translateY(4px); }
+.cc-tile[data-tip]::before { left: 32px; transform: translateY(4px); }
+.cc-tile[data-tip]:hover::after, .cc-tile[data-tip]:hover::before { transform: translateY(0); }
 
-[data-tip-pos="bottom"]::after {
-  bottom: auto;
-  top: calc(100% + 8px);
-  transform: translateX(-50%) translateY(-4px);
-}
-[data-tip-pos="bottom"]::before {
-  bottom: auto;
-  top: calc(100% + 2px);
-  border-width: 0 6px 6px 6px;
-  border-color: transparent transparent #0F172A transparent;
-  transform: translateX(-50%) translateY(-4px);
-}
-[data-tip-pos="bottom"]:hover::after,
-[data-tip-pos="bottom"]:hover::before {
-  transform: translateX(-50%) translateY(0);
-}
-
-[data-tip-pos="left"]::after {
-  left: 0;
-  transform: translateY(4px);
-}
-[data-tip-pos="left"]::before {
-  left: 16px;
-  transform: translateY(4px);
-}
-[data-tip-pos="left"]:hover::after,
-[data-tip-pos="left"]:hover::before {
-  transform: translateY(0);
-}
-
-[data-tip-pos="right"]::after {
-  left: auto;
-  right: 0;
-  transform: translateY(4px);
-}
-[data-tip-pos="right"]::before {
-  left: auto;
-  right: 16px;
-  transform: translateY(4px);
-}
-[data-tip-pos="right"]:hover::after,
-[data-tip-pos="right"]:hover::before {
-  transform: translateY(0);
-}
-
-.cc-info-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #E2E8F0;
-  color: #475569;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: system-ui, -apple-system, sans-serif;
-  margin-left: 5px;
-  cursor: help;
-  transition: all 120ms ease;
-  vertical-align: middle;
-  line-height: 1;
-}
-.cc-tile:hover .cc-info-dot, .cc-info-dot:hover {
-  background: #2563EB;
-  color: #FFFFFF;
-}
+.cc-info-dot { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%;
+  border: 1px solid var(--cc-line-2); background: #FFFFFF; color: var(--cc-faint); font-size: 9px; font-weight: 700;
+  font-family: var(--cc-sans); margin-left: 6px; cursor: help; transition: all 120ms ease; vertical-align: middle; line-height: 1;
+  letter-spacing: 0; text-transform: none; }
+.cc-tile:hover .cc-info-dot, .cc-info-dot:hover { background: var(--cc-primary); border-color: var(--cc-primary); color: #FFFFFF; }
+.cc-tile.accent .cc-info-dot { background: transparent; border-color: #374151; color: #9CA3AF; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -515,6 +460,14 @@ def H(markup: str) -> None:
 
 def esc(value) -> str:
     return _html.escape(str(value))
+
+
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]")
+
+
+def no_emoji(text) -> str:
+    """Drop emoji from text the backend writes (answers), so the page shows none."""
+    return re.sub(r"[ \t]{2,}", " ", _EMOJI.sub("", str(text)))
 
 
 def svg(path: str, size: int = 16, color: str = "currentColor", width: float = 2) -> str:
@@ -530,10 +483,12 @@ ICON_EYE = '<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5
 ICON_NEVER = '<circle cx="12" cy="12" r="8.5"></circle><path d="m6 18 12-12"></path>'
 ICON_BOX_CHECK = '<rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="m8.5 12 2.5 2.5 4.5-5"></path>'
 ICON_SHIELD = '<path d="M12 3.5 19.5 6v5.5c0 4.3-3.1 7.6-7.5 9-4.4-1.4-7.5-4.7-7.5-9V6z"></path>'
-LOGO = ('<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6" fill="#17191C"></rect>'
-        '<rect x="6" y="7.5" width="12" height="2.2" rx="1.1" fill="#FFFFFF"></rect>'
-        '<rect x="6" y="11" width="12" height="2.2" rx="1.1" fill="#FFFFFF" opacity="0.55"></rect>'
-        '<rect x="6" y="14.5" width="7" height="2.2" rx="1.1" fill="#FFFFFF"></rect></svg>')
+ICON_CHAT = '<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l.9-4.4A8 8 0 1 1 20 12z"></path><path d="M8.5 10.5h7"></path><path d="M8.5 13.5h4.5"></path>'
+# Brand mark: a landmark (bank) glyph on a near-black rounded square, as in the Floating Edition header.
+LOGO = ('<svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="12" fill="#111827"></rect>'
+        '<g transform="translate(8 8) scale(0.8333)" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M3 22h18"></path><path d="M6 18v-7"></path><path d="M10 18v-7"></path><path d="M14 18v-7"></path>'
+        '<path d="M18 18v-7"></path><path d="m12 2 8 5H4z"></path></g></svg>')
 
 
 def tag(text: str, tone: str = "neutral") -> str:
@@ -703,50 +658,56 @@ def go(label: str, key: str, page, ask: str | None = None) -> None:
         st.switch_page(page)
 
 
+def biz_type_label() -> str:
+    return "FMCG Wholesale · Pune" if biz == "SME-1" else ("Dental Clinic · Bengaluru" if biz == "SME-2" else "Design Agency · Mumbai")
+
+
+def role_label_text() -> str:
+    if is_owner:
+        return t("Owner (मालिक)", "मालिक")
+    if is_counter_staff:
+        return t("Counter Staff (स्टाफ)", "काउंटर स्टाफ")
+    return t("Accountant / CA (मुनीम)", "मुनीम / एकाउंटेंट")
+
+
+def role_tip_text() -> str:
+    if is_owner:
+        return t("Viewing with full Owner privileges: Bank liquidity, cash drawer, informal khata, and WhatsApp chasers.",
+                 "मालिक दृश्य: बैंक, गल्ला, कच्चा खाता और वसूली")
+    if is_counter_staff:
+        return t("Counter Staff: Access restricted to till balancing and collection slip entries.",
+                 "काउंटर स्टाफ: केवल गल्ला और पर्ची प्रविष्टि")
+    return t("Accountant / CA: Formal bank records only unless cash book is explicitly shared.",
+             "मुनीम/CA: केवल औपचारिक बैंक हिसाब")
+
+
 def page_header(title: str, subtitle: str, right=None) -> None:
-    role_icon = "👑" if is_owner else ("🪙" if is_counter_staff else "🏛️")
-    role_label = t("Owner (मालिक)", "मालिक") if is_owner else (t("Counter Staff (स्टाफ)", "काउंटर स्टाफ") if is_counter_staff else t("Accountant / CA (मुनीम)", "मुनीम / एकाउंटेंट"))
-    biz_type = "FMCG Wholesale · Pune" if biz == "SME-1" else ("Dental Clinic · Bengaluru" if biz == "SME-2" else "Design Agency · Mumbai")
+    """Floating Edition page header: red eyebrow, serif title, muted lede, status chips, ask field on the right."""
+    biz_type = biz_type_label()
     biz_tip = t(f"Business: {BIZ_NAME} ({biz_type}). Live accounting and bank reconciliation dataset.",
                 f"व्यापार: {BIZ_NAME} ({biz_type})")
     date_tip = t(f"Books reconciled as of close of business {config.AS_OF:%d %b %Y}. All financial calculations are tied to this cutoff.",
                  f"{config.AS_OF:%d %b %Y} तक का हिसाब")
     vault_tip = t("100% on-device SQLite vault. Zero remote telemetry or third-party sharing of confidential bank records.",
                   "केवल इस डिवाइस पर सुरक्षित लोकल डेटाबेस")
-    role_tip = (
-        t("Viewing with full Owner privileges: Bank liquidity, cash drawer, informal khata, and WhatsApp chasers.",
-          "मालिक दृश्य: बैंक, गल्ला, कच्चा खाता और वसूली") if is_owner
-        else (t("Counter Staff: Access restricted to till balancing and collection slip entries.",
-                "काउंटर स्टाफ: केवल गल्ला और पर्ची प्रविष्टि") if is_counter_staff
-              else t("Accountant / CA: Formal bank records only unless cash book is explicitly shared.",
-                     "मुनीम/CA: केवल औपचारिक बैंक हिसाब"))
-    )
 
     is_v_unlocked = st.session_state.get("vault_unlocked", False)
     if is_v_unlocked:
-        vault_badge = f'<span class="cc-badge pos" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🟢 🔓 Vault Unlocked · Sovereign Plane Active</span>'
+        vault_badge = (f'<span class="cc-badge pos" data-tip="{esc(vault_tip)}" data-tip-pos="bottom"><span class="cc-dot"></span>'
+                       f'{t("Vault unlocked · Sovereign plane active", "वॉल्ट खुला · सॉवरेन प्लेन सक्रिय")}</span>')
     else:
-        vault_badge = f'<span class="cc-badge warn" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🔴 🔒 Vault Locked</span>'
+        vault_badge = (f'<span class="cc-badge neg" data-tip="{esc(vault_tip)}" data-tip-pos="bottom"><span class="cc-dot"></span>'
+                       f'{t("Vault locked", "वॉल्ट लॉक")}</span>')
+    role_badge = f'<span class="cc-badge info" data-tip="{esc(role_tip_text())}" data-tip-pos="bottom">{esc(role_label_text())}</span>'
+    readonly_badge = f'<span class="cc-badge neutral">{t("Read-only", "केवल पढ़ने हेतु")}</span>'
 
-    H(f"""
-    <div class="cc-top-banner">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="font-size:1.15rem;font-weight:700;color:#0F172A;letter-spacing:-0.01em;" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{esc(BIZ_NAME)}</span>
-        <span class="cc-badge info" data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{biz_type}</span>
-        <span style="font-size:0.78rem;color:#64748B;" data-tip="{esc(date_tip)}" data-tip-pos="bottom">As of {config.AS_OF:%d %b %Y}</span>
-        {vault_badge}
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;" data-tip="{esc(role_tip)}" data-tip-pos="bottom">
-          {role_icon} {role_label}
-        </span>
-      </div>
-    </div>
-    """)
-    left, rgt = st.columns([3, 2], vertical_alignment="center")
+    left, rgt = st.columns([3, 2], vertical_alignment="bottom")
     with left:
-        H(f'<div class="cc-title" role="heading" aria-level="1">{esc(title)}</div>'
-          f'<div class="cc-sub">{esc(subtitle)}</div>')
+        H(f'<div class="cc-eyebrow"><span data-tip="{esc(biz_tip)}" data-tip-pos="bottom">{esc(biz_type)}</span> · '
+          f'<span data-tip="{esc(date_tip)}" data-tip-pos="bottom">{t("As of", "दिनांक")} {config.AS_OF:%d %b %Y}</span></div>'
+          f'<div class="cc-title" role="heading" aria-level="1">{esc(title)}</div>'
+          f'<div class="cc-sub">{esc(subtitle)}</div>'
+          f'<div class="cc-meta">{vault_badge}{role_badge}{readonly_badge}</div>')
     with rgt:
         if right is not None:
             right()
@@ -785,21 +746,23 @@ def render_audio_briefing(text: str) -> None:
     sub_lbl = "30-second audio summary" if not is_hi() else "30 सेकंड का नकद सारांश"
     lang = "hi-IN" if is_hi() else "en-IN"
 
-    svg_volume = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#24509A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>'
+    svg_volume = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4B4B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>'
 
     html_code = f"""
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Devanagari:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
-    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#F4F6FB;border:1px solid #B8B8B0;border-radius:8px;padding:10px 16px;font-family:'IBM Plex Sans','IBM Plex Sans Devanagari',system-ui,sans-serif;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:12px;min-width:240px;">
-        <span style="display:flex;align-items:center;">{svg_volume}</span>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=IBM+Plex+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&display=swap" rel="stylesheet">
+    <style>body{{margin:0;padding:2px 3px 0;}}</style>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#FFFFFF;border:1px solid #F3F4F6;border-radius:20px;padding:12px 14px 12px 18px;font-family:'Inter','IBM Plex Sans Devanagari',system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.03),0 4px 12px rgba(0,0,0,0.05);">
+      <div style="display:flex;align-items:center;gap:14px;min-width:240px;">
+        <span style="display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#FFF1F1;">{svg_volume}</span>
         <div>
-          <div style="font-size:14px;font-weight:600;color:#17191C;line-height:1.2;">{title_lbl}</div>
-          <div style="font-size:12px;color:#545A63;margin-top:2px;">{sub_lbl}</div>
+          <div style="font-family:'Lora','IBM Plex Sans Devanagari',Georgia,serif;font-size:15px;font-weight:700;color:#111827;line-height:1.2;">{title_lbl}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#6B7280;margin-top:4px;">{sub_lbl}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div id="speechWarn" style="display:none;font-size:11px;color:#A8261D;font-weight:500;">Browser speech synthesis unavailable</div>
-        <button id="speakBtn" onclick="togglePlay()" aria-label="Play daily audio briefing" style="background:#24509A;color:white;border:none;min-height:44px;min-width:108px;padding:0 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background 150ms ease;">
+        <button id="speakBtn" onclick="togglePlay()" aria-label="Play daily audio briefing" style="background:#FF4B4B;color:white;border:none;min-height:44px;min-width:112px;padding:0 22px;border-radius:10px;box-shadow:0 1px 2px rgba(255,75,75,0.3),0 8px 18px -6px rgba(255,75,75,0.55);font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background 150ms ease;">
           <span id="btnTxt">{play_lbl}</span>
         </button>
       </div>
@@ -817,7 +780,7 @@ def render_audio_briefing(text: str) -> None:
           window.speechSynthesis.cancel();
           isPlaying = false;
           document.getElementById('btnTxt').innerText = "{play_lbl}";
-          document.getElementById('speakBtn').style.background = "#24509A";
+          document.getElementById('speakBtn').style.background = "#FF4B4B";
         }} else {{
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(text);
@@ -826,12 +789,12 @@ def render_audio_briefing(text: str) -> None:
           u.onend = function() {{
             isPlaying = false;
             document.getElementById('btnTxt').innerText = "{play_lbl}";
-            document.getElementById('speakBtn').style.background = "#24509A";
+            document.getElementById('speakBtn').style.background = "#FF4B4B";
           }};
           u.onerror = function() {{
             isPlaying = false;
             document.getElementById('btnTxt').innerText = "{play_lbl}";
-            document.getElementById('speakBtn').style.background = "#24509A";
+            document.getElementById('speakBtn').style.background = "#FF4B4B";
           }};
           window.speechSynthesis.speak(u);
           isPlaying = true;
@@ -841,7 +804,7 @@ def render_audio_briefing(text: str) -> None:
       }}
     </script>
     """
-    components.html(html_code, height=68)
+    components.html(html_code, height=92)
 
 
 @st.dialog("Daily Recovery Sheet")
@@ -874,42 +837,42 @@ def daily_print_dialog():
     table_rows = ""
     for idx, (_, r) in enumerate(late.iterrows(), 1):
         table_rows += (
-            f'<tr style="border-bottom:1px solid #E5E5DF;">'
+            f'<tr style="border-bottom:1px solid #F3F4F6;">'
             f'<td style="padding:8px 6px;text-align:left;">{idx}</td>'
-            f'<td style="padding:8px 6px;font-weight:600;color:#17191C;">{esc(r["customer_name"])}</td>'
-            f'<td style="padding:8px 6px;text-align:right;font-weight:600;color:#17191C;">{inr(r["outstanding"])}</td>'
+            f'<td style="padding:8px 6px;font-weight:600;color:#111827;">{esc(r["customer_name"])}</td>'
+            f'<td style="padding:8px 6px;text-align:right;font-weight:600;color:#111827;">{inr(r["outstanding"])}</td>'
             f'<td style="padding:8px 6px;text-align:center;color:#8A5300;">{int(r["oldest_days"])}d</td>'
-            f'<td style="padding:8px 6px;text-align:center;"><span style="display:inline-block;width:16px;height:16px;border:1.5px solid #545A63;border-radius:2px;"></span></td>'
-            f'<td style="padding:8px 6px;border-bottom:1px dashed #B8B8B0;width:95px;"></td>'
-            f'<td style="padding:8px 6px;border-bottom:1px dashed #B8B8B0;"></td>'
+            f'<td style="padding:8px 6px;text-align:center;"><span style="display:inline-block;width:16px;height:16px;border:1.5px solid #4B5563;border-radius:2px;"></span></td>'
+            f'<td style="padding:8px 6px;border-bottom:1px dashed #E5E7EB;width:95px;"></td>'
+            f'<td style="padding:8px 6px;border-bottom:1px dashed #E5E7EB;"></td>'
             f'</tr>'
         )
 
     svg_print = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>'
 
     html_sheet = f"""
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Devanagari:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
-    <div id="printSheet" style="background:#FFF;padding:16px;font-family:'IBM Plex Sans','IBM Plex Sans Devanagari',system-ui,sans-serif;border:1px solid #B8B8B0;border-radius:8px;margin-top:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #17191C;padding-bottom:10px;margin-bottom:12px;">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=IBM+Plex+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+    <div id="printSheet" style="background:#FFF;padding:20px;font-family:'Inter','IBM Plex Sans Devanagari',system-ui,sans-serif;border:1px solid #F3F4F6;border-radius:20px;margin-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:10px;margin-bottom:12px;">
         <div>
-          <div style="font-size:18px;font-weight:700;color:#17191C;">{esc(BIZ_NAME)}</div>
-          <div style="font-size:13px;font-weight:600;color:#24509A;">DAILY RECOVERY & CHASING SHEET (गोदाम / फील्ड वसूली शीट)</div>
+          <div style="font-size:18px;font-weight:700;color:#111827;">{esc(BIZ_NAME)}</div>
+          <div style="font-size:13px;font-weight:600;color:#FF4B4B;">DAILY RECOVERY & CHASING SHEET (गोदाम / फील्ड वसूली शीट)</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:12px;font-weight:600;color:#17191C;">Date: {config.AS_OF:%d %b %Y}</div>
-          <div style="font-size:11px;color:#545A63;">Overdue (45+ Days): {len(late)} shops · Total: {inr(total_due)}</div>
+          <div style="font-size:12px;font-weight:600;color:#111827;">Date: {config.AS_OF:%d %b %Y}</div>
+          <div style="font-size:11px;color:#4B5563;">Overdue (45+ Days): {len(late)} shops · Total: {inr(total_due)}</div>
         </div>
       </div>
 
       <div style="margin-bottom:12px;text-align:right;">
-        <button onclick="window.print()" style="background:#24509A;color:white;border:none;min-height:44px;padding:0 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;">
+        <button onclick="window.print()" style="background:#FF4B4B;color:white;border:none;min-height:44px;padding:0 22px;border-radius:10px;box-shadow:0 1px 2px rgba(255,75,75,0.3),0 8px 18px -6px rgba(255,75,75,0.55);font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;">
           {svg_print} Print Sheet / PDF
         </button>
       </div>
 
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;">
         <thead>
-          <tr style="background:#F3F3F0;border-bottom:1px solid #17191C;">
+          <tr style="background:#F9FAFB;border-bottom:1px solid #111827;">
             <th style="padding:8px 6px;text-align:left;width:30px;">#</th>
             <th style="padding:8px 6px;text-align:left;">Retailer / Shop</th>
             <th style="padding:8px 6px;text-align:right;width:95px;">Due (₹)</th>
@@ -924,7 +887,7 @@ def daily_print_dialog():
         </tbody>
       </table>
 
-      <div style="display:flex;justify-content:space-between;gap:20px;margin-top:24px;padding-top:16px;border-top:1px solid #17191C;font-size:11px;">
+      <div style="display:flex;justify-content:space-between;gap:20px;margin-top:24px;padding-top:16px;border-top:1px solid #111827;font-size:11px;">
         <div><b>Salesman Sign:</b> ___________________</div>
         <div><b>Godown Manager Sign:</b> ___________________</div>
         <div><b>Cashier Sign:</b> ___________________</div>
@@ -1045,19 +1008,19 @@ def page_overview():
         <div class="cc-cockpit-hero">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <span class="cc-cockpit-tag" data-tip="{t('Morning executive cash status briefing synthesized from your verified bank and vault records.', 'दैनिक नकद स्थिति ब्रीफिंग')}">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
-              <span class="cc-badge-pill" data-tip="{t('Cash runway: Usable liquidity covers 3.8 months of fixed overheads without new credit.', 'सुरक्षित रनवे')}">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
+              <span class="cc-cockpit-tag" data-tip="{t('Morning executive cash status briefing synthesized from your verified bank and vault records.', 'दैनिक नकद स्थिति ब्रीफिंग')}">{t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
+              <span class="cc-badge-pill" data-tip="{t('Cash runway: Usable liquidity covers 3.8 months of fixed overheads without new credit.', 'सुरक्षित रनवे')}"><span class="cc-dot"></span>{t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
             </div>
-            <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;" data-tip="{t('At current expenditure rate, your liquidity covers 3.8 months of fixed overheads and payroll without factoring any new borrowings.', 'वर्तमान खर्च दर पर लगभग 3.8 महीने का सुरक्षित नकद रनवे है।')}">
+            <div class="cc-badge-pill" style="background:#F9FAFB;color:#111827;border-color:#E5E7EB;" data-tip="{t('At current expenditure rate, your liquidity covers 3.8 months of fixed overheads and payroll without factoring any new borrowings.', 'वर्तमान खर्च दर पर लगभग 3.8 महीने का सुरक्षित नकद रनवे है।')}">
               {t("Safe Runway: ", "सुरक्षित रनवे: ")} <b>{months:.1f} {t("Months", "महीने")}</b>
             </div>
           </div>
           
           <div style="display:flex;align-items:baseline;gap:14px;margin-top:14px;flex-wrap:wrap;" data-tip="{t('Net Usable Liquidity = Current Account balance (₹12.39L) + Cash-Credit headroom (₹25.00L) + Godown drawer cash (₹4.20L).', 'खर्च करने योग्य कुल नकदी: बैंक बैलेंस + CC लिमिट + गल्ला नकद')}">
-            <div class="cc-hero" style="color:#0F172A;margin:0;font-size:clamp(2.4rem, 5vw, 3rem);font-weight:800;">{esc(inr(total_liquid))}</div>
-            <span style="font-size:1rem;font-weight:600;color:#64748B;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")} <span class="cc-info-dot">i</span></span>
+            <div class="cc-hero" style="color:#111827;margin:0;font-size:clamp(2.4rem, 5vw, 3rem);font-weight:800;">{esc(inr(total_liquid))}</div>
+            <span style="font-size:1rem;font-weight:600;color:#6B7280;">{t("Net Usable Liquidity", "आज खर्च करने योग्य कुल नकदी")} <span class="cc-info-dot">i</span></span>
           </div>
-          <div style="font-size:0.88rem;color:#475569;margin-top:4px;">
+          <div style="font-size:0.88rem;color:#4B5563;margin-top:4px;">
             {esc(hero_sub_text)}
           </div>
           
@@ -1073,7 +1036,7 @@ def page_overview():
         <div class="cc-grid-4" style="margin-top:10px;margin-bottom:12px;">
           <div class="cc-tile" data-tip="{t('Total spendable liquid cash available right now: Bank liquidity + Godown till cash.', 'आज खर्च करने योग्य कुल नकदी: बैंक और गल्ले का नकद')}">
             <span class="l">{t("Net Usable Cash", "कुल उपलब्ध नकदी")}<span class="cc-info-dot">i</span></span>
-            <span class="v" style="color:#0F172A;">{inr(total_liquid)}</span>
+            <span class="v" style="color:#111827;">{inr(total_liquid)}</span>
             <span class="s">{t("Bank + drawer cash", "बैंक + गल्ला रोकड़")}</span>
           </div>
           <div class="cc-tile pos" data-tip="{t('Total bank liquidity: Available positive balance plus ₹25.00L sanctioned Cash-Credit limit.', 'बैंक सुरक्षित सीमा: उपलब्ध बैलेंस और CC लिमिट')}">
@@ -1124,25 +1087,25 @@ def page_overview():
             if c_days >= 900:
                 lim_act_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without a written acknowledgement or payment.",
                                 "3 साल से पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")
-                limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
+                limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">{svg(ICON_ALERT, 12, width=2.4)}30+ Mo (Section 18 Limitation Act)</span>'
 
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #D97706;background:#FFFBEB;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
               <div style="flex:1;min-width:260px;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <span style="font-size:0.78rem;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("1 Urgent Action This Morning", "आज सुबह की 1 सबसे जरूरी कार्रवाई")}</span>
+                  <span style="font-size:0.66rem;font-weight:700;color:#B45309;text-transform:uppercase;letter-spacing:0.22em;">{t("1 Urgent Action This Morning", "आज सुबह की 1 सबसे जरूरी कार्रवाई")}</span>
                   {limitation_badge}
                 </div>
-                <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">
+                <div style="font-size:1.02rem;font-weight:700;color:#111827;margin-top:4px;">
                   {esc(c_name)} {t("owes", "बकाया")} {esc(c_due)} ({c_days} {t("days overdue", "दिन पुराना")})
                 </div>
-                <div style="font-size:0.8rem;color:#475569;margin-top:2px;">
+                <div style="font-size:0.8rem;color:#4B5563;margin-top:2px;">
                   {t("Oldest invoice is 30+ months open. Collect or obtain acknowledgement before the 3-year statutory limit.", "30 महीने से अधिक पुराना बकाया। 3 साल की वैधानिक सीमा समाप्त होने से पहले संपर्क करें।")}
                 </div>
               </div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp message draft in WhatsApp Web. You review and click Send yourself.', 'WhatsApp पर शिष्टाचारपूर्ण संदेश ड्राफ्ट होगा।')}">
-                  📲 {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
+                  {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
                 </a>
               </div>
             </div>
@@ -1151,8 +1114,8 @@ def page_overview():
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #EF4444;background:#FEF2F2;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('Salaries exceed current bank balance without active overdraft. Action needed.', 'वेतन के लिए नकद योजना बनाएं')}">
               <div style="flex:1;">
-                <div style="font-size:0.78rem;font-weight:800;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("Action Required", "ध्यान दें")}</div>
-                <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">{t("1 Oct Payroll requires cash planning", "1 अक्टूबर वेतन के लिए नकद योजना आवश्यक")}</div>
+                <div style="font-size:0.66rem;font-weight:700;color:#991B1B;text-transform:uppercase;letter-spacing:0.22em;">{t("Action Required", "ध्यान दें")}</div>
+                <div style="font-size:1.02rem;font-weight:700;color:#111827;margin-top:4px;">{t("1 Oct Payroll requires cash planning", "1 अक्टूबर वेतन के लिए नकद योजना आवश्यक")}</div>
               </div>
             </div>
             """)
@@ -1160,7 +1123,7 @@ def page_overview():
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #16A34A;background:#F0FDF4;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('All operational metrics healthy: Till balanced, payroll covered, receivables normal.', 'सभी कार्य व्यवस्थित हैं')}">
               <div style="flex:1;">
-                <div style="font-size:0.78rem;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">✓ {t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
+                <div style="font-size:0.66rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.22em;">{t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
                 <div style="font-size:0.95rem;font-weight:600;color:#166534;margin-top:2px;">{t("No urgent payment or collection bottlenecks this morning.", "आज सुबह कोई तत्काल भुगतान या वसूली समस्या नहीं है।")}</div>
               </div>
             </div>
@@ -1195,20 +1158,20 @@ def page_overview():
             <div class="cc-fanchart-card" style="box-shadow:none;border:none;padding:4px 0 0;">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
                 <div>
-                  <div style="font-size:0.95rem;font-weight:700;color:#17191C;">{t("90-Day Projected Cash Runway (Monte Carlo Fan Chart)", "90-दिवसीय संभावित नकद रनवे (प्रायिकता विश्लेषण)")}</div>
-                  <div style="font-size:0.78rem;color:#64748B;">{t("P10–P90 probability envelope calibrated without lookahead bias", "P10–P90 सुरक्षित सीमा एवं संभावित नकद उतार-चढ़ाव")}</div>
+                  <div style="font-size:0.95rem;font-weight:700;color:#111827;">{t("90-Day Projected Cash Runway (Monte Carlo Fan Chart)", "90-दिवसीय संभावित नकद रनवे (प्रायिकता विश्लेषण)")}</div>
+                  <div style="font-size:0.78rem;color:#6B7280;">{t("P10–P90 probability envelope calibrated without lookahead bias", "P10–P90 सुरक्षित सीमा एवं संभावित नकद उतार-चढ़ाव")}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:14px;font-size:0.75rem;color:#475569;">
-                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P10–P90 Range: 80% of simulated random cash outcomes stay inside this envelope.', 'P10-P90 सीमा: 80% संभावित परिणाम इस दायरे में रहते हैं।')}"><span style="width:12px;height:12px;background:rgba(59,130,246,0.2);border:1px solid #3B82F6;border-radius:2px;"></span> P10–P90 Range <span class="cc-info-dot">i</span></span>
-                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P50 Median: The most probable expected cash balance trajectory based on historical patterns.', 'P50 मीडियन: सबसे संभावित नकद स्तर।')}"><span style="width:14px;height:3px;background:#2563EB;border-radius:2px;"></span> P50 Median <span class="cc-info-dot">i</span></span>
+                <div style="display:flex;align-items:center;gap:14px;font-size:0.75rem;color:#4B5563;">
+                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P10–P90 Range: 80% of simulated random cash outcomes stay inside this envelope.', 'P10-P90 सीमा: 80% संभावित परिणाम इस दायरे में रहते हैं।')}"><span style="width:12px;height:12px;background:rgba(17,24,39,0.08);border:1px solid #111827;border-radius:2px;"></span> P10–P90 Range <span class="cc-info-dot">i</span></span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('P50 Median: The most probable expected cash balance trajectory based on historical patterns.', 'P50 मीडियन: सबसे संभावित नकद स्तर।')}"><span style="width:14px;height:3px;background:#111827;border-radius:2px;"></span> P50 Median <span class="cc-info-dot">i</span></span>
                   <span style="display:inline-flex;align-items:center;gap:5px;" data-tip="{t('Sanctioned ₹25.00L Cash-Credit boundary. Balances below this line trigger penal interest.', 'स्वीकृत क्रेडिट लिमिट की सीमा।')}"><span style="width:14px;height:0;border-top:2px dashed #EF4444;"></span> ₹25L CC Threshold <span class="cc-info-dot">i</span></span>
                 </div>
               </div>
               
-              <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px;height:150px;display:flex;align-items:center;">
+              <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px;height:150px;display:flex;align-items:center;">
                 <svg style="width:100%;height:100%;" viewBox="0 0 600 140" preserveAspectRatio="none">
-                  <path d="M 0,75 Q 150,95 300,70 T 600,48 L 600,105 Q 450,125 300,118 T 0,98 Z" fill="rgba(59, 130, 246, 0.15)"></path>
-                  <path d="M 0,86 Q 150,106 300,88 T 600,70" fill="none" stroke="#2563EB" stroke-width="3"></path>
+                  <path d="M 0,75 Q 150,95 300,70 T 600,48 L 600,105 Q 450,125 300,118 T 0,98 Z" fill="rgba(17,24,39,0.07)"></path>
+                  <path d="M 0,86 Q 150,106 300,88 T 600,70" fill="none" stroke="#111827" stroke-width="3"></path>
                   <line x1="0" y1="122" x2="600" y2="122" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4 4"></line>
                   <text x="12" y="116" fill="#EF4444" font-size="10" font-weight="600" font-family="system-ui">₹25L Cash-Credit Threshold</text>
                   <circle cx="130" cy="102" r="4" fill="#D97706"></circle>
@@ -1465,8 +1428,8 @@ def collections_dialog():
             )
             assigned_id = vault.record_collection(coll_obj, update_drawer=True)
             toast_text = t(
-                f"✓ Slip {assigned_id} recorded ({payment_mode}: {inr(amt_val)} for {shop_val}).",
-                f"✓ पर्ची {assigned_id} दर्ज हुई ({payment_mode}: {inr(amt_val)} - {shop_val})।"
+                f"Slip {assigned_id} recorded ({payment_mode}: {inr(amt_val)} for {shop_val}).",
+                f"पर्ची {assigned_id} दर्ज हुई ({payment_mode}: {inr(amt_val)} - {shop_val})।"
             )
             st.session_state["toast"] = toast_text
             st.rerun()
@@ -1496,7 +1459,7 @@ def page_cash_book():
             H(f"""
             <div class="cc-card-modern" style="border-left:4px solid #DC2626;background:#FEF2F2;">
               <div style="font-size:1rem;font-weight:700;color:#991B1B;display:flex;align-items:center;gap:8px;">
-                <span>🔒 Sovereign Cash Book Locked</span>
+                <span>Sovereign Cash Book Locked</span>
                 <span class="cc-badge warn">Owner PIN Required</span>
               </div>
               <div style="font-size:0.86rem;color:#7F1D1D;margin-top:6px;line-height:1.5;">
@@ -1536,9 +1499,9 @@ def page_cash_book():
                 items_html = "".join(f'<li>{svg(ICON_BOX_CHECK, 16, MUTED)}{esc(doc)}</li>' for doc in checklist["documents"])
                 H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Bank Cash Deposits (Formal Plane)", "बैंक नकद जमा (औपचारिक)")}</div>'
                   f'<div class="cc-hero" style="font-size:1.6rem">{esc(inr(bank_cash_deposits))}</div>'
-                  f'<div class="cc-muted" style="color:#3F444B">{esc(facts_res.message)}</div>'
+                  f'<div class="cc-muted" style="color:#4B5563">{esc(facts_res.message)}</div>'
                   f'<div class="cc-note" style="margin-top:8px">{esc(facts_res.citation)}</div>'
-                  f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>')
+                  f'<div style="border-top:1px solid #F3F4F6;margin:14px 0 10px"></div>')
                 with st.expander(t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड"), expanded=False):
                     H(f'<ul class="cc-list sm">{items_html}</ul>'
                       f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
@@ -1569,7 +1532,7 @@ def page_cash_book():
             else t("Discrepancy detected between counted cash and 5-part drawer equation.", "गल्ले में असंगति पाई गई")
         )
         bal_badge = (
-            f'<span class="cc-badge pos" data-tip="{bal_tip}">Ties Exactly ✓</span>'
+            f'<span class="cc-badge pos" data-tip="{bal_tip}">{svg(ICON_CHECK, 12, width=2.6)}Ties exactly</span>'
             if is_bal
             else f'<span class="cc-badge warn" data-tip="{bal_tip}">{esc(inr(drift))} Drift to check</span>'
         )
@@ -1587,17 +1550,17 @@ def page_cash_book():
         <div class="cc-card-modern">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             <div>
-              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {drawer_title} {demo}</div>
-              <div style="font-size:0.78rem;color:#64748B;">{t("Opening Float + Parchi Cash In − Petty Expenses − Banked CDM = Expected Close", "शुरुआती नकद + पर्ची नकद − खर्च − बैंक जमा = अपेक्षित गल्ला")} · {when}</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#111827;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">{drawer_title} {demo}</div>
+              <div style="font-size:0.78rem;color:#6B7280;">{t("Opening Float + Parchi Cash In − Petty Expenses − Banked CDM = Expected Close", "शुरुआती नकद + पर्ची नकद − खर्च − बैंक जमा = अपेक्षित गल्ला")} · {when}</div>
             </div>
             {bal_badge}
           </div>
 
-          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+          <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
             <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:8px;text-align:center;">
               <div>
-                <div style="font-size:0.72rem;font-weight:600;color:#64748B;text-transform:uppercase;">Opening Float</div>
-                <div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-top:2px;">{esc(inr(open_c))}</div>
+                <div style="font-size:0.72rem;font-weight:600;color:#6B7280;text-transform:uppercase;">Opening Float</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#111827;margin-top:2px;">{esc(inr(open_c))}</div>
               </div>
               <div>
                 <div style="font-size:0.72rem;font-weight:600;color:#059669;text-transform:uppercase;">+ Parchi In</div>
@@ -1608,12 +1571,12 @@ def page_cash_book():
                 <div style="font-size:1.05rem;font-weight:700;color:#DC2626;margin-top:2px;">−{esc(inr(out_c))}</div>
               </div>
               <div>
-                <div style="font-size:0.72rem;font-weight:600;color:#2563EB;text-transform:uppercase;">− Banked CDM</div>
-                <div style="font-size:1.05rem;font-weight:700;color:#2563EB;margin-top:2px;">−{esc(inr(banked_c))}</div>
+                <div style="font-size:0.72rem;font-weight:600;color:#111827;text-transform:uppercase;">− Banked CDM</div>
+                <div style="font-size:1.05rem;font-weight:700;color:#111827;margin-top:2px;">−{esc(inr(banked_c))}</div>
               </div>
-              <div style="border-left:2px solid #CBD5E1;padding-left:8px;">
-                <div style="font-size:0.72rem;font-weight:700;color:#0F172A;text-transform:uppercase;">= Expected</div>
-                <div style="font-size:1.05rem;font-weight:800;color:#0F172A;margin-top:2px;">{esc(inr(expected_close))}</div>
+              <div style="border-left:2px solid #E5E7EB;padding-left:8px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#111827;text-transform:uppercase;">= Expected</div>
+                <div style="font-size:1.05rem;font-weight:800;color:#111827;margin-top:2px;">{esc(inr(expected_close))}</div>
               </div>
             </div>
           </div>
@@ -1623,9 +1586,9 @@ def page_cash_book():
               <span style="font-size:0.72rem;font-weight:700;color:#166534;display:block;">Physical Till Count</span>
               <span style="font-size:1.35rem;font-weight:800;color:#166534;">{esc(inr(counted_c))}</span>
             </div>
-            <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;">
-              <span style="font-size:0.72rem;font-weight:700;color:#475569;display:block;">Expected Cash</span>
-              <span style="font-size:1.35rem;font-weight:800;color:#0F172A;">{esc(inr(expected_close))}</span>
+            <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;">
+              <span style="font-size:0.72rem;font-weight:700;color:#4B5563;display:block;">Expected Cash</span>
+              <span style="font-size:1.35rem;font-weight:800;color:#111827;">{esc(inr(expected_close))}</span>
             </div>
             <div style="background:{'#F0FDF4' if is_bal else '#FEF2F2'};border:1px solid {'#BBF7D0' if is_bal else '#FECACA'};border-radius:8px;padding:10px 12px;">
               <span style="font-size:0.72rem;font-weight:700;color:{'#166534' if is_bal else '#991B1B'};display:block;">Drawer Drift</span>
@@ -1664,7 +1627,7 @@ def page_cash_book():
               </div>
               <div class="cc-tile info">
                 <span class="l">{t("UPI Direct Credits", "UPI ऑनलाइन")}</span>
-                <span class="v" style="font-size:1.3rem;color:#1E40AF;">{esc(inr(tot_upi))}</span>
+                <span class="v" style="font-size:1.3rem;color:#111827;">{esc(inr(tot_upi))}</span>
                 <span class="s">{t("Direct to bank account", "सीधे बैंक खाते में")}</span>
               </div>
               <div class="cc-tile warn">
@@ -1690,7 +1653,7 @@ def page_cash_book():
                 table_rows = []
                 for s in reversed(filtered_slips):
                     m_tag = getattr(s, "payment_mode", "CASH").upper()
-                    st_tag = "Banked ✓" if getattr(s, "is_banked", False) else ("In Till" if m_tag == "CASH" else "In Route Bag")
+                    st_tag = "Banked" if getattr(s, "is_banked", False) else ("In Till" if m_tag == "CASH" else "In Route Bag")
                     inv_tag = getattr(s, "invoice_no", "") or "FIFO (Oldest Invoices)"
                     s_date_str = s.date.strftime("%Y-%m-%d") if hasattr(s.date, "strftime") else str(s.date)[:10]
                     table_rows.append({
@@ -1721,25 +1684,25 @@ def page_cash_book():
             rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
             lim_tip = t("Under Section 18 Limitation Act, debts older than 3 years become legally time-barred without written acknowledgement.",
                         "3 साल से पुराना बकाया कानूनी रूप से अप्रवर्तनीय हो जाता है।")
-            flag = f'<span class="cc-badge warn" data-tip="{lim_tip}">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
-            color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
+            flag = f'<span class="cc-badge warn" data-tip="{lim_tip}">{svg(ICON_ALERT, 12, width=2.4)}{t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
+            color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#111827;font-weight:700;"
             sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
 
             H(f"""
             <div class="cc-action-card">
               <div style="flex:1;min-width:180px;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <span style="font-size:0.92rem;font-weight:700;color:#0F172A;">{esc(acc.party_name)}</span>
+                  <span style="font-size:0.92rem;font-weight:700;color:#111827;">{esc(acc.party_name)}</span>
                   {flag}
                 </div>
-                <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
+                <div style="font-size:0.78rem;color:#6B7280;margin-top:2px;">
                   {t("Informal khata balance", "कच्चा खाता बकाया")}: <span style="{color}">{esc(inr(acc.balance_due))}</span>
                 </div>
                 {sub_warning}
               </div>
               <div>
                 <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp reminder draft with balance and UPI payment link.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
-                  📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                  {t("Draft WhatsApp", "WhatsApp तकादा")}
                 </a>
               </div>
             </div>
@@ -1768,9 +1731,9 @@ def page_cash_book():
             items_html = "".join(f'<li>{svg(ICON_BOX_CHECK, 16, MUTED)}{esc(doc)}</li>' for doc in checklist["documents"])
             H(f'<div class="cc-h2" role="heading" aria-level="2">{t("Cash deposits this year", "इस वर्ष कुल नकद बैंक जमा")} {DEMO if is_seeded else ""}</div>'
               f'<div class="cc-hero" style="font-size:1.6rem">{esc(inr(ytd_deposits))}</div>'
-              f'<div class="cc-muted" style="color:#3F444B">{esc(facts_res.message)}</div>'
+              f'<div class="cc-muted" style="color:#4B5563">{esc(facts_res.message)}</div>'
               f'<div class="cc-note" style="margin-top:8px">{esc(facts_res.citation)}</div>'
-              f'<div style="border-top:1px solid #E2E2DC;margin:14px 0 10px"></div>')
+              f'<div style="border-top:1px solid #F3F4F6;margin:14px 0 10px"></div>')
             with st.expander(t("Records checklist before depositing cash", "नकद जमा से पहले जरूरी रिकॉर्ड"), expanded=False):
                 H(f'<ul class="cc-list sm">{items_html}</ul>'
                   f'<div class="cc-note" style="margin-top:12px">{esc(checklist["referral"])}</div>')
@@ -1783,7 +1746,7 @@ def page_cash_book():
               f'</div>')
             _match_list = list(matches.values()) if isinstance(matches, dict) else matches
             st.download_button(
-                label=t("📥 Download Tally XML (Receipt Vouchers)", "📥 टैली XML डाउनलोड करें"),
+                label=t("Download Tally XML (Receipt Vouchers)", "टैली XML डाउनलोड करें"), icon=":material/download:",
                 data=generate_tally_xml(pack, _match_list, biz),
                 file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
                 mime="application/xml",
@@ -1792,7 +1755,7 @@ def page_cash_book():
             )
             export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
             st.download_button(
-                label=t("📊 Download CA Excel Workbook", "📊 CA एक्सेल रीकॉन्सिलेशन डाउनलोड करें"),
+                label=t("Download CA Excel Workbook", "CA एक्सेल रीकॉन्सिलेशन डाउनलोड करें"), icon=":material/table_view:",
                 data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
                 file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1849,48 +1812,50 @@ def page_forecast():
 
     if fc_res.daily_points:
         st.write("")
-        a, b = st.columns([1, 2], vertical_alignment="center")
-        with a:
-            section(t("Projected bank balance", "अनुमानित बैंक बैलेंस"))
-        limit_amt = copilot.credit_limit(biz)
-        with b:
-            legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(36,80,154,0.16)"></i>{t("Likely range (P10–P90)", "संभावित दायरा (P10–P90)")}</span>'
-                      f'<span><i style="width:16px;height:2px;background:{ACCENT}"></i>{t("Most likely (P50)", "सबसे संभावित स्तर (P50)")}</span>')
-            if limit_amt:
-                legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>{t("Cash-credit limit", "कैश-क्रेडिट सीमा")}</span>'
-            H(f'<div class="cc-legend" style="justify-content:flex-end">{legend}</div>')
+        with st.container(border=True):  # chart, legend and note on one white card
+            a, b = st.columns([1, 2], vertical_alignment="center")
+            with a:
+                section(t("Projected bank balance", "अनुमानित बैंक बैलेंस"))
+            limit_amt = copilot.credit_limit(biz)
+            with b:
+                legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(17,24,39,0.08)"></i>{t("Likely range (P10–P90)", "संभावित दायरा (P10–P90)")}</span>'
+                          f'<span><i style="width:16px;height:2.5px;background:{INK}"></i>{t("Most likely (P50)", "सबसे संभावित स्तर (P50)")}</span>')
+                if limit_amt:
+                    legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>{t("Cash-credit limit", "कैश-क्रेडिट सीमा")}</span>'
+                H(f'<div class="cc-legend" style="justify-content:flex-end">{legend}</div>')
 
-        df_daily = pd.DataFrame([
-            {"Date": p.date, "p10": p.balance_p10, "p50": p.balance_p50, "p90": p.balance_p90,
-             "p10_txt": inr(p.balance_p10), "p50_txt": inr(p.balance_p50), "p90_txt": inr(p.balance_p90)}
-            for p in fc_res.daily_points
-        ])
-        lakh_expr = "(datum.value < 0 ? '−₹' : '₹') + format(abs(datum.value) / 100000, ',.0f') + 'L'"
-        x = alt.X("Date:T", title=None, axis=alt.Axis(format="%d %b", tickCount="month", grid=False, domain=False,
-                                                      tickColor="#E2E2DC", labelColor=SUBTLE, labelPadding=6))
-        y_axis = alt.Axis(labelExpr=lakh_expr, gridColor="#ECECE8", domain=False, ticks=False, labelColor=SUBTLE,
-                          labelPadding=8, tickCount=5)
-        band = alt.Chart(df_daily).mark_area(opacity=0.16, color=ACCENT).encode(
-            x=x, y=alt.Y("p10:Q", title=None, axis=y_axis), y2="p90:Q",
-            tooltip=[alt.Tooltip("Date:T", title="Date", format="%d %b %Y"),
-                     alt.Tooltip("p10_txt:N", title="Worst case (P10)"),
-                     alt.Tooltip("p50_txt:N", title="Most likely (P50)"),
-                     alt.Tooltip("p90_txt:N", title="Optimistic (P90)")])
-        line = alt.Chart(df_daily).mark_line(strokeWidth=2, color=ACCENT).encode(x="Date:T", y="p50:Q")
-        low = df_daily.loc[[df_daily.p50.idxmin()]].assign(label=lambda d: "Lowest " + d["p50_txt"])
-        low_pt = alt.Chart(low).mark_point(filled=True, fill="white", stroke=ACCENT, strokeWidth=2, size=70).encode(
-            x="Date:T", y="p50:Q")
-        low_txt = alt.Chart(low).mark_text(dy=22, fontSize=12, fontWeight=500, color=INK).encode(
-            x="Date:T", y="p50:Q", text="label:N")
-        layers = [band, line, low_pt, low_txt]
-        if limit_amt:
-            floor_df = pd.DataFrame([{"Floor": -limit_amt}])
-            layers.append(alt.Chart(floor_df).mark_rule(strokeDash=[6, 5], color=NEG, strokeWidth=1.5).encode(y="Floor:Q"))
-        chart = (alt.layer(*layers).properties(height=340)
-                 .configure(font=FONT).configure_view(strokeWidth=0)
-                 .configure_axis(labelFontSize=12))
-        st.altair_chart(chart, use_container_width=True, theme=None)
-        H('<div class="cc-note">Monte Carlo simulation calibrated without lookahead.</div>')
+            df_daily = pd.DataFrame([
+                {"Date": p.date, "p10": p.balance_p10, "p50": p.balance_p50, "p90": p.balance_p90,
+                 "p10_txt": inr(p.balance_p10), "p50_txt": inr(p.balance_p50), "p90_txt": inr(p.balance_p90)}
+                for p in fc_res.daily_points
+            ])
+            lakh_expr = "(datum.value < 0 ? '−₹' : '₹') + format(abs(datum.value) / 100000, ',.0f') + 'L'"
+            x = alt.X("Date:T", title=None, axis=alt.Axis(format="%d %b", tickCount="month", grid=False, domain=False,
+                                                          tickColor="#F3F4F6", labelColor=SUBTLE, labelPadding=6))
+            y_axis = alt.Axis(labelExpr=lakh_expr, gridColor="#F3F4F6", domain=False, ticks=False, labelColor=SUBTLE,
+                              labelPadding=8, tickCount=5)
+            # Floating Edition chart: ink line on a faint ink band, red marks only where attention is needed.
+            band = alt.Chart(df_daily).mark_area(opacity=0.08, color=INK).encode(
+                x=x, y=alt.Y("p10:Q", title=None, axis=y_axis), y2="p90:Q",
+                tooltip=[alt.Tooltip("Date:T", title="Date", format="%d %b %Y"),
+                         alt.Tooltip("p10_txt:N", title="Worst case (P10)"),
+                         alt.Tooltip("p50_txt:N", title="Most likely (P50)"),
+                         alt.Tooltip("p90_txt:N", title="Optimistic (P90)")])
+            line = alt.Chart(df_daily).mark_line(strokeWidth=2.5, color=INK).encode(x="Date:T", y="p50:Q")
+            low = df_daily.loc[[df_daily.p50.idxmin()]].assign(label=lambda d: "Lowest " + d["p50_txt"])
+            low_pt = alt.Chart(low).mark_point(filled=True, fill="white", stroke=ACCENT, strokeWidth=2, size=70).encode(
+                x="Date:T", y="p50:Q")
+            low_txt = alt.Chart(low).mark_text(dy=22, fontSize=12, fontWeight=700, color=ACCENT).encode(
+                x="Date:T", y="p50:Q", text="label:N")
+            layers = [band, line, low_pt, low_txt]
+            if limit_amt:
+                floor_df = pd.DataFrame([{"Floor": -limit_amt}])
+                layers.append(alt.Chart(floor_df).mark_rule(strokeDash=[6, 5], color=NEG, strokeWidth=1.5).encode(y="Floor:Q"))
+            chart = (alt.layer(*layers).properties(height=340)
+                     .configure(font=FONT).configure_view(strokeWidth=0)
+                     .configure_axis(labelFontSize=11, labelFontWeight=600))
+            st.altair_chart(chart, use_container_width=True, theme=None)
+            H('<div class="cc-note">Monte Carlo simulation calibrated without lookahead.</div>')
 
     st.write("")
     section("Month by month")
@@ -1910,7 +1875,7 @@ def page_forecast():
             f'<td style="font-weight:600">{esc(inr(mf.closing_balance_p50))}</td></tr>')
     H(f"""
     <div class="cc-card-modern">
-      <div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:12px;">{t("Month-by-Month Operating Outlook", "माह-दर-माह नकद प्रवाह विश्लेषण")}</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#111827;margin-bottom:12px;">{t("Month-by-Month Operating Outlook", "माह-दर-माह नकद प्रवाह विश्लेषण")}</div>
       <div class="cc-scroll">
         <table class="cc-table" style="min-width:720px">
           <thead>
@@ -1963,12 +1928,12 @@ def page_review():
     d60_tip = t("Strict Decision 60: Auto-accepts only occur when exactly one invoice unambiguously matches one deposit slip. 0 unvetted reconciliations.",
                 "Decision 60: बिना सत्यापन के कोई स्वतः मिलान नहीं।")
     H(f"""
-    <div style="display:flex;justify-content:space-between;align-items:center;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;margin-bottom:14px;gap:8px;flex-wrap:wrap;" data-tip="{esc(d60_tip)}">
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px 18px;margin-bottom:14px;gap:8px;flex-wrap:wrap;" data-tip="{esc(d60_tip)}">
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="cc-badge info" style="font-size:0.78rem;">Strict Decision 60</span>
-        <span style="font-size:0.86rem;font-weight:700;color:#1E40AF;">0 Unvetted Auto-Accepts · Strict Bank & Ledger Rule Engine <span class="cc-info-dot" style="background:#BFDBFE;color:#1E40AF;">i</span></span>
+        <span style="font-size:0.86rem;font-weight:700;color:#111827;">0 Unvetted Auto-Accepts · Strict Bank & Ledger Rule Engine <span class="cc-info-dot" style="background:#E5E7EB;color:#111827;">i</span></span>
       </div>
-      <div style="font-size:0.8rem;color:#2563EB;font-weight:600;">{counts['auto']:,} automatic matches · {counts[SUGGEST] + counts[ASK]:,} in decision queue</div>
+      <div style="font-size:0.8rem;color:#111827;font-weight:600;">{counts['auto']:,} automatic matches · {counts[SUGGEST] + counts[ASK]:,} in decision queue</div>
     </div>
     """)
 
@@ -1977,7 +1942,7 @@ def page_review():
     col_exp1, col_exp2 = st.columns(2)
     with col_exp1:
         st.download_button(
-            label=t("📥 Download Tally XML (Decision 60 Vouchers)", "📥 टैली XML डाउनलोड करें"),
+            label=t("Download Tally XML (Decision 60 Vouchers)", "टैली XML डाउनलोड करें"), icon=":material/download:",
             data=generate_tally_xml(pack, _match_list, biz),
             file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
             mime="application/xml",
@@ -1987,7 +1952,7 @@ def page_review():
     with col_exp2:
         export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
         st.download_button(
-            label=t("📊 Download CA Reconciliation Workbook (Excel)", "📊 CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"),
+            label=t("Download CA Reconciliation Workbook (Excel)", "CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"), icon=":material/table_view:",
             data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
             file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2028,20 +1993,25 @@ def page_review():
         gb.configure_column("type", header_name="Type", width=116, minWidth=112)
         gb.configure_column("rule", header_name="Rule", width=124, minWidth=104)
         gb.configure_column("narration", header_name="Bank narration", flex=1, minWidth=220)
-        gb.configure_grid_options(autoSizeStrategy=None, rowHeight=44, headerHeight=40)
+        gb.configure_grid_options(autoSizeStrategy=None, rowHeight=48, headerHeight=44)
         gb.configure_selection("single")
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)
         grid = AgGrid(
             view, gridOptions=gb.build(), height=560, fit_columns_on_grid_load=False, theme="alpine",
             key=f"queue_grid_{biz}_{choice}",
             custom_css={
-                ".ag-root-wrapper": {"border": "1px solid #B8B8B0 !important", "border-radius": "8px !important"},
-                ".ag-header": {"background-color": "#F3F3F0 !important", "border-bottom": "1px solid #B8B8B0 !important"},
-                ".ag-header-cell-text": {"font-weight": "600 !important", "color": "#17191C !important"},
-                ".ag-row": {"border-bottom": "1px solid #E5E5DF !important", "font-size": "13px !important"},
-                ".ag-row-selected": {"background-color": "#EDF1F8 !important"},
-                ".ag-row-hover": {"background-color": "#F7F7F4 !important"},
-                ".ag-cell-focus": {"border": "2px solid #24509A !important", "outline": "none !important"},
+                ".ag-root-wrapper": {"border": "1px solid #F3F4F6 !important", "border-radius": "20px !important",
+                                     "font-family": "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif !important",
+                                     "box-shadow": "0 1px 2px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.05)"},
+                ".ag-header": {"background-color": "#FFFFFF !important", "border-bottom": "1px solid #F3F4F6 !important"},
+                ".ag-header-cell-text": {"font-weight": "700 !important", "color": "#6B7280 !important", "font-size": "10px !important",
+                                         "letter-spacing": "0.18em !important", "text-transform": "uppercase !important"},
+                ".ag-row": {"border-bottom": "1px solid #F3F4F6 !important", "font-size": "13px !important", "color": "#111827 !important"},
+                ".ag-row-selected": {"background-color": "#FFF1F1 !important"},
+                ".ag-row-selected .ag-cell:first-child": {"box-shadow": "inset 3px 0 0 #FF4B4B"},
+                ".ag-row-hover": {"background-color": "#F9FAFB !important"},
+                ".ag-cell-focus": {"border": "1px solid #FF4B4B !important", "outline": "none !important"},
+                ".ag-paging-panel": {"border-top": "1px solid #F3F4F6 !important", "color": "#6B7280 !important"},
             },
         )
     sel = grid.get("selected_rows")
@@ -2071,7 +2041,7 @@ def page_review():
               f'<div class="cc-narr cc-mono">{esc(b.narration)}</div>'
               f'<div class="cc-label" style="font-size:0.76rem;margin:14px 0 4px">Suggested documents</div>')
             if m.docs:
-                doc_rows = "".join(f'<div><dt class="cc-mono" style="color:#17191C">{esc(d)}</dt><dd>{esc(inr(a))}</dd></div>'
+                doc_rows = "".join(f'<div><dt class="cc-mono" style="color:#111827">{esc(d)}</dt><dd>{esc(inr(a))}</dd></div>'
                                    for d, a in m.docs)
                 H(f'<dl class="cc-dl">{doc_rows}</dl>')
             else:
@@ -2081,8 +2051,9 @@ def page_review():
             is_v = txn_id in verified_keys
             col_v1, col_v2 = st.columns([1.4, 1])
             with col_v1:
-                v_lbl = t("✓ Verified by Owner", "✓ मालिक द्वारा सत्यापित") if is_v else t("Mark as Verified", "सत्यापित चिह्नित करें")
-                if st.button(v_lbl, key=f"verify_{txn_id}", type="primary" if not is_v else "secondary", use_container_width=True):
+                v_lbl = t("Verified by Owner", "मालिक द्वारा सत्यापित") if is_v else t("Mark as Verified", "सत्यापित चिह्नित करें")
+                if st.button(v_lbl, key=f"verify_{txn_id}", type="primary" if not is_v else "secondary", use_container_width=True,
+                             icon=":material/check:" if is_v else None):
                     if is_v:
                         verified_keys.remove(txn_id)
                     else:
@@ -2179,7 +2150,7 @@ def page_receivables():
                 if oldest >= 900:
                     l_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without written acknowledgement or payment.",
                               "3 साल से पुराना बकाया")
-                    lim_badge = f'<span class="cc-badge warn" data-tip="{l_tip}">⚠️ {t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
+                    lim_badge = f'<span class="cc-badge warn" data-tip="{l_tip}">{svg(ICON_ALERT, 12, width=2.4)}{t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
                 elif oldest >= 45:
                     d_tip = t("Days elapsed since the oldest unpaid invoice was issued to this retailer.", "पुराने इनवॉइस की अवधि")
                     lim_badge = f'<span class="cc-badge neutral" data-tip="{d_tip}">{oldest}d overdue</span>'
@@ -2217,21 +2188,21 @@ def page_receivables():
                 <div class="cc-action-card">
                   <div style="flex:1;min-width:220px;">
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                      <span style="font-size:0.94rem;font-weight:700;color:#0F172A;">{esc(c_name)}</span>
+                      <span style="font-size:0.94rem;font-weight:700;color:#111827;">{esc(c_name)}</span>
                       {lim_badge}
                     </div>
-                    <div style="font-size:0.78rem;color:#64748B;margin-top:2px;">
+                    <div style="font-size:0.78rem;color:#6B7280;margin-top:2px;">
                       {inv_count} {t("open invoices", "खुले इनवॉइस")} · {t("Oldest", "सबसे पुराना")}: {oldest}d
                     </div>
                     {prot_banner}
                   </div>
                   <div style="text-align:right;margin:0 16px;">
-                    <div style="font-size:1.15rem;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;">{esc(inr(amt))}</div>
-                    <div style="font-size:0.74rem;color:#64748B;">{t("Outstanding", "बकाया")}</div>
+                    <div style="font-size:1.15rem;font-weight:800;color:#111827;font-variant-numeric:tabular-nums;">{esc(inr(amt))}</div>
+                    <div style="font-size:0.74rem;color:#6B7280;">{t("Outstanding", "बकाया")}</div>
                   </div>
                   <div>
                     <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Drafts an invoice reminder in WhatsApp Web for immediate review and sending.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
-                      📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                      {t("Draft WhatsApp", "WhatsApp तकादा")}
                     </a>
                   </div>
                 </div>
@@ -2280,11 +2251,17 @@ def page_ask():
         mid, _ = st.columns([3, 1.2])
         with mid:
             if not PUBLIC:
-                with st.form("ask_form", border=False):
-                    c1, c2 = st.columns([5, 1], vertical_alignment="bottom")
-                    c1.text_input(t("Your question", "आपका सवाल"), key="ask_typed",
-                                  placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
-                    c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True, on_click=_submit_typed)
+                with st.container(key="ask_box"):
+                    H(f'<div class="cc-ask-head">{svg(ICON_CHAT, 18, INK)}<span>{t("Ask in your own words", "अपने शब्दों में पूछें")}</span></div>'
+                      f'<div class="cc-note">{t("Type a question about your cash, dues or forecast and press Ask.", "अपने कैश, बकाया या अनुमान के बारे में सवाल लिखें और पूछें दबाएं।")}</div>')
+                    with st.form("ask_form", border=False):
+                        c1, c2 = st.columns([5, 1.1], vertical_alignment="bottom")
+                        c1.text_input(t("Your question", "आपका सवाल"), key="ask_typed", label_visibility="collapsed",
+                                      placeholder=t("For example: who owes me the most?", "उदाहरण: मुझ पर सबसे ज्यादा बकाया किसका है?"))
+                        asked = c2.form_submit_button(t("Ask", "पूछें"), type="primary", use_container_width=True,
+                                                      icon=":material/arrow_forward:")
+                    if asked:  # also true when the question is sent with the Enter key
+                        _submit_typed()
 
                 with st.expander(t("Speak or upload voice question (माइक या ऑडियो फ़ाइल)", "माइक से बोलें या ऑडियो फ़ाइल अपलोड करें"), icon=":material/mic:"):
                     rec_audio = st.audio_input(t("Record voice question", "आवाज़ रिकॉर्ड करें"), key="mic_audio_input")
@@ -2316,7 +2293,8 @@ def page_ask():
             st.pills(t("Try one of these", "इनमें से कोई सवाल चुनें") if not PUBLIC else t("Choose a question", "सवाल चुनें"),
                      chips, key="ask_chip", on_change=_pick_chip)
             if PUBLIC:
-                H(f'<div class="cc-note">{t("Typing your own question is switched off in this preview until our safety checks pass.", "सुरक्षा जांच पूरी होने तक टाइपिंग बंद है।")}</div>')
+                H(f'<div class="cc-callout neutral" style="margin-top:4px">{svg(ICON_LOCK, 16)}<div class="d">'
+                  f'{t("Typing your own question is switched off in this preview until our safety checks pass.", "सुरक्षा जांच पूरी होने तक टाइपिंग बंद है।")}</div></div>')
 
             selected_q = st.session_state.get("ask_q")
             if selected_q:
@@ -2336,10 +2314,10 @@ def page_ask():
                 H(f"""
                 <div class="cc-card-modern" style="margin-top:16px;">
                   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;">
-                    <div style="font-size:1.1rem;font-weight:700;color:#0F172A;">{esc(display_q)}</div>
+                    <div style="font-size:1.1rem;font-weight:700;color:#111827;">{esc(display_q)}</div>
                     {label}
                   </div>
-                  <div style="font-size:1.02rem;line-height:1.65;margin-top:12px;color:#1E293B;">{esc(a.text)}</div>
+                  <div style="font-size:1.02rem;line-height:1.65;margin-top:12px;color:#111827;">{esc(no_emoji(a.text)).replace(chr(10), "<br>")}</div>
                 </div>
                 """)
 
@@ -2348,19 +2326,19 @@ def page_ask():
                     hi_summary = ""
                     sq = selected_q.lower()
                     if "salar" in sq or "1 अक्टूबर" in sq or "सैलरी" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।'
+                        hi_summary = '<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।'
                     elif "who owes" in sq or "बकाया" in sq or "उधारी" in sq:
                         top_invoices = a.numbers.get("invoices", 31) if (a and isinstance(a.numbers, dict)) else 31
                         top_amt = a.numbers.get("outstanding", 782910.0) if (a and isinstance(a.numbers, dict)) else 782910.0
-                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल {inr(top_amt)} ({top_invoices} खुले इनवॉइस)।'
+                        hi_summary = f'<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल {inr(top_amt)} ({top_invoices} खुले इनवॉइस)।'
                     elif "cash in till" in sq or "galla" in sq or "drawer" in sq or "गल्ला" in sq or "रोकड़" in sq:
-                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।'
+                        hi_summary = f'<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।'
                     elif "worst cash dip" in sq or "कम बैलेंस" in sq or "कमी" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।'
+                        hi_summary = '<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।'
                     elif "loan" in sq or "लोन" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।'
+                        hi_summary = '<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।'
                     elif "reminder" in sq or "तकादा" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश \'Receivables\' पेज पर तैयार हैं।'
+                        hi_summary = '<span style="color:#FF4B4B;font-weight:600">सरल समझ:</span> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश \'Receivables\' पेज पर तैयार हैं।'
                     if hi_summary:
                         H(f'<div style="margin-top:12px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:0.92rem;color:#166534">{hi_summary}</div>')
 
@@ -2426,7 +2404,7 @@ def page_quality():
     section("Matching receipts to documents")
     H(f"""
     <div class="cc-card-modern">
-      <div style="font-size:0.95rem;font-weight:700;color:#0F172A;margin-bottom:4px;">Strict Decision 60 Auto-Match Accuracy</div>
+      <div style="font-size:0.95rem;font-weight:700;color:#111827;margin-bottom:4px;">Strict Decision 60 Auto-Match Accuracy</div>
       <div class="cc-muted" style="margin-bottom:12px;">{esc(precision_txt)}</div>
       {_html_table(summary(df), highlight=biz, min_width=900)}
     </div>
@@ -2450,7 +2428,7 @@ def page_quality():
         mape_note = "target ≤ 10%"
     H(f"""
     <div class="cc-card-modern">
-      <div style="font-size:0.95rem;font-weight:700;color:#0F172A;margin-bottom:8px;">Holdout Forecast Benchmarks (Jul–Sep 2026 Out-of-Sample)</div>
+      <div style="font-size:0.95rem;font-weight:700;color:#111827;margin-bottom:8px;">Holdout Forecast Benchmarks (Jul–Sep 2026 Out-of-Sample)</div>
       <div class="cc-tiles">
         {tile("Model error (MAPE) on the frozen holdout", mape_label, f"{mape_note} · naive 3-month baseline {holdout_res.naive_mape:.2%}")}
         {tile("Agency inflows error", f"{holdout_res.agency_inflow_mape:.2%}", f"naive baseline {holdout_res.naive_agency_inflow_mape:.2%}")}
@@ -2479,7 +2457,7 @@ def page_setup():
             if step == 1:
                 H('<div class="cc-title" role="heading" aria-level="1" style="font-size:1.6rem">'
                   'Connect your accounts with peace of mind</div>'
-                  '<div class="cc-sub" style="font-size:0.95rem;color:#3F444B;margin:8px 0 20px">'
+                  '<div class="cc-sub" style="font-size:0.95rem;color:#4B5563;margin:8px 0 20px">'
                   'We connect through RBI-regulated Account Aggregator rails. We only read your data to give you clarity, '
                   'never to act on your behalf.</div>')
                 a, b = st.columns(2, gap="large")
@@ -2507,7 +2485,7 @@ def page_setup():
                 n_customers = len(by_customer(open_items(pack, biz)))
                 H('<div class="cc-title" role="heading" aria-level="1" style="font-size:1.6rem">'
                   'Reading and checking your books</div>'
-                  '<div class="cc-sub" style="font-size:0.95rem;color:#3F444B;margin:8px 0 20px">'
+                  '<div class="cc-sub" style="font-size:0.95rem;color:#4B5563;margin:8px 0 20px">'
                   f'Eighteen months of statements, {rep["bank_lines"]:,} lines, checked for balance breaks and missing '
                   'receipts.</div>')
                 tiles(
@@ -2557,7 +2535,7 @@ def page_setup():
                 salary, _ = copilot.salary_run(biz, "2026-09")
                 H('<div class="cc-title" role="heading" aria-level="1" style="font-size:1.6rem">'
                   'We found your key numbers</div>'
-                  '<div class="cc-sub" style="font-size:0.95rem;color:#3F444B;margin:8px 0 20px">'
+                  '<div class="cc-sub" style="font-size:0.95rem;color:#4B5563;margin:8px 0 20px">'
                   'Filled in from your recurring transactions. Confirm them, or adjust them with your accountant.</div>')
                 rows = []
                 if limit:
@@ -2566,7 +2544,7 @@ def page_setup():
                 rows.append(("Suggested cash floor", "A five-day operating buffer", "₹2,00,000"))
                 H('<dl class="cc-dl">' + "".join(
                     f'<div style="align-items:baseline"><dt style="display:flex;flex-direction:column">'
-                    f'<span style="color:#17191C;font-weight:500">{esc(t)}</span><span class="cc-muted">{esc(d)}</span></dt>'
+                    f'<span style="color:#111827;font-weight:500">{esc(t)}</span><span class="cc-muted">{esc(d)}</span></dt>'
                     f'<dd style="font-size:1.1rem;font-weight:600">{esc(v)}</dd></div>' for t, d, v in rows) + '</dl>')
                 H('<div class="cc-callout neutral" style="margin-top:16px;font-size:0.85rem">Accountant view: formal bank '
                   'records are shared; drawer cash and khata notes stay private to the owner unless shared.</div>')
@@ -2593,21 +2571,26 @@ PAGES = {
 }
 current = st.navigation(list(PAGES.values()), position="hidden")
 
-# ── SIDEBAR: BUSINESS, PAGES, ROLE, LANGUAGE ─────────────────────────────────
+# Primary pages live in the top bar (Floating Edition layout); the sidebar keeps workspace controls.
+TOP_NAV = ("overview", "cash", "forecast", "review", "recv", "ask")
+
+
+def nav_label(k: str) -> str:
+    label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
+    if k == "review":
+        rev_c = sum(v for tier, v in queue_counts(biz).items() if tier in (SUGGEST, ASK))
+        label = f"{t('Review', 'समीक्षा')} · {rev_c:,}"
+    return label
+
+
+# ── SIDEBAR: BUSINESS, ROLE, VAULT, LANGUAGE ─────────────────────────────────
 with st.sidebar:
-    H(f'<div class="cc-brand">{LOGO}<span>Cash Copilot</span></div>')
+    H(f'<div class="cc-side-eyebrow">{t("Workspace", "कार्यक्षेत्र")}</div>')
     _biz_options = list(config.BUSINESSES)
     biz = st.selectbox("Business", _biz_options, format_func=lambda b: config.BUSINESSES[b], key="biz",
                        index=_biz_options.index(st.session_state["biz_choice"]),
                        on_change=lambda: st.session_state.update(biz_choice=st.session_state["biz"]))
     H('<div class="cc-note" style="padding:0 2px">Sample data pack · as of 30 Sep 2026 · read-only</div>')
-    with st.container(key="nav"):
-        for k in ("overview", "cash", "forecast", "review", "recv", "ask"):
-            label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
-            if k == "review":
-                rev_c = sum(v for t, v in queue_counts(biz).items() if t in (SUGGEST, ASK))
-                label = f"{t('Review', 'समीक्षा')} · {rev_c:,}"
-            st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="nav_more"):
         for k in ("quality", "setup"):
             label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
@@ -2636,22 +2619,14 @@ with st.sidebar:
         # ── Sovereign Vault PIN Gating Card ──
         is_v_unlocked = st.session_state.get("vault_unlocked", False)
         if is_v_unlocked:
-            H(f"""
-            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
-              <div style="font-size:0.78rem;font-weight:700;color:#166534;">🟢 🔓 Vault Unlocked · Sovereign Plane Active</div>
-            </div>
-            """)
+            H(f'<div class="cc-vault on"><span class="cc-dot"></span>{t("Vault unlocked · Sovereign plane active", "वॉल्ट खुला · सॉवरेन प्लेन सक्रिय")}</div>')
             if st.button(t("Lock Vault", "वॉल्ट लॉक करें"), key="btn_sidebar_lock_vault", use_container_width=True):
                 vault.lock()
                 st.session_state["vault_unlocked"] = False
                 st.session_state["toast"] = t("Vault locked. Sovereign records secured.", "वॉल्ट लॉक किया गया।")
                 st.rerun()
         else:
-            H(f"""
-            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
-              <div style="font-size:0.78rem;font-weight:700;color:#991B1B;">🔴 🔒 Vault Locked</div>
-            </div>
-            """)
+            H(f'<div class="cc-vault off"><span class="cc-dot"></span>{t("Vault locked", "वॉल्ट लॉक")}</div>')
             s_pin = st.text_input(
                 t("Owner PIN", "मालिक PIN"),
                 type="password",
@@ -2693,4 +2668,38 @@ showing_partial_view = (not is_owner) or (not is_v_unlocked)
 if msg := st.session_state.pop("toast", None):
     st.toast(msg, icon=":material/check_circle:")
 
+
+# ── TOP BAR: BRAND · PAGES · WHO IS VIEWING (Floating Edition header) ────────
+def render_topbar() -> None:
+    initials = "".join(w[0] for w in BIZ_NAME.split()[:2]).upper() or "CC"
+    with st.container(key="topbar"):
+        c_brand, c_nav, c_id = st.columns([1.75, 5.6, 2.0], vertical_alignment="center", gap="medium")
+        with c_brand:
+            H(f'<div class="cc-brand">{LOGO}<span>Cash Copilot</span></div>')
+        with c_nav:
+            with st.container(key="tnav"):
+                for k in TOP_NAV:
+                    label = t("Ask", "पूछें") if k == "ask" else nav_label(k)
+                    st.page_link(PAGES[k], label=label)
+        with c_id:
+            H(f'<div class="cc-ident" data-tip="{esc(role_tip_text())}" data-tip-pos="bottom">'
+              f'<div class="cc-avatar">{esc(initials)}</div>'
+              f'<div><div class="n">{esc(BIZ_NAME)}</div><div class="r">{esc(role_label_text())}</div></div></div>')
+    # Mark the open page in the top bar: red label with a small dot underneath.
+    active = next((i for i, k in enumerate(TOP_NAV, start=1) if PAGES[k].title == current.title), None)
+    if active:
+        H(f'<style>.st-key-tnav > div:nth-child({active}) [data-testid="stPageLink-NavLink"] p {{ color: var(--cc-primary) !important; }}'
+          f'.st-key-tnav > div:nth-child({active}) [data-testid="stPageLink-NavLink"]::after {{ content: ""; position: absolute; left: 50%;'
+          f' bottom: 2px; width: 4px; height: 4px; border-radius: 50%; background: var(--cc-primary); transform: translateX(-50%); }}</style>')
+
+
+render_topbar()
+if is_hi():
+    # Letter-spacing splits Devanagari conjuncts apart, so tracked caps go back to normal spacing in Hindi.
+    H('<style>.stApp *:not([data-testid*="Icon"]) { letter-spacing: normal !important; }</style>')
 current.run()
+
+H(f'<footer class="cc-footer"><span>© 2026 Cash Copilot · {t("Read-only cash copilot for Indian SMEs", "भारतीय SME के लिए केवल-पढ़ने वाला नकद सहायक")}</span>'
+  f'<span class="links"><span>{t("Never moves money", "कभी पैसे नहीं भेजता")}</span>'
+  f'<span>{t("Cash book stays on this device", "रोकड़ बही इसी डिवाइस पर")}</span>'
+  f'<span>{t("Sample data pack", "नमूना डेटा")}</span></span></footer>')

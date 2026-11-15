@@ -1,9 +1,11 @@
+# "Floating Edition" theme: near-black ink, one red accent, white surfaces.
+# Fonts (Inter / Lora / JetBrains Mono) are loaded and applied in app/streamlit_app.py.
 [theme]
 base = "light"
-primaryColor = "#24509A"
+primaryColor = "#FF4B4B"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F3F3F0"
-textColor = "#17191C"
+secondaryBackgroundColor = "#F9FAFB"
+textColor = "#1F2937"
 font = "sans serif"
 
 [client]

@@ -1,11 +1,11 @@
-# "Floating Edition" theme: near-black ink, one red accent, white surfaces.
-# Fonts (Inter / Lora / JetBrains Mono) are loaded and applied in app/streamlit_app.py.
+# "Refined Sidebar" theme: warm paper canvas, near-black ink, white cards; coral is used only for small eyebrows.
+# Fonts (Satoshi / Cabinet Grotesk) are loaded and applied in app/streamlit_app.py.
 [theme]
 base = "light"
-primaryColor = "#FF4B4B"
+primaryColor = "#17191D"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F9FAFB"
-textColor = "#1F2937"
+secondaryBackgroundColor = "#F6F6F4"
+textColor = "#17191D"
 font = "sans serif"
 
 [client]

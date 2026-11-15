@@ -1101,10 +1101,27 @@ def page_overview():
             c_due = inr(top_late["outstanding"])
             c_days = int(top_late["oldest_days"])
             c_phone = "910000000001"
-            wa_msg = f"Namaste {c_name}, Kaveri Distributors balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
+            if c_days >= 900:
+                if is_hi():
+                    wa_msg = (
+                        f"नमस्ते {c_name} जी, आशा है आप सकुशल हैं। {BIZ_NAME} के रिकॉर्ड अनुसार, "
+                        f"हमारी पिछली आपूर्ति का {c_due} बकाया है। क्या आप कृपया पुष्टि कर सकते हैं कि यह "
+                        f"आपकी बहियों से मेल खाता है, या बताएं कि हम कब तक छोटे भुगतान की उम्मीद कर सकते हैं? धन्यवाद!"
+                    )
+                else:
+                    wa_msg = (
+                        f"Namaste {c_name} ji, hope you are doing well. As per our records with {BIZ_NAME}, "
+                        f"the pending balance is {c_due} from our earlier supplies. Could you please confirm if this matches "
+                        f"your books, or let us know when we can expect a small part-settlement? Thank you!"
+                    )
+            else:
+                if is_hi():
+                    wa_msg = f"नमस्ते {c_name}, {BIZ_NAME} का {c_due} बकाया ({c_days} दिन) लंबित है। कृपया जल्द से जल्द भुगतान करें।"
+                else:
+                    wa_msg = f"Namaste {c_name}, {BIZ_NAME} balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
             wa_url = f"https://wa.me/{c_phone}?text={_html.escape(wa_msg)}"
             limitation_badge = ""
-            if c_days > 900:
+            if c_days >= 900:
                 lim_act_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without a written acknowledgement or payment.",
                                 "3 साल से पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")
                 limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
@@ -1558,11 +1575,19 @@ def page_cash_book():
         )
 
         # ── Interactive 5-Part Cash Drawer Balancing Cockpit Card ──
+        prof = config.get_profile(biz)
+        if getattr(prof, "archetype", "") == "clinic":
+            drawer_title = t("Front Desk & Till Cash Balancing Cockpit", "रिसेप्शन व काउंटर नकद मिलान")
+        elif getattr(prof, "archetype", "") == "agency":
+            drawer_title = t("Cash Drawer Balancing Cockpit", "दैनिक नकद रोकड़ मिलान")
+        else:
+            drawer_title = t("Godown Cash Drawer Balancing Cockpit", "दैनिक गल्ला रोकड़ मिलान")
+
         H(f"""
         <div class="cc-card-modern">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             <div>
-              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {t("Godown Cash Drawer Balancing Cockpit", "दैनिक गल्ला रोकड़ मिलान")} {demo}</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {drawer_title} {demo}</div>
               <div style="font-size:0.78rem;color:#64748B;">{t("Opening Float + Parchi Cash In − Petty Expenses − Banked CDM = Expected Close", "शुरुआती नकद + पर्ची नकद − खर्च − बैंक जमा = अपेक्षित गल्ला")} · {when}</div>
             </div>
             {bal_badge}
@@ -1765,9 +1790,10 @@ def page_cash_book():
                 use_container_width=True,
                 key="cb_dl_tally_xml",
             )
+            export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
             st.download_button(
                 label=t("📊 Download CA Excel Workbook", "📊 CA एक्सेल रीकॉन्सिलेशन डाउनलोड करें"),
-                data=generate_ca_excel_pack(pack, _match_list, vault, biz),
+                data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
                 file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
@@ -1959,9 +1985,10 @@ def page_review():
             key="rev_dl_tally_xml",
         )
     with col_exp2:
+        export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
         st.download_button(
             label=t("📊 Download CA Reconciliation Workbook (Excel)", "📊 CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"),
-            data=generate_ca_excel_pack(pack, _match_list, vault, biz),
+            data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
             file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -2121,9 +2148,16 @@ def page_receivables():
           f'<div class="cc-muted">{t("Showing", "कुल")} {len(filtered_cust)} {t("customers owing", "ग्राहकों पर")} {esc(inr(filtered_cust.outstanding.sum()))} {t("outstanding. Largest first.", "बकाया। सबसे बड़े पहले।")}</div>')
 
     if filtered_cust.empty:
-        H(f'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 16px;text-align:center">'
-          f'{svg(ICON_CHECK_CIRCLE, 28, SUBTLE, 1.6)}<div style="font-weight:500">{t("No customers in this list", "इस सूची में कोई ग्राहक नहीं है")}</div>'
-          f'<div class="cc-muted" style="max-width:420px">{t("Balances older than 30 months can become hard to recover under the Limitation Act. They will show here first.", "30 महीने से अधिक पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")}</div></div>')
+        if choice == t("Over 30 months", "30 महीने से अधिक (Limitation Act)"):
+            H(f'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 16px;text-align:center">'
+              f'{svg(ICON_CHECK_CIRCLE, 28, SUBTLE, 1.6)}<div style="font-weight:500">{t("No customers in this list", "इस सूची में कोई ग्राहक नहीं है")}</div>'
+              f'<div class="cc-muted" style="max-width:420px">{t("Balances older than 30 months can become hard to recover under the Limitation Act. They will show here first.", "30 महीने से अधिक पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")}</div></div>')
+        else:
+            st.info(t(f"No customers found matching the filter: '{choice}'.", f"फ़िल्टर '{choice}' से मेल खाने वाला कोई ग्राहक नहीं मिला।"))
+            if st.button(t("Clear filter / Show all customers", "फ़िल्टर हटाएं / सभी ग्राहक देखें"), key="btn_clear_recv_filter"):
+                st.session_state["chase_filter"] = t("All customers", "सभी ग्राहक")
+                st.session_state["_chase_filter"] = "All"
+                st.rerun()
     else:
         collections = vault.collection_records.get(biz, [])
         with st.container(key="crows"):
@@ -2156,12 +2190,26 @@ def page_receivables():
                     prot_banner = (f'<div style="font-size:0.78rem;color:#166534;background:#DCFCE7;border:1px solid #BBF7D0;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-flex;align-items:center;gap:6px;" data-tip="{s_tip}">'
                                    f'{svg(ICON_SHIELD, 14, "#166534")}{esc(salesman_note)} <span class="cc-info-dot" style="background:#BBF7D0;color:#166534;">i</span></div>')
 
-                if is_hi():
-                    wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
-                               f"कृपया चेक कर भुगतान करें। धन्यवाद। UPI: payment@bank")
+                if oldest >= 900:
+                    if is_hi():
+                        wa_text = (
+                            f"नमस्ते {c_name} जी, आशा है आप सकुशल हैं। {BIZ_NAME} के रिकॉर्ड अनुसार, "
+                            f"हमारी पिछली आपूर्ति का {inr(amt)} बकाया है। क्या आप कृपया पुष्टि कर सकते हैं कि यह "
+                            f"आपकी बहियों से मेल खाता है, या बताएं कि हम कब तक छोटे भुगतान की उम्मीद कर सकते हैं? धन्यवाद!"
+                        )
+                    else:
+                        wa_text = (
+                            f"Namaste {c_name} ji, hope you are doing well. As per our records with {BIZ_NAME}, "
+                            f"the pending balance is {inr(amt)} from our earlier supplies. Could you please confirm if this matches "
+                            f"your books, or let us know when we can expect a small part-settlement? Thank you!"
+                        )
                 else:
-                    wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
-                               f"Kripya check kar lijiye. UPI: payment@bank")
+                    if is_hi():
+                        wa_text = (f"नमस्ते {c_name} जी, {BIZ_NAME} की ओर से नमस्कार। आपके खाते का कुल बकाया {inr(amt)} है। "
+                                   f"कृपया चेक कर भुगतान करें। धन्यवाद। UPI: payment@bank")
+                    else:
+                        wa_text = (f"Namaste {c_name}, {BIZ_NAME} se namaskar. Aapka pichla bill {inr(amt)} ka baaki hai. "
+                                   f"Kripya check kar lijiye. UPI: payment@bank")
 
                 wa_url = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
 
@@ -2565,14 +2613,26 @@ with st.sidebar:
             label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
             st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="side_bottom"):
+        def _on_role_change():
+            new_role = st.session_state.get("role", "Owner")
+            st.session_state["role_choice"] = new_role
+            if new_role != "Owner":
+                if vault is not None and hasattr(vault, "lock"):
+                    vault.lock()
+                st.session_state["vault_unlocked"] = False
+
         role = st.selectbox(
             t("Viewing as", "भूमिका (Viewing as)"), ROLES, key="role", index=ROLES.index(st.session_state["role_choice"]),
-            on_change=lambda: st.session_state.update(role_choice=st.session_state["role"]),
+            on_change=_on_role_change,
             help=t("Owner sees all books; Counter staff need the owner PIN for the cash book; "
                    "the Accountant (CA) view respects the owner's sharing setting.",
                    "मालिक सभी बही-खाते देख सकते हैं; काउंटर स्टाफ को गल्ले के लिए PIN चाहिए; "
                    "एकाउंटेंट को मालिक की अनुमति से ही गल्ला दिखता है।"),
         )
+        if role != "Owner":
+            if vault is not None and hasattr(vault, "lock"):
+                vault.lock()
+            st.session_state["vault_unlocked"] = False
         # ── Sovereign Vault PIN Gating Card ──
         is_v_unlocked = st.session_state.get("vault_unlocked", False)
         if is_v_unlocked:

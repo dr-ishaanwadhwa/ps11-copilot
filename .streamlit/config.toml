@@ -1,9 +1,11 @@
+# "Refined Sidebar" theme: warm paper canvas, near-black ink, white cards; coral is used only for small eyebrows.
+# Fonts (Satoshi / Cabinet Grotesk) are loaded and applied in app/streamlit_app.py.
 [theme]
 base = "light"
-primaryColor = "#24509A"
+primaryColor = "#17191D"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F3F3F0"
-textColor = "#17191C"
+secondaryBackgroundColor = "#F6F6F4"
+textColor = "#17191D"
 font = "sans serif"
 
 [client]

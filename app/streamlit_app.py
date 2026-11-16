@@ -34,11 +34,12 @@ from copilot.match import match_all
 from copilot.match.audit import select_audit_sample
 from copilot.match.engine import ASK, SUGGEST
 from copilot.receivables import by_customer, daily_recovery_candidates, open_items, overdue
+from copilot.score import score_matches, summary
 from copilot.gemini import ocr_collection_slip, transcribe_audio
 from copilot.masking import sanitize_slip_image
 from copilot.match.names import match_retailer_name
 from copilot.ingest import parse_bank_statement, parse_tally_xml
-from copilot.tally import generate_ca_excel_pack, generate_tally_xml
+from copilot.tally import generate_ca_excel_pack, generate_statutory_ca_excel_pack, generate_tally_xml
 from copilot.vault import (
     Collection,
     GallaEntry,
@@ -61,6 +62,11 @@ st.set_page_config(
 
 PUBLIC = os.environ.get("COPILOT_PUBLIC") == "1"
 
+
+def get_business_name(b: str) -> str:
+    """Return authentic business name for an SME identifier, eliminating brand bleed across commercial personas."""
+    return config.BUSINESSES.get(b, f"Business-{b}")
+
 # ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
 INK = "#17191C"
 MUTED = "#545A63"
@@ -74,7 +80,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Devanagari:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
 html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
-.stApp td, .stApp th, .stApp div, .stApp span:not([data-testid="stIconMaterial"]) {
+.stApp td, .stApp th, .stApp div, .stApp span:not([data-testid*="Icon"]) {
   font-family: 'IBM Plex Sans', 'IBM Plex Sans Devanagari', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 .stApp { color: #17191C; -webkit-font-smoothing: antialiased; }
@@ -129,7 +135,9 @@ div[role="dialog"] [data-baseweb="base-input"] { background: #FFFFFF !important;
 .st-key-rows, .st-key-krows, .st-key-crows { border-top: 1px solid #B8B8B0; gap: 0 !important; }
 
 /* panels */
-.st-key-cc_panel { background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 10px; padding: 20px; }
+.st-key-cc_panel { background: #F7F7F4; border: 1px solid #B8B8B0; border-radius: 10px; padding: 20px;
+  min-width: 0; container-type: inline-size; overflow-wrap: anywhere; }
+.st-key-cc_panel .cc-hero { font-size: clamp(1.15rem, 15cqw, 2.75rem); }
 [data-testid="stVerticalBlockBorderWrapper"] { border-radius: 10px; border-color: #B8B8B0 !important; }
 [data-testid="stExpander"] details { border: 1px solid #B8B8B0; border-radius: 8px; }
 [data-testid="stExpander"] summary p { font-weight: 500; }
@@ -526,6 +534,7 @@ def svg(path: str, size: int = 16, color: str = "currentColor", width: float = 2
 ICON_CHECK = '<path d="m5 12.5 4.5 4.5L19 7.5"></path>'
 ICON_CHECK_CIRCLE = '<circle cx="12" cy="12" r="9"></circle><path d="m8 12.3 2.7 2.7L16 9.5"></path>'
 ICON_ALERT = '<path d="M12 4 21 19.5H3z"></path><path d="M12 10v4.5"></path><path d="M12 17.4v.1"></path>'
+ICON_UNLOCK = '<rect x="5" y="11" width="14" height="9.5" rx="2"></rect><path d="M8 11V7.5a4 4 0 0 1 7.6-1.7"></path>'
 ICON_LOCK = '<rect x="5" y="11" width="14" height="9.5" rx="2"></rect><path d="M8 11V7.5a4 4 0 0 1 8 0V11"></path>'
 ICON_EYE = '<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="2.8"></circle>'
 ICON_NEVER = '<circle cx="12" cy="12" r="8.5"></circle><path d="m6 18 12-12"></path>'
@@ -542,6 +551,17 @@ def tag(text: str, tone: str = "neutral") -> str:
 
 
 DEMO = '<span class="cc-demo">Demo</span>'
+
+
+def vault_role_note(role_name: str) -> str:
+    """Why a non-owner role has no PIN field: the vault is force-locked for every role except Owner."""
+    who = "Accountant" if role_name.startswith("Accountant") else role_name
+    return (f'<div class="cc-note" data-testid="vault-role-note" style="margin:6px 0 10px;line-height:1.5;">'
+            + t(f"You are viewing as {who}. Sovereign cash is restricted to the Owner, so there is no PIN to enter in this role. "
+                f"Switch 'Viewing as' to Owner to unlock it.",
+                f"आप {who} के रूप में देख रहे हैं। गल्ले का नकद केवल मालिक के लिए है, इसलिए इस भूमिका में PIN नहीं लगता। "
+                f"अनलॉक करने के लिए 'Viewing as' में Owner चुनें।")
+            + '</div>')
 
 
 def tile(label: str, value: str, sub: str = "", tone: str = "", tip: str = "") -> str:
@@ -590,8 +610,10 @@ vault = get_vault()
 
 
 @st.cache_resource(show_spinner="Running the 90-day forecast…")
-def forecast_for(business: str):
-    return simulate_forecast(as_of(pack, config.HOLDOUT_START), business)
+def forecast_for(business: str, cutoff: pd.Timestamp = config.AS_OF, late_days: int = 0,
+                 bill_shift: int = 0, sales_factor: float = 1.0):
+    return simulate_forecast(as_of(pack, cutoff), business, receipt_delay_days=late_days,
+                             bill_shift_days=bill_shift, sales_factor=sales_factor)
 
 
 @st.cache_resource(show_spinner="Scoring the forecast on the holdout…")
@@ -705,7 +727,6 @@ def go(label: str, key: str, page, ask: str | None = None) -> None:
 
 
 def page_header(title: str, subtitle: str, right=None) -> None:
-    role_icon = "👑" if is_owner else ("🪙" if is_counter_staff else "🏛️")
     role_label = t("Owner (मालिक)", "मालिक") if is_owner else (t("Counter Staff (स्टाफ)", "काउंटर स्टाफ") if is_counter_staff else t("Accountant / CA (मुनीम)", "मुनीम / एकाउंटेंट"))
     biz_type = "FMCG Wholesale · Pune" if biz == "SME-1" else ("Dental Clinic · Bengaluru" if biz == "SME-2" else "Design Agency · Mumbai")
     biz_tip = t(f"Business: {BIZ_NAME} ({biz_type}). Live accounting and bank reconciliation dataset.",
@@ -725,9 +746,9 @@ def page_header(title: str, subtitle: str, right=None) -> None:
 
     is_v_unlocked = st.session_state.get("vault_unlocked", False)
     if is_v_unlocked:
-        vault_badge = f'<span class="cc-badge pos" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🟢 🔓 Vault Unlocked · Sovereign Plane Active</span>'
+        vault_badge = f'<span class="cc-badge pos" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">{svg(ICON_UNLOCK, 13)} Vault Unlocked · Sovereign Plane Active</span>'
     else:
-        vault_badge = f'<span class="cc-badge warn" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">🔴 🔒 Vault Locked</span>'
+        vault_badge = f'<span class="cc-badge warn" data-tip="{esc(vault_tip)}" data-tip-pos="bottom">{svg(ICON_LOCK, 13)} Vault Locked</span>'
 
     H(f"""
     <div class="cc-top-banner">
@@ -739,7 +760,7 @@ def page_header(title: str, subtitle: str, right=None) -> None:
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="cc-badge pos" style="font-size:0.8rem;padding:4px 10px;" data-tip="{esc(role_tip)}" data-tip-pos="bottom">
-          {role_icon} {role_label}
+          {role_label}
         </span>
       </div>
     </div>
@@ -939,6 +960,16 @@ def daily_print_dialog():
 def page_overview():
     page_header(t("Overview", "अवलोकन"), t(f"Namaste, {BIZ_NAME}. Your position on {config.AS_OF:%d %b %Y}.",
                                             f"नमस्ते, {BIZ_NAME}। {config.AS_OF:%d %b %Y} को आपकी नकद स्थिति।"))
+    if not st.session_state.get("onboarded", False):
+        with st.container(border=True, key="first_run"):
+            fr1, fr2, fr3 = st.columns([4, 1.3, 1], vertical_alignment="center")
+            fr1.markdown(t("**New here?** A three-step setup shows what is shared, checks your books and confirms your key numbers.",
+                           "**पहली बार?** तीन चरणों का सेटअप बताता है कि क्या साझा होता है, आपके खाते जांचता है और मुख्य आंकड़े पक्के करता है।"))
+            if fr2.button(t("Start setup", "सेटअप शुरू करें"), type="primary", key="btn_first_run_setup", use_container_width=True):
+                st.switch_page(PAGES["setup"])
+            if fr3.button(t("Not now", "अभी नहीं"), key="btn_first_run_skip", use_container_width=True):
+                st.session_state["onboarded"] = True
+                st.rerun()
     bal, _ = copilot.closing_balance(biz)
     limit = copilot.credit_limit(biz)
     items = open_items(pack, biz)
@@ -1046,8 +1077,8 @@ def page_overview():
         <div class="cc-cockpit-hero">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <span class="cc-cockpit-tag" data-tip="{t('Morning executive cash status briefing synthesized from your verified bank and vault records.', 'दैनिक नकद स्थिति ब्रीफिंग')}">☀️ {t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
-              <span class="cc-badge-pill" data-tip="{t('Cash runway: Usable liquidity covers 3.8 months of fixed overheads without new credit.', 'सुरक्षित रनवे')}">🟢 {t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
+              <span class="cc-cockpit-tag" data-tip="{t('Morning executive cash status briefing synthesized from your verified bank and vault records.', 'दैनिक नकद स्थिति ब्रीफिंग')}">{t("Aaj Ka Hisaab · Morning Briefing", "आज का हिसाब · दैनिक नकद ब्रीफिंग")}</span>
+              <span class="cc-badge-pill" data-tip="{t('Cash runway: Usable liquidity covers 3.8 months of fixed overheads without new credit.', 'सुरक्षित रनवे')}">{t("Surplus · Safe Runway", "सुरक्षित ऑपरेटिंग रनवे")}</span>
             </div>
             <div class="cc-badge-pill" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;" data-tip="{t('At current expenditure rate, your liquidity covers 3.8 months of fixed overheads and payroll without factoring any new borrowings.', 'वर्तमान खर्च दर पर लगभग 3.8 महीने का सुरक्षित नकद रनवे है।')}">
               {t("Safe Runway: ", "सुरक्षित रनवे: ")} <b>{months:.1f} {t("Months", "महीने")}</b>
@@ -1102,36 +1133,37 @@ def page_overview():
             c_due = inr(top_late["outstanding"])
             c_days = int(top_late["oldest_days"])
             c_phone = "910000000001"
+            biz_name = get_business_name(biz)
             if c_days >= 900:
                 if is_hi():
                     wa_msg = (
-                        f"नमस्ते {c_name} जी, आशा है आप सकुशल हैं। {BIZ_NAME} के रिकॉर्ड अनुसार, "
+                        f"नमस्ते {c_name} जी, आशा है आप सकुशल हैं। {biz_name} के रिकॉर्ड अनुसार, "
                         f"हमारी पिछली आपूर्ति का {c_due} बकाया है। क्या आप कृपया पुष्टि कर सकते हैं कि यह "
                         f"आपकी बहियों से मेल खाता है, या बताएं कि हम कब तक छोटे भुगतान की उम्मीद कर सकते हैं? धन्यवाद!"
                     )
                 else:
                     wa_msg = (
-                        f"Namaste {c_name} ji, hope you are doing well. As per our records with {BIZ_NAME}, "
+                        f"Namaste {c_name} ji, hope you are doing well. As per our records with {biz_name}, "
                         f"the pending balance is {c_due} from our earlier supplies. Could you please confirm if this matches "
                         f"your books, or let us know when we can expect a small part-settlement? Thank you!"
                     )
             else:
                 if is_hi():
-                    wa_msg = f"नमस्ते {c_name}, {BIZ_NAME} का {c_due} बकाया ({c_days} दिन) लंबित है। कृपया जल्द से जल्द भुगतान करें।"
+                    wa_msg = f"नमस्ते {c_name}, {biz_name} का {c_due} बकाया ({c_days} दिन) लंबित है। कृपया जल्द से जल्द भुगतान करें।"
                 else:
-                    wa_msg = f"Namaste {c_name}, {BIZ_NAME} balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
+                    wa_msg = f"Namaste {c_name}, {biz_name} balance of {c_due} is overdue ({c_days} days). Kindly clear at your earliest convenience."
             wa_url = f"https://wa.me/{c_phone}?text={_html.escape(wa_msg)}"
             limitation_badge = ""
             if c_days >= 900:
                 lim_act_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without a written acknowledgement or payment.",
                                 "3 साल से पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")
-                limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">⚠️ 30+ Mo (Section 18 Limitation Act)</span>'
+                limitation_badge = f'<span class="cc-badge warn" data-tip="{lim_act_tip}">30+ Mo (Section 18 Limitation Act)</span>'
 
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #D97706;background:#FFFBEB;margin-top:4px;margin-bottom:14px;padding:14px 18px;">
               <div style="flex:1;min-width:260px;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <span style="font-size:0.78rem;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("1 Urgent Action This Morning", "आज सुबह की 1 सबसे जरूरी कार्रवाई")}</span>
+                  <span style="font-size:0.78rem;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:0.04em;">{t("1 Urgent Action This Morning", "आज सुबह की 1 सबसे जरूरी कार्रवाई")}</span>
                   {limitation_badge}
                 </div>
                 <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">
@@ -1143,7 +1175,7 @@ def page_overview():
               </div>
               <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp message draft in WhatsApp Web. You review and click Send yourself.', 'WhatsApp पर शिष्टाचारपूर्ण संदेश ड्राफ्ट होगा।')}">
-                  📲 {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
+                  {t("Send WhatsApp Reminder", "WhatsApp तकादा भेजें")}
                 </a>
               </div>
             </div>
@@ -1152,7 +1184,7 @@ def page_overview():
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #EF4444;background:#FEF2F2;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('Salaries exceed current bank balance without active overdraft. Action needed.', 'वेतन के लिए नकद योजना बनाएं')}">
               <div style="flex:1;">
-                <div style="font-size:0.78rem;font-weight:800;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">⚡ {t("Action Required", "ध्यान दें")}</div>
+                <div style="font-size:0.78rem;font-weight:800;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;">{t("Action Required", "ध्यान दें")}</div>
                 <div style="font-size:1.02rem;font-weight:700;color:#0F172A;margin-top:4px;">{t("1 Oct Payroll requires cash planning", "1 अक्टूबर वेतन के लिए नकद योजना आवश्यक")}</div>
               </div>
             </div>
@@ -1161,7 +1193,7 @@ def page_overview():
             H(f"""
             <div class="cc-action-card" style="border-left:4px solid #16A34A;background:#F0FDF4;margin-top:4px;margin-bottom:14px;padding:14px 18px;" data-tip="{t('All operational metrics healthy: Till balanced, payroll covered, receivables normal.', 'सभी कार्य व्यवस्थित हैं')}">
               <div style="flex:1;">
-                <div style="font-size:0.78rem;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">✓ {t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
+                <div style="font-size:0.78rem;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.04em;">{t("All Priorities In Order", "सभी कार्य व्यवस्थित")}</div>
                 <div style="font-size:0.95rem;font-weight:600;color:#166534;margin-top:2px;">{t("No urgent payment or collection bottlenecks this morning.", "आज सुबह कोई तत्काल भुगतान या वसूली समस्या नहीं है।")}</div>
               </div>
             </div>
@@ -1466,8 +1498,8 @@ def collections_dialog():
             )
             assigned_id = vault.record_collection(coll_obj, update_drawer=True)
             toast_text = t(
-                f"✓ Slip {assigned_id} recorded ({payment_mode}: {inr(amt_val)} for {shop_val}).",
-                f"✓ पर्ची {assigned_id} दर्ज हुई ({payment_mode}: {inr(amt_val)} - {shop_val})।"
+                f"Slip {assigned_id} recorded ({payment_mode}: {inr(amt_val)} for {shop_val}).",
+                f"पर्ची {assigned_id} दर्ज हुई ({payment_mode}: {inr(amt_val)} - {shop_val})।"
             )
             st.session_state["toast"] = toast_text
             st.rerun()
@@ -1497,7 +1529,7 @@ def page_cash_book():
             H(f"""
             <div class="cc-card-modern" style="border-left:4px solid #DC2626;background:#FEF2F2;">
               <div style="font-size:1rem;font-weight:700;color:#991B1B;display:flex;align-items:center;gap:8px;">
-                <span>🔒 Sovereign Cash Book Locked</span>
+                <span>{svg(ICON_LOCK, 14)} Sovereign Cash Book Locked</span>
                 <span class="cc-badge warn">Owner PIN Required</span>
               </div>
               <div style="font-size:0.86rem;color:#7F1D1D;margin-top:6px;line-height:1.5;">
@@ -1507,7 +1539,10 @@ def page_cash_book():
             </div>
             """)
 
-            with st.container(border=True):
+            if not is_owner:
+                H(vault_role_note(role))
+            else:
+              with st.container(border=True):
                 H(f'<div class="cc-h2">{t("Unlock Sovereign Vault", "वॉल्ट अनलॉक करें")}</div>')
                 c_pin1, c_pin2 = st.columns([1.5, 1])
                 inline_pin = c_pin1.text_input(
@@ -1570,7 +1605,7 @@ def page_cash_book():
             else t("Discrepancy detected between counted cash and 5-part drawer equation.", "गल्ले में असंगति पाई गई")
         )
         bal_badge = (
-            f'<span class="cc-badge pos" data-tip="{bal_tip}">Ties Exactly ✓</span>'
+            f'<span class="cc-badge pos" data-tip="{bal_tip}">Ties Exactly</span>'
             if is_bal
             else f'<span class="cc-badge warn" data-tip="{bal_tip}">{esc(inr(drift))} Drift to check</span>'
         )
@@ -1588,7 +1623,7 @@ def page_cash_book():
         <div class="cc-card-modern">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
             <div>
-              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">🪙 {drawer_title} {demo}</div>
+              <div style="font-size:1.05rem;font-weight:700;color:#0F172A;" data-tip="{t('End-of-day till reconciliation against 5-part cash equation.', 'दैनिक गल्ला रोकड़ मिलान')}">{drawer_title} {demo}</div>
               <div style="font-size:0.78rem;color:#64748B;">{t("Opening Float + Parchi Cash In − Petty Expenses − Banked CDM = Expected Close", "शुरुआती नकद + पर्ची नकद − खर्च − बैंक जमा = अपेक्षित गल्ला")} · {when}</div>
             </div>
             {bal_badge}
@@ -1691,7 +1726,7 @@ def page_cash_book():
                 table_rows = []
                 for s in reversed(filtered_slips):
                     m_tag = getattr(s, "payment_mode", "CASH").upper()
-                    st_tag = "Banked ✓" if getattr(s, "is_banked", False) else ("In Till" if m_tag == "CASH" else "In Route Bag")
+                    st_tag = "Banked" if getattr(s, "is_banked", False) else ("In Till" if m_tag == "CASH" else "In Route Bag")
                     inv_tag = getattr(s, "invoice_no", "") or "FIFO (Oldest Invoices)"
                     s_date_str = s.date.strftime("%Y-%m-%d") if hasattr(s.date, "strftime") else str(s.date)[:10]
                     table_rows.append({
@@ -1722,7 +1757,7 @@ def page_cash_book():
             rem = format_whatsapp_reminder(acc, BIZ_NAME, upi_handle="payment@bank")
             lim_tip = t("Under Section 18 Limitation Act, debts older than 3 years become legally time-barred without written acknowledgement.",
                         "3 साल से पुराना बकाया कानूनी रूप से अप्रवर्तनीय हो जाता है।")
-            flag = f'<span class="cc-badge warn" data-tip="{lim_tip}">⚠️ {t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
+            flag = f'<span class="cc-badge warn" data-tip="{lim_tip}">{t("30+ Months", "30 महीने से अधिक")}</span>' if acc.is_limitation_alert else f'<span class="cc-badge neutral">{acc.months_open}m open</span>'
             color = f"color:{NEG};font-weight:700;" if acc.balance_due < 0 else "color:#0F172A;font-weight:700;"
             sub_warning = f'<div style="font-size:0.74rem;color:#B45309;margin-top:2px;">{esc(rem["limitation_warning"])}</div>' if rem["limitation_warning"] else ""
 
@@ -1740,7 +1775,7 @@ def page_cash_book():
               </div>
               <div>
                 <a href="{rem['wa_link']}" target="_blank" class="cc-wa-btn" data-tip="{t('Opens a pre-filled WhatsApp reminder draft with balance and UPI payment link.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
-                  📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                  {t("Draft WhatsApp", "WhatsApp तकादा")}
                 </a>
               </div>
             </div>
@@ -1784,17 +1819,16 @@ def page_cash_book():
               f'</div>')
             _match_list = list(matches.values()) if isinstance(matches, dict) else matches
             st.download_button(
-                label=t("📥 Download Tally XML (Receipt Vouchers)", "📥 टैली XML डाउनलोड करें"),
+                label=t("Download Tally XML (Receipt Vouchers)", "टैली XML डाउनलोड करें"),
                 data=generate_tally_xml(pack, _match_list, biz),
                 file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
                 mime="application/xml",
                 use_container_width=True,
                 key="cb_dl_tally_xml",
             )
-            export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
             st.download_button(
-                label=t("📊 Download CA Excel Workbook", "📊 CA एक्सेल रीकॉन्सिलेशन डाउनलोड करें"),
-                data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
+                label=t("Download Statutory CA Excel Workbook (5-Sheet)", "वैधानिक CA एक्सेल डाउनलोड करें (5-शीट)"),
+                data=generate_statutory_ca_excel_pack(pack, _match_list, None, biz),
                 file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
@@ -1804,13 +1838,27 @@ def page_cash_book():
 
 # ── PAGE: FORECAST (FR-FC-1, FR-FC-2) ────────────────────────────────────────
 def page_forecast():
+    # Forecast start: defaults to the day the books are reconciled to, so it looks forward.
+    fc_min = pack.bank.txn_date.min() + pd.DateOffset(months=6)
+    fc_start = pd.Timestamp(st.session_state.get("fc_start", config.AS_OF.date()))
+    fc_end = fc_start + pd.Timedelta(days=90)
     page_header(t("Forecast", "नकद अनुमान (Forecast)"),
-                t(f"90 days from {config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y}, trained only on data before that date.",
-                  f"{config.HOLDOUT_START.day} {config.HOLDOUT_START:%b %Y} से अगले 90 दिनों का सुरक्षित नकद अनुमान।"))
+                t(f"The next 90 days: {fc_start:%d %b %Y} to {fc_end:%d %b %Y}, using only what was known on the start date.",
+                  f"अगले 90 दिन: {fc_start:%d %b %Y} से {fc_end:%d %b %Y} तक, केवल शुरुआती तारीख तक की जानकारी पर आधारित।"))
     if showing_partial_view:
         st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
 
-    fc_res = forecast_for(biz)
+    c_date, c_w1, c_w2, c_w3 = st.columns([1.2, 1.3, 1.3, 1], vertical_alignment="bottom")
+    c_date.date_input(t("Forecast from", "अनुमान की शुरुआत"), value=config.AS_OF.date(), min_value=fc_min.date(),
+                      max_value=config.AS_OF.date(), format="DD/MM/YYYY", key="fc_start")
+    wi_late = c_w1.toggle(t("Customers pay 15 days late", "ग्राहक 15 दिन देर से भुगतान करें"), key="fc_wi_late")
+    wi_early = c_w2.toggle(t("Pay suppliers 15 days early", "सप्लायर को 15 दिन पहले भुगतान"), key="fc_wi_early")
+    wi_sales = c_w3.toggle(t("Sales drop 20%", "बिक्री 20% घटे"), key="fc_wi_sales")
+    what_if = wi_late or wi_early or wi_sales
+
+    fc_base = forecast_for(biz, fc_start)
+    fc_res = (forecast_for(biz, fc_start, 15 if wi_late else 0, -15 if wi_early else 0, 0.8 if wi_sales else 1.0)
+              if what_if else fc_base)
 
     # Shortfall warning cards (D50, D40)
     if fc_res.warnings:
@@ -1837,7 +1885,7 @@ def page_forecast():
             <div>
               <div style="font-size:0.95rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:8px;">
                 {t("No Shortfall Projected · Safe Operating Runway", "कोई नकद कमी नहीं आएगी · सुरक्षित ऑपरेटिंग रनवे")}
-                <span class="cc-badge pos">Q3 Safe</span>
+                <span class="cc-badge pos">{t("Safe", "सुरक्षित")}</span>
               </div>
               <div style="font-size:0.86rem;color:#14532D;margin-top:4px;line-height:1.5;">
                 {t("Your bank headroom stays clear of the sanctioned cash-credit limit, salary obligations and operating expenses across all 90 days.",
@@ -1891,7 +1939,41 @@ def page_forecast():
                  .configure(font=FONT).configure_view(strokeWidth=0)
                  .configure_axis(labelFontSize=12))
         st.altair_chart(chart, use_container_width=True, theme=None)
-        H('<div class="cc-note">Monte Carlo simulation calibrated without lookahead.</div>')
+        H(f'<div class="cc-note">{t("Simulated from your own payment history up to the start date.", "शुरुआती तारीख तक के आपके भुगतान इतिहास से तैयार।")}</div>')
+
+        # Plain-language reading of the chart (15 Nov demo feedback)
+        low_pt = min(fc_res.daily_points, key=lambda p: p.balance_p50)
+        worst = min(p.balance_p10 for p in fc_res.daily_points)
+        lines = [t(f"Your lowest point is <b>{esc(inr(low_pt.balance_p50))}</b> on <b>{low_pt.date:%d %b %Y}</b>.",
+                   f"आपका सबसे निचला स्तर <b>{low_pt.date:%d %b %Y}</b> को <b>{esc(inr(low_pt.balance_p50))}</b> रहेगा।")]
+        if limit_amt:
+            room = low_pt.balance_p50 + limit_amt
+            lines.append(t(f"You do not need to draw on your {esc(inr(limit_amt))} cash-credit limit.",
+                           f"आपको अपनी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा का उपयोग नहीं करना पड़ेगा।") if low_pt.balance_p50 >= 0 else
+                         t(f"That leaves {esc(inr(room))} of your {esc(inr(limit_amt))} cash-credit limit unused.",
+                           f"उस दिन आपकी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा में से {esc(inr(room))} बची रहेगी।") if room >= 0 else
+                         t(f"That is {esc(inr(-room))} beyond your {esc(inr(limit_amt))} cash-credit limit.",
+                           f"यह आपकी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा से {esc(inr(-room))} ज़्यादा है।"))
+        elif low_pt.balance_p50 < 0:
+            lines.append(t("Your bank balance goes below zero on that day.", "उस दिन आपका बैंक बैलेंस शून्य से नीचे चला जाएगा।"))
+        # No "1 in 10" wording: on the holdout only ~22% of actuals landed inside this band.
+        lines.append(t(f"If customers pay slower than usual, the simulation's low case is {esc(inr(worst))}. Treat it as a rough guide.",
+                       f"अगर ग्राहक सामान्य से देर से भुगतान करें, तो अनुमान का निचला स्तर {esc(inr(worst))} है। इसे मोटा अंदाज़ा मानें।"))
+        if what_if:
+            base_low = min(p.balance_p50 for p in fc_base.daily_points)
+            lines.append(t(f"With the what-ifs switched on, the lowest point moves from {esc(inr(base_low))} to "
+                           f"{esc(inr(low_pt.balance_p50))}.",
+                           f"ऊपर चुनी गई स्थितियों में सबसे निचला स्तर {esc(inr(base_low))} से बदलकर {esc(inr(low_pt.balance_p50))} हो जाता है।"))
+        top_cust = by_customer(open_items(pack, biz, fc_start)).head(1)
+        if not top_cust.empty:
+            tc = top_cust.iloc[0]
+            lines.append(t(f"The one collection that helps most: <b>{esc(inr(tc.outstanding))}</b> from "
+                           f"<b>{esc(tc.customer_name)}</b> (oldest invoice {int(tc.oldest_days)} days).",
+                           f"सबसे ज़्यादा मदद करने वाली वसूली: <b>{esc(tc.customer_name)}</b> से <b>{esc(inr(tc.outstanding))}</b> "
+                           f"(सबसे पुराना इनवॉइस {int(tc.oldest_days)} दिन)।"))
+        H(f'<div class="cc-card-modern" data-testid="fc-plain"><div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:8px;">'
+          f'{t("What this forecast means for you", "इस अनुमान का आपके लिए क्या मतलब है")}</div>'
+          + "".join(f'<div style="font-size:0.92rem;color:#334155;line-height:1.6;">{ln}</div>' for ln in lines) + '</div>')
 
     st.write("")
     section("Month by month")
@@ -1978,7 +2060,7 @@ def page_review():
     col_exp1, col_exp2 = st.columns(2)
     with col_exp1:
         st.download_button(
-            label=t("📥 Download Tally XML (Decision 60 Vouchers)", "📥 टैली XML डाउनलोड करें"),
+            label=t("Download Tally XML (Decision 60 Vouchers)", "टैली XML डाउनलोड करें"),
             data=generate_tally_xml(pack, _match_list, biz),
             file_name=f"tally_receipts_{biz}_{config.AS_OF:%Y%m%d}.xml",
             mime="application/xml",
@@ -1986,10 +2068,9 @@ def page_review():
             key="rev_dl_tally_xml",
         )
     with col_exp2:
-        export_vault = vault if (is_owner and is_v_unlocked and not showing_partial_view and share_cash_book) else None
         st.download_button(
-            label=t("📊 Download CA Reconciliation Workbook (Excel)", "📊 CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"),
-            data=generate_ca_excel_pack(pack, _match_list, export_vault, biz),
+            label=t("Download Statutory CA Reconciliation Workbook (Excel)", "वैधानिक CA रीकॉन्सिलेशन एक्सेल डाउनलोड करें"),
+            data=generate_statutory_ca_excel_pack(pack, _match_list, None, biz),
             file_name=f"ca_reconciliation_{biz}_{config.AS_OF:%Y%m%d}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
@@ -2082,7 +2163,7 @@ def page_review():
             is_v = txn_id in verified_keys
             col_v1, col_v2 = st.columns([1.4, 1])
             with col_v1:
-                v_lbl = t("✓ Verified by Owner", "✓ मालिक द्वारा सत्यापित") if is_v else t("Mark as Verified", "सत्यापित चिह्नित करें")
+                v_lbl = t("Verified by Owner", "मालिक द्वारा सत्यापित") if is_v else t("Mark as Verified", "सत्यापित चिह्नित करें")
                 if st.button(v_lbl, key=f"verify_{txn_id}", type="primary" if not is_v else "secondary", use_container_width=True):
                     if is_v:
                         verified_keys.remove(txn_id)
@@ -2155,10 +2236,16 @@ def page_receivables():
               f'<div class="cc-muted" style="max-width:420px">{t("Balances older than 30 months can become hard to recover under the Limitation Act. They will show here first.", "30 महीने से अधिक पुराने बकाये की वसूली में कानूनी अड़चन आ सकती है।")}</div></div>')
         else:
             st.info(t(f"No customers found matching the filter: '{choice}'.", f"फ़िल्टर '{choice}' से मेल खाने वाला कोई ग्राहक नहीं मिला।"))
-            if st.button(t("Clear filter / Show all customers", "फ़िल्टर हटाएं / सभी ग्राहक देखें"), key="btn_clear_recv_filter"):
+            def _reset_chase_filter():
                 st.session_state["chase_filter"] = t("All customers", "सभी ग्राहक")
                 st.session_state["_chase_filter"] = "All"
-                st.rerun()
+
+            st.button(
+                t("Clear filter / Show all customers", "फ़िल्टर हटाएं / सभी ग्राहक देखें"),
+                key="btn_clear_recv_filter",
+                on_click=_reset_chase_filter,
+            )
+
     else:
         collections = vault.collection_records.get(biz, [])
         with st.container(key="crows"):
@@ -2180,7 +2267,7 @@ def page_receivables():
                 if oldest >= 900:
                     l_tip = t("Section 18 Limitation Act: Trade debts older than 3 years become legally time-barred without written acknowledgement or payment.",
                               "3 साल से पुराना बकाया")
-                    lim_badge = f'<span class="cc-badge warn" data-tip="{l_tip}">⚠️ {t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
+                    lim_badge = f'<span class="cc-badge warn" data-tip="{l_tip}">{t("30+ Months (Sec 18 Limitation Act)", "30+ महीने (Sec 18)")}</span>'
                 elif oldest >= 45:
                     d_tip = t("Days elapsed since the oldest unpaid invoice was issued to this retailer.", "पुराने इनवॉइस की अवधि")
                     lim_badge = f'<span class="cc-badge neutral" data-tip="{d_tip}">{oldest}d overdue</span>'
@@ -2232,7 +2319,7 @@ def page_receivables():
                   </div>
                   <div>
                     <a href="{wa_url}" target="_blank" class="cc-wa-btn" data-tip="{t('Drafts an invoice reminder in WhatsApp Web for immediate review and sending.', 'WhatsApp पर तकादा संदेश तैयार करता है।')}">
-                      📲 {t("Draft WhatsApp", "WhatsApp तकादा")}
+                      {t("Draft WhatsApp", "WhatsApp तकादा")}
                     </a>
                   </div>
                 </div>
@@ -2487,6 +2574,7 @@ def page_setup():
                     st.session_state["onboarding_step"] = 2
                     st.rerun()
                 if c2.button("Skip for now", key="onb_skip_btn", use_container_width=True):
+                    st.session_state["onboarded"] = True
                     st.switch_page(PAGES["overview"])
 
             elif step == 2:
@@ -2561,6 +2649,7 @@ def page_setup():
                 c1, c2, _ = st.columns([1.4, 1, 2.6])
                 if c1.button("Open my overview", type="primary", key="onb_step3_finish", use_container_width=True):
                     st.session_state["onboarding_step"] = 1
+                    st.session_state["onboarded"] = True
                     st.switch_page(PAGES["overview"])
                 if c2.button("Back", key="onb_step3_back", use_container_width=True):
                     st.session_state["onboarding_step"] = 2
@@ -2588,7 +2677,10 @@ with st.sidebar:
                        index=_biz_options.index(st.session_state["biz_choice"]),
                        on_change=lambda: st.session_state.update(biz_choice=st.session_state["biz"]))
     H('<div class="cc-note" style="padding:0 2px">Sample data pack · as of 30 Sep 2026 · read-only</div>')
+    onboarded = st.session_state.get("onboarded", False)
     with st.container(key="nav"):
+        if not onboarded:
+            st.page_link(PAGES["setup"], label=t("Start here", "यहाँ से शुरू करें"), icon=PAGES["setup"].icon)
         for k in ("overview", "cash", "forecast", "review", "recv", "ask"):
             label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
             if k == "review":
@@ -2596,7 +2688,7 @@ with st.sidebar:
                 label = f"{t('Review', 'समीक्षा')} · {rev_c:,}"
             st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="nav_more"):
-        for k in ("quality", "setup"):
+        for k in (("quality", "setup") if onboarded else ("quality",)):
             label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
             st.page_link(PAGES[k], label=label, icon=PAGES[k].icon)
     with st.container(key="side_bottom"):
@@ -2625,7 +2717,7 @@ with st.sidebar:
         if is_v_unlocked:
             H(f"""
             <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
-              <div style="font-size:0.78rem;font-weight:700;color:#166534;">🟢 🔓 Vault Unlocked · Sovereign Plane Active</div>
+              <div style="font-size:0.78rem;font-weight:700;color:#166534;">{svg(ICON_UNLOCK, 13)} Vault Unlocked · Sovereign Plane Active</div>
             </div>
             """)
             if st.button(t("Lock Vault", "वॉल्ट लॉक करें"), key="btn_sidebar_lock_vault", use_container_width=True):
@@ -2636,10 +2728,12 @@ with st.sidebar:
         else:
             H(f"""
             <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px 10px;margin:8px 0 6px;">
-              <div style="font-size:0.78rem;font-weight:700;color:#991B1B;">🔴 🔒 Vault Locked</div>
+              <div style="font-size:0.78rem;font-weight:700;color:#991B1B;">{svg(ICON_LOCK, 13)} Vault Locked</div>
             </div>
             """)
-            s_pin = st.text_input(
+            if role != "Owner":
+                H(vault_role_note(role))
+            s_pin = "" if role != "Owner" else st.text_input(
                 t("Owner PIN", "मालिक PIN"),
                 type="password",
                 max_chars=4,
@@ -2647,7 +2741,7 @@ with st.sidebar:
                 help=t("Demo PIN: 0000", "डेमो PIN: 0000"),
                 placeholder="0000",
             )
-            if st.button(t("Unlock Vault", "वॉल्ट अनलॉक करें"), key="btn_sidebar_unlock_vault", type="primary", use_container_width=True):
+            if role == "Owner" and st.button(t("Unlock Vault", "वॉल्ट अनलॉक करें"), key="btn_sidebar_unlock_vault", type="primary", use_container_width=True):
                 expected_pin = os.environ.get("COPILOT_OWNER_PIN") or "0000"
                 if s_pin == expected_pin or (s_pin and vault.unlock(s_pin)):
                     vault.unlock(s_pin or expected_pin)

@@ -152,3 +152,23 @@ def test_deep_forecast_simulator(pack):
     fc2 = simulator.simulate("SME-1", cutoff=pd.Timestamp("2026-06-30"), n_paths=100, seed=42)
     assert fc.monthly_forecasts[0].inflows_p50 == fc2.monthly_forecasts[0].inflows_p50
 
+
+
+def test_what_if_knobs_move_the_low_point_the_right_way():
+    """Late customers and early supplier payments lower the trough; defaults change nothing."""
+    from copilot import config
+    from copilot.forecast import as_of, simulate_forecast
+    from copilot.load import load_pack
+
+    view = as_of(load_pack(), config.AS_OF)
+
+    def run(**kw):
+        pts = simulate_forecast(view, "SME-1", n_paths=100, seed=1, **kw).daily_points
+        return min(p.balance_p50 for p in pts), pts[-1].balance_p50
+
+    base_low, base_close = run()
+    assert run(receipt_delay_days=0, bill_shift_days=0, sales_factor=1.0) == (base_low, base_close)
+    assert run(receipt_delay_days=15)[0] < base_low
+    assert run(bill_shift_days=-15)[0] < base_low
+    # Lower sales only bite once the new invoices would have been collected, so check the close.
+    assert run(sales_factor=0.8)[1] < base_close

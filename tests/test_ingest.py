@@ -64,3 +64,52 @@ def test_parse_tally_xml():
     assert df.iloc[0]["bill_name"] == "INV-2026-089"
     assert df.iloc[0]["amount"] == 45000.0
     assert df.iloc[1]["amount"] == 28500.0
+
+
+def test_parse_bank_statement_skips_readme_sheet():
+    """A workbook whose first sheet is a README must still parse (15 Nov demo crash)."""
+    import io
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as xl:
+        pd.DataFrame({"About": ["Synthetic data"]}).to_excel(xl, sheet_name="README", index=False)
+        pd.DataFrame({
+            "business_id": ["SME-1", "SME-2", "SME-1", "SME-2"],
+            "txn_date": ["2026-10-01", "2026-10-01", "2026-10-02", "2026-10-02"],
+            "narration": ["A", "B", "C", "D"],
+            "debit_inr": [100, None, None, 50],
+            "credit_inr": [None, 200, 30, None],
+            "balance_inr": [900, 5200, 930, 5150],
+        }).to_excel(xl, sheet_name="bank_transactions", index=False)
+
+    res = parse_bank_statement(buf.getvalue(), "PS-11_bank_statements.xlsx")
+    assert res["rows_read"] == 4
+    # Each business keeps its own running balance, so interleaved rows still tie.
+    assert res["balance_ties"] is True
+    assert list(res["df"].columns) == ["txn_date", "narration", "amount", "balance"]
+
+
+def test_parse_bank_statement_description_is_not_credit():
+    """'description' contains the letters 'cr' and must not be read as the credit column."""
+    csv_data = (
+        "Txn Date,Description,Debit,Credit,Balance\n"
+        "01/10/2026,OPENING,0,10000,10000\n"
+        "02/10/2026,RENT,4000,0,6000\n"
+    ).encode("utf-8")
+
+    res = parse_bank_statement(csv_data, "sbi_statement.csv")
+    assert res["summary"]["total_credits"] == 10000.0
+    assert res["summary"]["total_debits"] == 4000.0
+    assert res["balance_ties"] is True
+
+
+def test_parse_bank_statement_no_usable_sheet_names_sheets():
+    import io
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as xl:
+        pd.DataFrame({"About": ["x"]}).to_excel(xl, sheet_name="README", index=False)
+        pd.DataFrame({"category": ["y"]}).to_excel(xl, sheet_name="taxonomy", index=False)
+
+    with pytest.raises(ValueError, match="README, taxonomy"):
+        parse_bank_statement(buf.getvalue(), "notes.xlsx")

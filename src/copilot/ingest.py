@@ -29,33 +29,48 @@ def parse_bank_statement(file_bytes: bytes, filename: str) -> dict[str, Any]:
     if fn.endswith(".csv"):
         # Try utf-8 first, fallback to latin-1
         try:
-            raw_df = pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8")
+            sheets = {"": pd.read_csv(io.BytesIO(file_bytes), encoding="utf-8")}
         except UnicodeDecodeError:
-            raw_df = pd.read_csv(io.BytesIO(file_bytes), encoding="latin-1")
+            sheets = {"": pd.read_csv(io.BytesIO(file_bytes), encoding="latin-1")}
     elif fn.endswith((".xlsx", ".xls")):
-        raw_df = pd.read_excel(io.BytesIO(file_bytes))
+        # A workbook often opens with a README or summary sheet, so read them all.
+        sheets = pd.read_excel(io.BytesIO(file_bytes), sheet_name=None)
     else:
         raise ValueError(f"Unsupported file format '{filename}'. Expected CSV or Excel (.xlsx/.xls).")
 
-    # Normalize column names: strip spaces and lowercase
-    col_map = {c: str(c).strip().lower().replace(" ", "_") for c in raw_df.columns}
-    df = raw_df.rename(columns=col_map)
+    def find_col(cols, keys, exclude=()):
+        # Keys of 1-2 letters ("dr", "cr") must be a whole word: "cr" is inside "description".
+        for c in cols:
+            if c not in exclude and any(k in c.split("_") or (len(k) > 2 and k in c) for k in keys):
+                return c
+        return None
 
-    # Detect date column
-    date_col = next((c for c in df.columns if any(k in c for k in ("date", "txn_date", "value_date"))), None)
-    # Detect narration column
-    narr_col = next((c for c in df.columns if any(k in c for k in ("narration", "description", "particulars", "remarks"))), None)
-    # Detect balance column
-    bal_col = next((c for c in df.columns if any(k in c for k in ("balance", "closing_bal", "closing_balance", "running_bal"))), None)
-    # Detect amount columns (either single 'amount' with Dr/Cr, or separate debit/credit)
-    dr_col = next((c for c in df.columns if any(k in c for k in ("debit", "withdrawal", "dr"))), None)
-    cr_col = next((c for c in df.columns if any(k in c for k in ("credit", "deposit", "cr"))), None)
-    amt_col = next((c for c in df.columns if c in ("amount", "txn_amount") and c not in (dr_col, cr_col)), None)
+    # Use the first sheet that has both a date and a narration column.
+    df = date_col = narr_col = None
+    for raw_df in sheets.values():
+        cand = raw_df.rename(columns={c: re.sub(r"[^a-z0-9]+", "_", str(c).strip().lower()).strip("_")
+                                      for c in raw_df.columns})
+        d = find_col(cand.columns, ("date",))
+        n = find_col(cand.columns, ("narration", "description", "particulars", "remarks"))
+        if df is None or (d and n):
+            df, date_col, narr_col = cand, d, n
+        if d and n:
+            break
 
+    where = f" (sheets checked: {', '.join(map(str, sheets))})" if len(sheets) > 1 else ""
     if not date_col:
-        raise ValueError("Could not find a valid Date column in the statement.")
+        raise ValueError(f"Could not find a valid Date column in the statement{where}.")
     if not narr_col:
-        raise ValueError("Could not find a valid Narration/Description column in the statement.")
+        raise ValueError(f"Could not find a valid Narration/Description column in the statement{where}.")
+
+    taken = (date_col, narr_col)
+    bal_col = find_col(df.columns, ("balance", "closing_bal", "running_bal"), taken)
+    # Amounts are either separate debit/credit columns or a single signed 'amount'
+    dr_col = find_col(df.columns, ("debit", "withdrawal", "dr"), taken)
+    cr_col = find_col(df.columns, ("credit", "deposit", "cr"), taken)
+    amt_col = next((c for c in df.columns if c in ("amount", "txn_amount") and c not in (dr_col, cr_col)), None)
+    # A file covering several accounts keeps one running balance per account
+    grp_col = next((c for c in df.columns if c in ("business_id", "account_no", "account_number")), None)
 
     def clean_num(val) -> float:
         if pd.isna(val) or val is None:
@@ -96,25 +111,24 @@ def parse_bank_statement(file_bytes: bytes, filename: str) -> dict[str, Any]:
             "narration": narr,
             "amount": amt,
             "balance": bal,
+            "_grp": str(row[grp_col]) if grp_col else "",
         })
 
     if not parsed_rows:
         raise ValueError("No valid transaction rows found in the uploaded file.")
 
-    res_df = pd.DataFrame(parsed_rows).sort_values("txn_date").reset_index(drop=True)
+    # Stable sort: same-day rows must keep their statement order for the balance check
+    res_df = pd.DataFrame(parsed_rows).sort_values("txn_date", kind="stable").reset_index(drop=True)
 
-    # Check running balance ties
+    # Check running balance ties, each account against its own previous row
     breaks = []
-    balance_ties = True
-    if bal_col and len(res_df) > 1:
-        for i in range(1, len(res_df)):
-            prev_b = res_df.loc[i - 1, "balance"]
-            curr_b = res_df.loc[i, "balance"]
-            curr_amt = res_df.loc[i, "amount"]
-            # Tolerance +/- 1.0 rupee for round-offs
-            if abs((prev_b + curr_amt) - curr_b) > 1.0:
-                breaks.append(i)
-        balance_ties = len(breaks) == 0
+    if bal_col:
+        prev_b = res_df.groupby("_grp")["balance"].shift()
+        # Tolerance +/- 1.0 rupee for round-offs
+        off = (prev_b + res_df["amount"] - res_df["balance"]).abs() > 1.0
+        breaks = res_df.index[prev_b.notna() & off].tolist()
+    balance_ties = len(breaks) == 0
+    res_df = res_df.drop(columns="_grp")
 
     credits = res_df[res_df.amount > 0].amount.sum()
     debits = res_df[res_df.amount < 0].amount.sum()

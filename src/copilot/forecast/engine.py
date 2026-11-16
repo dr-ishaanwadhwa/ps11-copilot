@@ -42,8 +42,17 @@ def simulate_forecast(
     n_paths: int = 1000,
     seed: int = 0,
     owner_floor: float = 0.0,
+    receipt_delay_days: int = 0,
+    bill_shift_days: int = 0,
+    sales_factor: float = 1.0,
 ) -> ForecastResult:
-    """Run bottom-up daily cash flow simulation for 90 days from cutoff (strictly <= cutoff data)."""
+    """Run bottom-up daily cash flow simulation for 90 days from cutoff (strictly <= cutoff data).
+
+    What-if knobs (the defaults leave the baseline unchanged):
+    - receipt_delay_days: every customer pays this many days later than their usual pattern.
+    - bill_shift_days: supplier bills are paid this many days later (negative = earlier).
+    - sales_factor: new invoicing after the cutoff is scaled by this factor.
+    """
     cutoff = view.cutoff
     rng = np.random.default_rng(seed)
 
@@ -124,6 +133,8 @@ def simulate_forecast(
     bill_outflows: dict[pd.Timestamp, float] = {}
     for r in open_bills.itertuples():
         p_date = r.due_date + pd.Timedelta(days=int(median_lag))
+        if bill_shift_days and p_date > cutoff:
+            p_date = max(p_date + pd.Timedelta(days=bill_shift_days), dates[0])
         bill_outflows[p_date] = bill_outflows.get(p_date, 0.0) + float(r.bill_total)
 
     # 2f. Residual daily outflow over 90 days before cutoff
@@ -234,13 +245,13 @@ def simulate_forecast(
             age = item["age"]
             c = item["customer"]
             del_draw = sample_delay_conditional(age, cust_delays.get(c), biz_delays, rng)
-            arr = item["invoice_date"] + pd.Timedelta(days=del_draw)
+            arr = item["invoice_date"] + pd.Timedelta(days=del_draw + receipt_delay_days)
             if arr in date_to_idx:
                 sim_in[p, date_to_idx[arr]] += item["net"]
 
         # New invoices
         for idx, d in enumerate(dates):
-            iss_amt = (tot_90 / 90.0) * 7.0 * weekday_shares[d.dayofweek]
+            iss_amt = (tot_90 / 90.0) * 7.0 * weekday_shares[d.dayofweek] * sales_factor
             if biz_profile.has_tds:
                 iss_net = iss_amt * (1.0 - config.TDS_RATE)
             elif biz_profile.archetype == "clinic":
@@ -248,7 +259,7 @@ def simulate_forecast(
             else:
                 iss_net = iss_amt
             del_draw = int(rng.choice(biz_delays)) if len(biz_delays) > 0 else 30
-            arr = d + pd.Timedelta(days=del_draw)
+            arr = d + pd.Timedelta(days=del_draw + receipt_delay_days)
             if arr in date_to_idx:
                 sim_in[p, date_to_idx[arr]] += iss_net
 
@@ -356,8 +367,12 @@ class CashForecastSimulator:
         n_paths: int = 1000,
         seed: int = 0,
         owner_floor: float = 0.0,
+        **what_if,
     ) -> ForecastResult:
-        """Run bottom-up Monte Carlo cash forecast from a cutoff date."""
+        """Run bottom-up Monte Carlo cash forecast from a cutoff date.
+
+        `what_if` takes simulate_forecast's receipt_delay_days, bill_shift_days and sales_factor.
+        """
         view = self.get_view(cutoff)
         return simulate_forecast(
             view=view,
@@ -365,5 +380,6 @@ class CashForecastSimulator:
             n_paths=n_paths,
             seed=seed,
             owner_floor=owner_floor,
+            **what_if,
         )
 

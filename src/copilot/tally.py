@@ -18,6 +18,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
 
+from . import config
+
 
 # ---------------------------------------------------------------------------
 # Visual Styling Tokens (aligned with Design Tokens)
@@ -109,9 +111,9 @@ def generate_tally_xml(*args: Any, **kwargs: Any) -> str:
             if not biz_df.empty:
                 company_name = str(biz_df["business_name"].iloc[0])
             else:
-                company_name = f"Business-{biz}"
+                company_name = config.BUSINESSES.get(biz, f"Business-{biz}")
         else:
-            company_name = "Kaveri Distributors" if biz == "SME-1" else f"Business-{biz}"
+            company_name = config.BUSINESSES.get(biz, "Kaveri Distributors" if biz == "SME-1" else f"Business-{biz}")
 
         vouchers = _build_vouchers_from_pack(pack, matches, biz, company_name)
 
@@ -344,7 +346,12 @@ def _render_tally_xml(company_name: str, vouchers: list[dict[str, Any]]) -> str:
 # Standardized CA Reconciliation Excel Workbook Generator
 # ---------------------------------------------------------------------------
 def generate_ca_excel_pack(*args: Any, **kwargs: Any) -> bytes:
-    """Generate standardized 6-sheet CA Reconciliation Excel Workbook (.xlsx).
+    """Generate standardized CA Reconciliation Excel Workbook (.xlsx).
+
+    Supports:
+    1. Standard 6-sheet pack (Internal / Dual-Plane) with Salesman_Collection_Slips and Block D till cash.
+    2. Statutory 5-sheet pack (statutory_5_sheet=True / omit_informal_cash=True) strictly isolating
+       informal cash under ADR-004.
 
     Supported calling conventions:
     1. Direct Data Mode:
@@ -354,6 +361,12 @@ def generate_ca_excel_pack(*args: Any, **kwargs: Any) -> bytes:
        generate_ca_excel_pack(pack: Pack, matches: list[Match], vault: Any, biz: str)
        generate_ca_excel_pack(pack=pack, matches=matches, vault=vault, biz=biz)
     """
+    statutory_5_sheet = (
+        kwargs.pop("statutory_5_sheet", False)
+        or kwargs.pop("omit_informal_cash", False)
+        or kwargs.pop("statutory", False)
+    )
+
     company: str = "Kaveri Distributors"
     biz: str = "SME-1"
     as_of: pd.Timestamp = pd.Timestamp("2026-09-30")
@@ -394,10 +407,19 @@ def generate_ca_excel_pack(*args: Any, **kwargs: Any) -> bytes:
         biz = str(args[3] if len(args) > 3 else kwargs.get("biz", "SME-1"))
 
         company, as_of, summary, matched, suggest, unmatched, invs, slips = _extract_excel_pack_data(
-            pack, matches, vault, biz
+            pack, matches, vault, biz, statutory_5_sheet=statutory_5_sheet
         )
 
-    return _build_openpyxl_workbook(company, biz, as_of, summary, matched, suggest, unmatched, invs, slips)
+    return _build_openpyxl_workbook(
+        company, biz, as_of, summary, matched, suggest, unmatched, invs, slips,
+        statutory_5_sheet=statutory_5_sheet
+    )
+
+
+def generate_statutory_ca_excel_pack(*args: Any, **kwargs: Any) -> bytes:
+    """Generate statutory 5-sheet CA Reconciliation Excel pack strictly omitting informal vault cash (ADR-004)."""
+    kwargs["statutory_5_sheet"] = True
+    return generate_ca_excel_pack(*args, **kwargs)
 
 
 def _extract_excel_pack_data(
@@ -405,9 +427,12 @@ def _extract_excel_pack_data(
     matches: Sequence[Any],
     vault: Any,
     biz: str,
+    statutory_5_sheet: bool = False,
 ) -> tuple[str, pd.Timestamp, dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Extract and synthesize all 6 dataset structures from Pack, Match, and Vault models."""
-    company = "Kaveri Distributors" if biz == "SME-1" else f"Business-{biz}"
+    """Extract and synthesize dataset structures from Pack, Match, and Vault models.
+    When statutory_5_sheet=True, strictly isolates private informal drawer cash and salesman parchi slips under ADR-004.
+    """
+    company = config.BUSINESSES.get(biz, "Kaveri Distributors" if biz == "SME-1" else f"Business-{biz}")
     opening_balance = 0.0
     bank_account_name = "HDFC Bank Current A/c"
 
@@ -462,13 +487,13 @@ def _extract_excel_pack_data(
     ask_inr = _calc_sum(ask_matches)
     no_doc_inr = _calc_sum(no_doc_matches)
 
-    # Cash drawer data from Vault
+    # Cash drawer data from Vault (Zero extraction under statutory mode per ADR-004)
     drawer_counted = 0.0
     drawer_drift = 0.0
     salesman_collections = 0.0
     slips_data: list[dict[str, Any]] = []
 
-    if vault is not None:
+    if vault is not None and not statutory_5_sheet:
         try:
             if hasattr(vault, "get_latest_galla"):
                 latest_galla = vault.get_latest_galla(biz)
@@ -512,9 +537,9 @@ def _extract_excel_pack_data(
         "ask_inr": ask_inr,
         "no_doc_count": len(no_doc_matches),
         "no_doc_inr": no_doc_inr,
-        "drawer_counted": drawer_counted,
-        "salesman_collections": salesman_collections,
-        "drawer_drift": drawer_drift,
+        "drawer_counted": 0.0 if statutory_5_sheet else drawer_counted,
+        "salesman_collections": 0.0 if statutory_5_sheet else salesman_collections,
+        "drawer_drift": 0.0 if statutory_5_sheet else drawer_drift,
     }
 
     # Sheet 2: Matched_Receipts_AUTO
@@ -647,8 +672,9 @@ def _build_openpyxl_workbook(
     unmatched_credits: list[dict[str, Any]],
     open_invoices: list[dict[str, Any]],
     salesman_slips: list[dict[str, Any]],
+    statutory_5_sheet: bool = False,
 ) -> bytes:
-    """Build and style the 6-sheet CA Reconciliation Workbook."""
+    """Build and style the CA Reconciliation Workbook (5 sheets if statutory_5_sheet=True, 6 sheets otherwise)."""
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # Remove default blank sheet
 
@@ -721,15 +747,16 @@ def _build_openpyxl_workbook(
     ws1.append(["NO_DOC (Owner Capital / Contra)", no_doc_cnt, no_doc_amt])
     ws1.append([])
 
-    # Block D: Cash Drawer & Collections Cross-Check
-    drawer_counted = float(summary_data.get("drawer_counted", 0.0))
-    salesman_colls = float(summary_data.get("salesman_collections", sum(float(s.get("Amount_Collected_INR", 0.0)) for s in salesman_slips)))
-    drawer_drift = float(summary_data.get("drawer_drift", 0.0))
+    # Block D: Cash Drawer & Collections Cross-Check (Omitted in statutory 5-sheet pack per ADR-004)
+    if not statutory_5_sheet:
+        drawer_counted = float(summary_data.get("drawer_counted", 0.0))
+        salesman_colls = float(summary_data.get("salesman_collections", sum(float(s.get("Amount_Collected_INR", 0.0)) for s in salesman_slips)))
+        drawer_drift = float(summary_data.get("drawer_drift", 0.0))
 
-    ws1.append(["CASH DRAWER & COLLECTIONS CROSS-CHECK", ""])
-    ws1.append(["Drawer Counted Cash", drawer_counted])
-    ws1.append(["Salesman Route Collections", salesman_colls])
-    ws1.append(["Drawer Drift", drawer_drift])
+        ws1.append(["CASH DRAWER & COLLECTIONS CROSS-CHECK", ""])
+        ws1.append(["Drawer Counted Cash", drawer_counted])
+        ws1.append(["Salesman Route Collections", salesman_colls])
+        ws1.append(["Drawer Drift", drawer_drift])
 
     # Style Sheet 1
     for row in ws1.iter_rows():
@@ -890,35 +917,36 @@ def _build_openpyxl_workbook(
             cell.border = thin_border
 
     # -----------------------------------------------------------------------
-    # Sheet 6: Salesman_Collection_Slips
+    # Sheet 6: Salesman_Collection_Slips (Omitted in statutory 5-sheet pack per ADR-004)
     # -----------------------------------------------------------------------
-    ws6 = wb.create_sheet(title="Salesman_Collection_Slips")
-    headers6 = [
-        "Slip_ID", "Collection_Date", "Salesman_Name", "Retail_Shop_Name",
-        "Amount_Collected_INR", "Payment_Mode", "Linked_Invoice_No",
-        "Drawer_Deposit_Date", "Drawer_Tally_Status"
-    ]
-    ws6.append(headers6)
-    for cell in ws6[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+    if not statutory_5_sheet:
+        ws6 = wb.create_sheet(title="Salesman_Collection_Slips")
+        headers6 = [
+            "Slip_ID", "Collection_Date", "Salesman_Name", "Retail_Shop_Name",
+            "Amount_Collected_INR", "Payment_Mode", "Linked_Invoice_No",
+            "Drawer_Deposit_Date", "Drawer_Tally_Status"
+        ]
+        ws6.append(headers6)
+        for cell in ws6[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    for r in salesman_slips:
-        ws6.append([r.get(k, "") for k in headers6])
+        for r in salesman_slips:
+            ws6.append([r.get(k, "") for k in headers6])
 
-    ws6.auto_filter.ref = ws6.dimensions
-    ws6.freeze_panes = "A2"
+        ws6.auto_filter.ref = ws6.dimensions
+        ws6.freeze_panes = "A2"
 
-    for row in ws6.iter_rows(min_row=2):
-        for cell in row:
-            col_name = headers6[cell.column - 1]
-            if col_name == "Amount_Collected_INR":
-                cell.number_format = INR_CURRENCY_FORMAT
-                cell.alignment = Alignment(horizontal="right")
-            elif col_name in ("Collection_Date", "Drawer_Deposit_Date"):
-                cell.alignment = Alignment(horizontal="center")
-            cell.border = thin_border
+        for row in ws6.iter_rows(min_row=2):
+            for cell in row:
+                col_name = headers6[cell.column - 1]
+                if col_name == "Amount_Collected_INR":
+                    cell.number_format = INR_CURRENCY_FORMAT
+                    cell.alignment = Alignment(horizontal="right")
+                elif col_name in ("Collection_Date", "Drawer_Deposit_Date"):
+                    cell.alignment = Alignment(horizontal="center")
+                cell.border = thin_border
 
     # Auto-adjust column widths across all sheets
     for ws in wb.worksheets:
@@ -955,15 +983,23 @@ class TallyReceiptExporter:
 
 
 class CAReconciliationExporter:
-    """Chartered Accountant 6-Sheet Reconciliation Workbook export engine."""
+    """Chartered Accountant Reconciliation Workbook export engine."""
 
-    def __init__(self, company_name: str = "Kaveri Distributors", business_id: str = "SME-1"):
+    def __init__(
+        self,
+        company_name: str = "Kaveri Distributors",
+        business_id: str = "SME-1",
+        statutory_5_sheet: bool = False,
+    ):
         self.company_name = company_name
         self.business_id = business_id
+        self.statutory_5_sheet = statutory_5_sheet
 
     def generate_workbook(self, *args: Any, **kwargs: Any) -> bytes:
         """Generate multi-tab Excel reconciliation pack."""
         if not args and "company" not in kwargs:
             kwargs["company"] = self.company_name
             kwargs["biz"] = self.business_id
+        if "statutory_5_sheet" not in kwargs and self.statutory_5_sheet:
+            kwargs["statutory_5_sheet"] = self.statutory_5_sheet
         return generate_ca_excel_pack(*args, **kwargs)

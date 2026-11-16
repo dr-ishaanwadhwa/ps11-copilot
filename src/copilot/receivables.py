@@ -12,15 +12,17 @@ OPEN_STATUSES = {"OPEN", "PARTIALLY_PAID", "PENDING"}
 
 
 def open_items(pack: Pack, business_id: str, as_of: pd.Timestamp = config.AS_OF) -> pd.DataFrame:
+    as_of_ts = pd.Timestamp(as_of)
     inv = pack.invoices.drop_duplicates("invoice_no")
-    inv = inv[(inv.business_id == business_id) & inv.status_as_of_30sep2026.isin(OPEN_STATUSES)].copy()
+    inv = inv[(inv.business_id == business_id) & (inv.invoice_date <= as_of_ts) & inv.status_as_of_30sep2026.isin(OPEN_STATUSES)].copy()
     inv["outstanding"] = (inv.invoice_total - inv.amount_received - inv.tds_deducted_by_customer
                           - inv.disallowed_amount).round(2)
     inv = inv[inv.outstanding > 0.5]
-    inv["days_open"] = (as_of - inv.invoice_date).dt.days
-    inv["days_overdue"] = (as_of - inv.due_date).dt.days.clip(lower=0)
+    inv["days_open"] = (as_of_ts - inv.invoice_date).dt.days.clip(lower=0)
+    inv["days_overdue"] = (as_of_ts - inv.due_date).dt.days.clip(lower=0)
     return inv[["invoice_no", "customer_name", "invoice_date", "due_date", "invoice_total", "outstanding",
                 "days_open", "days_overdue", "status_as_of_30sep2026"]].sort_values("invoice_date")
+
 
 
 def by_customer(items: pd.DataFrame) -> pd.DataFrame:

@@ -102,14 +102,11 @@ def test_non_owner_cannot_unlock_vault_in_sidebar():
     at.run()
     assert at.session_state["vault_unlocked"] is False
 
-    # Attempt to enter PIN and unlock
-    pin_input = [w for w in at.sidebar.text_input if w.key == "sidebar_owner_pin_input"][0]
-    pin_input.input("0000")
-    unlock_btn = [b for b in at.sidebar.button if b.key == "btn_sidebar_unlock_vault"][0]
-    unlock_btn.click()
-    at.run()
-
-    # Re-locked on rerun
+    # A non-owner gets no PIN field or unlock button at all (15 Nov demo: typing 0000 as
+    # Accountant appeared to work, then silently re-locked). They see why instead.
+    assert not [w for w in at.sidebar.text_input if w.key == "sidebar_owner_pin_input"]
+    assert not [b for b in at.sidebar.button if b.key == "btn_sidebar_unlock_vault"]
+    assert any("vault-role-note" in m.value and "viewing as Accountant" in m.value for m in at.sidebar.markdown)
     assert at.session_state["vault_unlocked"] is False
     assert any("Formal books only" in w.value for w in at.warning)
 
@@ -219,17 +216,13 @@ def test_receivables_limitation_act_empty_state():
 # 4. BUG REPRODUCTION: CLEAR FILTER BUTTON RUNTIME CRASH (STREAMLIT API EXCEPTION)
 # ============================================================================
 
-def test_receivables_generic_empty_state_button_runtime_crash_reproduction():
-    """EMPIRICAL CHALLENGER FINDING:
+def test_receivables_generic_empty_state_button_runtime_crash_fixed():
+    """Verify that clicking 'Clear filter / Show all customers' executes cleanly
+    without StreamlitAPIException after Milestone 4 callback wrapping fix.
     
-    Reproduce the runtime exception when clicking 'Clear filter / Show all customers'
-    on line 2157 of app/streamlit_app.py.
-    
-    StreamlitAPIException: `st.session_state.chase_filter` cannot be modified
-    after the widget with key `chase_filter` is instantiated.
-    
-    This occurs because line 2158 directly assigns to `st.session_state['chase_filter']`
-    inside the button click conditional rather than using an `on_click` callback.
+    Fix:
+    In app/streamlit_app.py, session state mutation is wrapped inside an `on_click`
+    callback so the widget state is cleanly updated prior to widget re-instantiation.
     """
     orig_by_customer = recv.by_customer
 
@@ -259,12 +252,9 @@ def test_receivables_generic_empty_state_button_runtime_crash_reproduction():
         clear_buttons[0].click()
         at.run()
 
-        # EXPECTED FAILURE: The live code throws StreamlitAPIException!
-        assert at.exception, "Expected StreamlitAPIException when modifying instantiated widget key"
-        ex = at.exception[0]
-        assert "cannot be modified after the widget with key `chase_filter` is instantiated" in ex.message, (
-            f"Unexpected exception message: {ex.message}"
-        )
+        # VERIFICATION: Zero exceptions! The callback ran cleanly.
+        assert not at.exception, f"Expected no StreamlitAPIException, got: {[e.message for e in at.exception]}"
+
 
 
 # ============================================================================

@@ -351,3 +351,51 @@ def test_streamlit_dialogs_ast_integrity():
 
 
 
+
+
+def test_demo_chip_answers_have_no_placeholders(copilot):
+    """Every suggested question answers without leftover "[...]" draft text (16 Nov: the
+    salary answer ended in "[forecast, not in v1]" on the live demo)."""
+    import re
+    chips = ["Can I pay salaries on 1 October 2026?", "Who owes me the most?",
+             "Should I take a loan to cover next month's shortfall?",
+             "Send a reminder to everyone who owes me money.", "Explain my cash position in Hindi.",
+             "What is my worst cash dip in the next 90 days?"]
+    for biz in ("SME-1", "SME-2", "SME-3"):
+        for q in chips:
+            text = copilot.ask(biz, q).text
+            assert not re.search(r"\[[^\]]*(not in v1|TODO|tbd|placeholder)[^\]]*\]", text, re.I), (biz, q, text)
+
+
+def test_worst_cash_dip_is_computed_and_matches_forecast_page(pack):
+    """The dip chip is answered by the forecast engine (not the language model) and gives the
+    Forecast page's numbers; a locked vault must not crash it (16 Nov live-demo crash)."""
+    from copilot import config
+    from copilot.answers import Copilot
+    from copilot.forecast import as_of, simulate_forecast
+    from copilot.vault import VaultDB
+
+    locked = VaultDB(in_memory=True)  # never unlocked
+    c = Copilot(pack, vault=locked)
+    for q in ("What is my worst cash dip in the next 90 days?", "अगले 90 दिनों में सबसे कम बैलेंस कब होगा?"):
+        a = c.ask("SME-1", q)
+        assert a.intent == "FACT", (q, a.intent, a.text)
+    fc = simulate_forecast(as_of(pack, config.AS_OF), "SME-1")
+    low = min(fc.daily_points, key=lambda p: p.balance_p50)
+    assert a.numbers["lowest_balance"] == round(low.balance_p50)
+    assert a.numbers["lowest_date"] == f"{low.date:%Y-%m-%d}"
+    assert "**" not in a.text
+
+
+def test_open_question_with_locked_vault_does_not_crash(pack):
+    from copilot.answers import Copilot
+    from copilot.vault import VaultDB
+    a = Copilot(pack, vault=VaultDB(in_memory=True)).ask("SME-1", "How is my business doing overall?")
+    assert a.text
+
+
+def test_loan_refusal_gives_the_shortfall_facts_it_promises(copilot):
+    a = copilot.ask("SME-1", "Should I take a loan to cover next month's shortfall?")
+    assert a.intent == "LOAN"
+    assert "lowest projected balance" in a.text and "Customers owe you" in a.text
+    assert "lender" in a.text  # still refuses to recommend one

@@ -97,11 +97,44 @@ class Copilot:
         galla_sentence = f" You also counted {inr(galla_cash)} in the drawer today; it is not included above." if galla_cash > 0 else ""
         text = (f"{'Yes' if yes else 'Not from current liquidity alone'}. Salaries were {inr(salary)} in "
                 f"{pd.Timestamp(month + '-01'):%B}. The closing balance on {on - pd.Timedelta(days=1):%d %b %Y} "
-                f"is {inr(bal)}{limit_txt}.{galla_sentence} Receipts expected and other payments due in the first week: "
-                f"[forecast, not in v1].")
+                f"is {inr(bal)}{limit_txt}.{galla_sentence} The Forecast page shows the receipts and payments "
+                f"expected in the first week of October.")
         return Answer(text, "FACT", [bal_row] + sal_rows,
                       {"salary": salary, "closing_balance": round(bal), "headroom": round(available),
                        "galla_cash": round(galla_cash), "yes": yes})
+
+    def _shortfall_fact(self, biz: str) -> str:
+        """The shortfall facts the loan refusal promises: the projected low point and when."""
+        n = self.worst_cash_dip(biz).numbers
+        return (f"Your lowest projected balance is {inr(n['lowest_balance'])} on "
+                f"{pd.Timestamp(n['lowest_date']):%d %b %Y}; the low case is {inr(n['low_case'])}.")
+
+    def worst_cash_dip(self, biz: str) -> Answer:
+        """Lowest projected balance in the next 90 days, computed by the forecast engine.
+
+        Same start date, path count and seed as the Forecast page, so the two always agree.
+        """
+        from .forecast import as_of, simulate_forecast
+
+        cache = self.__dict__.setdefault("_forecast_cache", {})
+        if biz not in cache:
+            cache[biz] = simulate_forecast(as_of(self.pack, config.AS_OF), biz)
+        fc = cache[biz]
+        low = min(fc.daily_points, key=lambda p: p.balance_p50)
+        worst = min(p.balance_p10 for p in fc.daily_points)
+        limit = self.credit_limit(biz)
+        if limit:
+            limit_txt = (f" That stays inside your {inr(limit)} cash-credit limit." if worst >= -limit else
+                         f" In that low case you would be {inr(-limit - worst)} beyond your {inr(limit)} cash-credit limit.")
+        else:
+            limit_txt = " That stays above zero." if worst >= 0 else " In that low case the balance goes below zero."
+        text = (f"Your lowest projected balance in the next 90 days is {inr(low.balance_p50)} on "
+                f"{low.date:%d %b %Y}, against {inr(fc.opening_balance)} today. If customers pay slower than "
+                f"usual, the low case is {inr(worst)}.{limit_txt} The ranges are still being calibrated, "
+                f"so treat the low case as a rough guide.")
+        return Answer(text, "FACT", [f"FORECAST-{biz}-{config.AS_OF:%Y%m%d}"],
+                      {"lowest_balance": round(low.balance_p50), "lowest_date": f"{low.date:%Y-%m-%d}",
+                       "low_case": round(worst), "opening_balance": round(fc.opening_balance)})
 
     def cash_runway(self, biz: str) -> Answer:
         vault = self._get_vault()
@@ -304,6 +337,8 @@ class Copilot:
             if kw.intent in ("LOAN", "JUDGE_PERSON", "SEND"):
                 items = open_items(self.pack, biz)
                 facts.append(f"Customers owe you {inr(items.outstanding.sum())} across {len(items)} invoices.")
+            if kw.intent == "LOAN":
+                facts.append(self._shortfall_fact(biz))
             return Answer(" ".join([kw.reply] + facts), kw.intent)
 
         q = question.lower().strip()
@@ -335,6 +370,10 @@ class Copilot:
                         pass
             return self.can_pay_salaries(biz, galla_cash=effective_galla)
 
+        # 4b. Lowest projected balance: computed by the forecast engine, never by the language model
+        if any(k in q for k in ["dip", "lowest", "low point", "worst cash", "सबसे कम बैलेंस", "कम बैलेंस"]):
+            return self.worst_cash_dip(biz)
+
         # 5. Cash Runway / Solvency
         if any(k in q for k in ["solvency", "runway", "buffer", "रनवे", "कितने दिन", "cash runway", "kitne din"]):
             return self.cash_runway(biz)
@@ -359,7 +398,11 @@ class Copilot:
 
         # For non-deterministic / open-ended questions, route with known names masked
         vault = self._get_vault()
-        khata_names = [a.party_name for a in vault.get_khata_summary(biz).get("accounts", [])] if vault else []
+        try:
+            khata_names = [a.party_name for a in vault.get_khata_summary(biz).get("accounts", [])] if vault else []
+        except Exception:
+            # A locked vault (public site, non-owner role) must not crash the page; mask formal names only.
+            khata_names = []
         all_known = tuple(self.party_names(biz)) + tuple(khata_names)
         r = route(question, use_llm=True, known_names=list(all_known))
         if r.intent != "FACT":
@@ -367,6 +410,8 @@ class Copilot:
             if r.intent in ("LOAN", "JUDGE_PERSON", "SEND"):
                 items = open_items(self.pack, biz)
                 facts.append(f"Customers owe you {inr(items.outstanding.sum())} across {len(items)} invoices.")
+            if r.intent == "LOAN":
+                facts.append(self._shortfall_fact(biz))
             return Answer(" ".join([r.reply] + facts), r.intent)
 
         # Grounded AI Copilot for general SME queries

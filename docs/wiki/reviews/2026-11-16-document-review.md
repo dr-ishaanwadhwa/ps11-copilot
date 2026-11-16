@@ -31,6 +31,8 @@
 | "13,359 real-world commercial transactions", "pilot testing", "traction" | PITCH l.262, AUDIT l.127 | The data pack is **synthetic** (its own README says so). No pilots or customers exist. | data README |
 | 276 / 291 / 337 tests passing | PITCH l.256, ATTESTATION §4, onboarding §3 | 460+ tests at this review; 337 was a point-in-time count | `pytest` |
 
+Counting note: the Data quality page and `score.summary` report "auto" as AUTO plus NO_DOC lines, i.e. 7,639 (SME-1 1,175; SME-2 6,462; SME-3 2). Pure AUTO matches number 7,630; the 9 NO_DOC lines are posted automatically with no document to match. Both figures are correct. Label whichever one you quote.
+
 Confirmed and safe to use: 13,359 bank lines (12 duplicates removed), 6,438 sales invoices, 18 months (1 Apr 2025 to 30 Sep 2026), 3 businesses, SME-1 low of −₹23,29,533 on 1 Oct 2025 against a ₹25L limit, receivables ₹90,47,390 on 346 invoices, 89 admin hours a month for SME-1, ₹1L AUTO cap, 2% weekly audit sample, Tally XML GUIDs, 5-sheet CA pack.
 
 ## 2. Security and privacy claims vs what is built

@@ -526,6 +526,13 @@ def esc(value) -> str:
     return _html.escape(str(value))
 
 
+def answer_html(text: str) -> str:
+    """Escape an answer, then render only **bold** and line breaks (model answers use light markdown)."""
+    safe = esc(text)
+    safe = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe)
+    return safe.replace("\n", "<br>")
+
+
 def svg(path: str, size: int = 16, color: str = "currentColor", width: float = 2) -> str:
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
             f'stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{path}</svg>')
@@ -2427,7 +2434,7 @@ def page_ask():
                     <div style="font-size:1.1rem;font-weight:700;color:#0F172A;">{esc(display_q)}</div>
                     {label}
                   </div>
-                  <div style="font-size:1.02rem;line-height:1.65;margin-top:12px;color:#1E293B;">{esc(a.text)}</div>
+                  <div style="font-size:1.02rem;line-height:1.65;margin-top:12px;color:#1E293B;">{answer_html(a.text)}</div>
                 </div>
                 """)
 

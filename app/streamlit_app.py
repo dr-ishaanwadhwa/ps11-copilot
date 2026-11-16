@@ -27,6 +27,7 @@ from copilot.answers import Copilot
 from copilot.categorise import score_categories
 from copilot.checks import import_report
 from copilot.fmt import inr
+from copilot.hindi import hindi_summary
 from copilot.forecast import as_of, evaluate_holdout, simulate_forecast
 from copilot.load import load_pack
 from copilot.match import match_all
@@ -2345,22 +2346,8 @@ def page_ask():
 
                 # Hindi summary card when Hindi is selected or asked
                 if is_hi() or "hindi" in selected_q.lower():
-                    hi_summary = ""
-                    sq = selected_q.lower()
-                    if "salar" in sq or "1 अक्टूबर" in sq or "सैलरी" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> हाँ, आप 1 अक्टूबर को सैलरी आसानी से दे सकते हैं। आपके बैंक खाते में कैश-क्रेडिट लिमिट के बाद भी पर्याप्त सुरक्षित सीमा बची रहेगी।'
-                    elif "who owes" in sq or "बकाया" in sq or "उधारी" in sq:
-                        top_invoices = a.numbers.get("invoices", 31) if (a and isinstance(a.numbers, dict)) else 31
-                        top_amt = a.numbers.get("outstanding", 782910.0) if (a and isinstance(a.numbers, dict)) else 782910.0
-                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> सबसे ज्यादा बकाया लक्ष्मी सुपर मार्ट (बिबवेवाड़ी) पर है: कुल {inr(top_amt)} ({top_invoices} खुले इनवॉइस)।'
-                    elif "cash in till" in sq or "galla" in sq or "drawer" in sq or "गल्ला" in sq or "रोकड़" in sq:
-                        hi_summary = f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> आज गल्ले (दराज) में गिना हुआ कुल नकद कैश {inr(answer_galla())} सुरक्षित रूप से दर्ज है।'
-                    elif "worst cash dip" in sq or "कम बैलेंस" in sq or "कमी" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> अगले 90 दिनों में आपका खाता कभी भी बैंक क्रेडिट लिमिट के नीचे नहीं जाएगा। सबसे निचला स्तर सुरक्षित रहेगा।'
-                    elif "loan" in sq or "लोन" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> आपको अतिरिक्त लोन लेने की जरूरत नहीं है। आपकी मौजूदा कैश-क्रेडिट सीमा और आने वाली वसूली पर्याप्त है।'
-                    elif "reminder" in sq or "तकादा" in sq:
-                        hi_summary = '<span style="color:#24509A;font-weight:600">सरल समझ:</span> सभी प्रमुख बकायेदारों के लिए 1-क्लिक WhatsApp तकादा संदेश \'Receivables\' पेज पर तैयार हैं।'
+                    hi_line = hindi_summary(a)
+                    hi_summary = (f'<span style="color:#24509A;font-weight:600">सरल समझ:</span> {esc(hi_line)}' if hi_line else "")
                     if hi_summary:
                         H(f'<div style="margin-top:12px;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;font-size:0.92rem;color:#166534">{hi_summary}</div>')
 

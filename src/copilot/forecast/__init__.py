@@ -7,6 +7,7 @@ from .backtest import (
     evaluate_holdout,
     replay_lead_times,
 )
+from .calendar import CalendarForecast, CalendarPoint, calendar_forecast
 from .delays import (
     compute_net_amount,
     compute_tpa_rates,

@@ -866,6 +866,15 @@ def forecast_for(business: str, cutoff: pd.Timestamp = config.AS_OF, late_days: 
                              bill_shift_days=bill_shift, sales_factor=sales_factor)
 
 
+@st.cache_data(show_spinner="Working out the next few weeks…", max_entries=64)
+def calendar_for(business: str, start: str, horizon: int, late_days: int, sales_pct: int,
+                 one_off: float, one_off_date: str | None):
+    from copilot.forecast.calendar import calendar_forecast
+    return calendar_forecast(pack, business, pd.Timestamp(start), horizon=horizon, receipt_delay_days=late_days,
+                             sales_change_pct=sales_pct, one_off_amount=one_off,
+                             one_off_date=pd.Timestamp(one_off_date) if one_off_date else None)
+
+
 @st.cache_resource(show_spinner="Scoring the forecast on the holdout…")
 def holdout_scores():
     return evaluate_holdout(pack)
@@ -958,12 +967,12 @@ def t(en: str, hi: str) -> str:
 
 
 PAGE_TITLES_HI = {
-    "overview": "अवलोकन",
+    "overview": "आज",
     "cash": "रोकड़ बही",
     "forecast": "नकद अनुमान",
-    "review": "समीक्षा व मिलान",
-    "recv": "बाजार उधारी",
-    "ask": "रोकड़ सलाहकार",
+    "review": "जांचना है",
+    "recv": "किसे पैसे देने हैं",
+    "ask": "पूछें",
     "quality": "डेटा शुद्धता",
     "setup": "सेटिंग्स व वॉल्ट",
 }
@@ -1364,7 +1373,61 @@ def render_briefing_card(headline_html: str, body: str, speech: str, height: int
     components.html(html_code, height=height)
 
 
+def today_for_accountant():
+    """The accountant's day: decide the receipts the rules were unsure about, then hand the books to Tally."""
+    counts = queue_counts(biz)
+    waiting = counts[SUGGEST] + counts[ASK]
+    page_header(t("Today", "आज"), t("Your job today: confirm the receipts the system was not sure about.",
+                                    "आज का काम: जिन रसीदों पर सिस्टम पक्का नहीं था, उन्हें पक्का करें।"))
+    st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
+    tiles(
+        tile(t("To check", "जांचना है"), f"{waiting:,}", t("receipts need your decision", "रसीदों पर फैसला बाकी"), tone="warn" if waiting else "pos"),
+        tile(t("Matched automatically", "अपने आप मिलान"), f"{counts['auto']:,}", t("no action needed", "कुछ करने की ज़रूरत नहीं")),
+        tile(t("Books as of", "हिसाब की तिथि"), f"{config.AS_OF:%d %b %Y}", t("bank statement and invoices", "बैंक स्टेटमेंट और इनवॉइस")),
+    )
+    st.write("")
+    c1, c2 = st.columns(2)
+    if c1.button(t(f"Check {waiting:,} receipts", f"{waiting:,} रसीदें जांचें"), type="primary", use_container_width=True,
+                 icon=":material/fact_check:", key="acct_go_review"):
+        st.switch_page(PAGES["review"])
+    if c2.button(t("Open the cash book and Tally export", "रोकड़ बही और Tally एक्सपोर्ट"), use_container_width=True,
+                 icon=":material/menu_book:", key="acct_go_cash"):
+        st.switch_page(PAGES["cash"])
+
+
+def today_for_counter():
+    """The counter's day: count the drawer, note any udhaar, see who still owes."""
+    page_header(t("Today", "आज"), t("Three things to do at the counter today.", "आज काउंटर पर तीन काम।"))
+    st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
+    steps = [
+        (t("Count the cash in the drawer", "गल्ले की नकदी गिनें"),
+         t("Enter the count in the cash book at closing time.", "दुकान बंद करते समय रोकड़ बही में गिनती दर्ज करें।")),
+        (t("Note any udhaar", "उधारी दर्ज करें"),
+         t("If a customer takes goods on credit, add it to their khata.", "अगर ग्राहक उधार सामान ले, तो उसके खाते में लिखें।")),
+        (t("Collect from customers who owe", "बकाया ग्राहकों से वसूली"),
+         t("Check who owes before a customer pays at the counter.", "ग्राहक के भुगतान से पहले देखें कि किसका कितना बाकी है।")),
+    ]
+    H('<div class="cc-card-modern">' + "".join(
+        f'<div style="display:flex;gap:16px;align-items:flex-start;padding:12px 0;{"border-top:1px solid #EDEDE9;" if i else ""}">'
+        f'<div style="width:34px;height:34px;border-radius:17px;background:#17191D;color:#fff;display:flex;align-items:center;'
+        f'justify-content:center;font-weight:700;flex:none">{i + 1}</div>'
+        f'<div><div style="font-weight:700;font-size:1.02rem">{esc(a)}</div><div style="color:#475569;font-size:0.9rem">{esc(b)}</div></div></div>'
+        for i, (a, b) in enumerate(steps)) + '</div>')
+    st.write("")
+    c1, c2 = st.columns(2)
+    if c1.button(t("Open the cash book", "रोकड़ बही खोलें"), type="primary", use_container_width=True,
+                 icon=":material/menu_book:", key="counter_go_cash"):
+        st.switch_page(PAGES["cash"])
+    if c2.button(t("See who owes money", "देखें किसका बकाया है"), use_container_width=True,
+                 icon=":material/receipt_long:", key="counter_go_recv"):
+        st.switch_page(PAGES["recv"])
+
+
 def page_overview():
+    if is_accountant:
+        return today_for_accountant()
+    if is_counter_staff:
+        return today_for_counter()
     page_header(greeting_line(), t("Here is the clearest view of your business today.", "आज आपके व्यापार की सबसे साफ़ तस्वीर।"))
     if not st.session_state.get("onboarded", False):
         with st.container(border=True, key="first_run"):
@@ -1428,23 +1491,54 @@ def page_overview():
                       f'<div class="cc-card-sub">{t("Formal bank accounts · last 30 days", "औपचारिक बैंक खाते · पिछले 30 दिन")}</div>')
                 with h_r:
                     with st.container(key="cposlink"):
-                        st.page_link(PAGES["forecast"], label=t("View report", "रिपोर्ट देखें"), icon=":material/arrow_outward:")
+                        st.page_link(PAGES["forecast"], label=t("See forecast", "अनुमान देखें"), icon=":material/arrow_outward:")
                 if len(series):
-                    lo, hi = float(series.min()), float(series.max())
-                    span = (hi - lo) or 1.0
-                    peak = int(series.values.argmax())
-                    ramp = ["#F1F5F9", "#E2E8F0", "#CBD5E1", "#94A3B8"]
-                    bars = []
-                    for i, (day, v) in enumerate(series.items()):
-                        frac = (float(v) - lo) / span
-                        shade = ramp[min(3, int(frac * 4))]
-                        cls = ' class="hi"' if i == peak else ""
-                        bars.append(f'<i{cls} style="--i:{i};height:{12 + frac * 88:.1f}%;background:{shade}" '
-                                    f'title="{day:%d %b}: {esc(inr(float(v)))}"></i>')
-                    mid = series.index[len(series) // 2]
-                    H(f'<div class="cc-bars" role="img" aria-label="{esc(t("Daily closing bank balance for the last 30 days", "पिछले 30 दिनों का दैनिक बैंक बैलेंस"))}">'
-                      f'{"".join(bars)}</div>'
-                      f'<div class="cc-axis"><span>{series.index[0]:%d %b}</span><span>{mid:%d %b}</span><span>{series.index[-1]:%d %b}</span></div>')
+                    # A balance line instead of bars: where the money stands now, how the month moved it,
+                    # and the one low day worth knowing about.
+                    last = float(series.iloc[-1])
+                    chg = delta  # same comparison as the Bank balance card: against last month's closing balance
+                    up = chg >= 0
+                    H(f'<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:6px 0 2px">'
+                      f'<span style="font-size:1.9rem;font-weight:700;letter-spacing:-0.02em;color:{INK}">{esc(inr(last))}</span>'
+                      f'<span style="font-size:0.85rem;font-weight:700;padding:3px 10px;border-radius:999px;'
+                      f'background:{"#ECFDF3" if up else "#FEF2F2"};color:{"#067647" if up else "#B42318"}">'
+                      f'{"▲" if up else "▼"} {esc(inr(abs(chg)))} {t("this month", "इस महीने")}</span></div>')
+                    df = pd.DataFrame({"Date": series.index, "Bal": series.to_numpy(dtype=float)})
+                    df["txt"] = df.Bal.map(inr)
+                    lo_i, hi_i = int(df.Bal.idxmin()), int(df.Bal.idxmax())
+                    marks = df.loc[[lo_i, hi_i]].copy()
+                    marks["label"] = [t(f"Lowest {df.txt[lo_i]}", f"सबसे कम {df.txt[lo_i]}"),
+                                      t(f"Highest {df.txt[hi_i]}", f"सबसे ज़्यादा {df.txt[hi_i]}")]
+                    marks["dy"] = [18, -14]
+                    marks["col"] = [ACCENT, INK]
+                    x = alt.X("Date:T", title=None, axis=alt.Axis(format="%d %b", tickCount=4, grid=False, domain=False,
+                                                                  ticks=False, labelColor=SUBTLE, labelPadding=8))
+                    y = alt.Y("Bal:Q", title=None, axis=None, scale=alt.Scale(zero=False, padding=20))
+                    tip = [alt.Tooltip("Date:T", title=t("Date", "तारीख"), format="%d %b %Y"),
+                           alt.Tooltip("txt:N", title=t("Closing balance", "दिन का बैलेंस"))]
+                    fill = alt.Gradient(gradient="linear", x1=1, x2=1, y1=1, y2=0,
+                                        stops=[alt.GradientStop(color="rgba(23,25,29,0)", offset=0),
+                                               alt.GradientStop(color="rgba(23,25,29,0.14)", offset=1)])
+                    area = alt.Chart(df).mark_area(interpolate="monotone", color=fill,
+                                                   line={"color": INK, "strokeWidth": 2.5}).encode(x=x, y=y, tooltip=tip)
+                    pts = alt.Chart(marks).mark_point(filled=True, fill="white", strokeWidth=2.5, size=80).encode(
+                        x="Date:T", y="Bal:Q", stroke=alt.Color("col:N", scale=None), tooltip=tip)
+                    def side(i):  # keep a label inside the card when its point sits near either edge
+                        frac = i / max(len(df) - 1, 1)
+                        return ("right", -8) if frac > 0.75 else ("left", 8) if frac < 0.25 else ("center", 0)
+                    (lo_al, lo_dx), (hi_al, hi_dx) = side(lo_i), side(hi_i)
+                    lo_txt = alt.Chart(marks.iloc[[0]]).mark_text(dy=20, dx=lo_dx, align=lo_al, fontSize=12, fontWeight=700,
+                                                                  color=ACCENT).encode(x="Date:T", y="Bal:Q", text="label:N")
+                    hi_txt = alt.Chart(marks.iloc[[1]]).mark_text(dy=-16, dx=hi_dx, align=hi_al, fontSize=12, fontWeight=700,
+                                                                  color=INK).encode(x="Date:T", y="Bal:Q", text="label:N")
+                    today = alt.Chart(df.tail(1)).mark_point(filled=True, color=INK, size=70).encode(x="Date:T", y="Bal:Q", tooltip=tip)
+                    chart = (alt.layer(area, pts, lo_txt, hi_txt, today).properties(height=200, padding={"left": 4, "right": 4, "top": 26, "bottom": 0},
+                                         autosize=alt.AutoSizeParams(type="fit", contains="padding"))
+                             .configure(font=FONT)
+                             .configure_view(strokeWidth=0).configure_axis(labelFontSize=11, labelFontWeight=600))
+                    # Vega sizes the chart to the card's outer width; keep it inside the card's padding.
+                    H('<style>.st-key-cposcard canvas, .st-key-cposcard svg.marks { max-width: 100% !important; height: auto !important; }</style>')
+                    st.altair_chart(chart, use_container_width=True, theme=None)
         with c_brief:
             healthy = bool(sal.numbers.get("yes")) and (bal + (limit or 0)) > 0
             headline = (t("Your business is<br>in a healthy position.", "आपका व्यापार<br>अच्छी स्थिति में है।") if healthy
@@ -2203,202 +2297,130 @@ def page_cash_book():
 
 # ── PAGE: FORECAST (FR-FC-1, FR-FC-2) ────────────────────────────────────────
 def page_forecast():
-    # Forecast start: defaults to the day the books are reconciled to, so it looks forward.
-    fc_min = pack.bank.txn_date.min() + pd.DateOffset(months=6)
-    fc_start = pd.Timestamp(st.session_state.get("fc_start", config.AS_OF.date()))
-    fc_end = fc_start + pd.Timedelta(days=90)
-    page_header(t("Forecast", "नकद अनुमान (Forecast)"),
-                t(f"The next 90 days: {fc_start:%d %b %Y} to {fc_end:%d %b %Y}, using only what was known on the start date.",
-                  f"अगले 90 दिन: {fc_start:%d %b %Y} से {fc_end:%d %b %Y} तक, केवल शुरुआती तारीख तक की जानकारी पर आधारित।"))
-    if showing_partial_view:
-        st.warning(render_partial_view_notice(), icon=":material/visibility_off:")
+    page_header(t("Forecast", "नकद अनुमान"),
+                t("Your bank balance over the coming weeks, worked out from this business's own history.",
+                  "आने वाले हफ्तों में आपका बैंक बैलेंस, इसी कारोबार के अपने इतिहास से।"))
+    if not is_owner:
+        st.info(t("Only the owner can see the forecast. Choose Owner under 'Who is using this?' in the sidebar.",
+                  "अनुमान केवल मालिक देख सकते हैं। साइडबार में 'कौन इस्तेमाल कर रहा है?' में मालिक चुनें।"), icon=":material/lock:")
+        return
 
-    c_date, c_w1, c_w2, c_w3 = st.columns([1.2, 1.3, 1.3, 1], vertical_alignment="bottom")
-    c_date.date_input(t("Forecast from", "अनुमान की शुरुआत"), value=config.AS_OF.date(), min_value=fc_min.date(),
-                      max_value=config.AS_OF.date(), format="DD/MM/YYYY", key="fc_start")
-    wi_late = c_w1.toggle(t("Customers pay 15 days late", "ग्राहक 15 दिन देर से भुगतान करें"), key="fc_wi_late")
-    wi_early = c_w2.toggle(t("Pay suppliers 15 days early", "सप्लायर को 15 दिन पहले भुगतान"), key="fc_wi_early")
-    wi_sales = c_w3.toggle(t("Sales drop 20%", "बिक्री 20% घटे"), key="fc_wi_sales")
-    what_if = wi_late or wi_early or wi_sales
+    first_day = (pack.bank.txn_date.min() + pd.DateOffset(months=3)).date()
+    with st.container(border=True, key="fcfilters"):
+        c1, c2, c3, c4 = st.columns([1.2, 1.1, 1.2, 1.3], vertical_alignment="bottom")
+        start = c1.date_input(t("Start from", "शुरुआत की तारीख"), value=config.AS_OF.date(), min_value=first_day,
+                              max_value=config.AS_OF.date(), format="DD/MM/YYYY", key="fc_start",
+                              help=t("Pick an earlier date to check the forecast against what really happened.",
+                                     "पहले की तारीख चुनें और देखें कि अनुमान असल से कितना मिला।"))
+        horizon = c2.radio(t("Look ahead", "कितने दिन आगे"), [30, 60, 90], index=2, key="fc_h", horizontal=True,
+                           format_func=lambda d: t(f"{d} days", f"{d} दिन"))
+        late = c3.selectbox(t("Customers pay late by", "ग्राहक देर से भुगतान करें"), [0, 7, 15, 30], key="fc_late",
+                            format_func=lambda d: t("On time (usual)", "हमेशा की तरह") if d == 0 else t(f"{d} days", f"{d} दिन"))
+        sales = c4.select_slider(t("Sales change", "बिक्री में बदलाव"), options=[-30, -20, -10, 0, 10, 20, 30], value=0,
+                                 key="fc_sales", format_func=lambda v: f"{v:+d}%" if v else t("No change", "कोई बदलाव नहीं"))
+        with st.expander(t("Add a big one-off payment", "कोई बड़ा एकमुश्त भुगतान जोड़ें"), expanded=False):
+            o1, o2 = st.columns(2)
+            one_off = o1.number_input(t("Amount (₹)", "राशि (₹)"), min_value=0, step=50_000, value=0, key="fc_oneoff")
+            one_off_day = o2.date_input(t("On", "तारीख"), value=start + pd.Timedelta(days=10),
+                                        min_value=start + pd.Timedelta(days=1), max_value=start + pd.Timedelta(days=int(horizon)),
+                                        format="DD/MM/YYYY", key="fc_oneoff_day")
 
-    fc_base = forecast_for(biz, fc_start)
-    fc_res = (forecast_for(biz, fc_start, 15 if wi_late else 0, -15 if wi_early else 0, 0.8 if wi_sales else 1.0)
-              if what_if else fc_base)
+    fc = calendar_for(biz, str(start), int(horizon), int(late), int(sales), float(one_off),
+                      str(one_off_day) if one_off else None)
+    what_if = bool(late or sales or one_off)
+    low, end = fc.lowest, fc.points[-1]
+    limit_amt = fc.credit_limit
 
-    # Shortfall warning cards (D50, D40)
-    if fc_res.warnings:
-        for w in fc_res.warnings:
-            H(f"""
-            <div class="cc-card-modern" style="border-left:4px solid #D97706;background:#FFFBEB;">
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                {svg(ICON_ALERT, 22, "#D97706")}
-                <div>
-                  <div style="font-size:0.95rem;font-weight:700;color:#92400E;display:flex;align-items:center;gap:8px;">
-                    {t("Early Shortfall Warning", "नकद कमी की पूर्व चेतावनी")}
-                    <span class="cc-badge warn">{w.level.title()}</span>
-                  </div>
-                  <div style="font-size:0.86rem;color:#78350F;margin-top:4px;line-height:1.5;">{esc(w.message)}</div>
-                </div>
-              </div>
-            </div>
-            """)
-    else:
-        H(f"""
-        <div class="cc-card-modern" style="border-left:4px solid #059669;background:#F0FDF4;">
-          <div style="display:flex;gap:12px;align-items:flex-start;">
-            {svg(ICON_CHECK_CIRCLE, 22, "#059669")}
-            <div>
-              <div style="font-size:0.95rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:8px;">
-                {t("No Shortfall Projected · Safe Operating Runway", "कोई नकद कमी नहीं आएगी · सुरक्षित ऑपरेटिंग रनवे")}
-                <span class="cc-badge pos">{t("Safe", "सुरक्षित")}</span>
-              </div>
-              <div style="font-size:0.86rem;color:#14532D;margin-top:4px;line-height:1.5;">
-                {t("Your bank headroom stays clear of the sanctioned cash-credit limit, salary obligations and operating expenses across all 90 days.",
-                   "अगले 90 दिनों में वेतन दिवस और सामान्य खर्चों के बाद भी खाता स्वीकृत क्रेडिट लिमिट से पूर्णतः सुरक्षित रहेगा।")}
-              </div>
-            </div>
-          </div>
-        </div>
-        """)
+    tiles(
+        tile(t("Balance on start date", "शुरुआती बैलेंस"), inr(fc.opening_balance), f"{fc.start:%d %b %Y}"),
+        tile(t("Lowest point", "सबसे कम स्तर"), inr(low.p50), f"{low.date:%d %b %Y}", tone="neg" if low.p50 < 0 else ""),
+        tile(t(f"After {fc.horizon} days", f"{fc.horizon} दिन बाद"), inr(end.p50),
+             t(f"likely between {inr(end.p10)} and {inr(end.p90)}", f"संभावित {inr(end.p10)} से {inr(end.p90)}")),
+    )
 
-    if fc_res.daily_points:
-        st.write("")
-        with st.container(border=True):  # chart, legend and note on one white card
-            a, b = st.columns([1, 2], vertical_alignment="center")
-            with a:
-                section(t("Projected bank balance", "अनुमानित बैंक बैलेंस"))
-            limit_amt = copilot.credit_limit(biz)
-            with b:
-                legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(23,25,29,0.08)"></i>{t("Likely range (P10–P90)", "संभावित दायरा (P10–P90)")}</span>'
-                          f'<span><i style="width:16px;height:2.5px;background:{INK}"></i>{t("Most likely (P50)", "सबसे संभावित स्तर (P50)")}</span>')
-                if limit_amt:
-                    legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>{t("Cash-credit limit", "कैश-क्रेडिट सीमा")}</span>'
-                H(f'<div class="cc-legend" style="justify-content:flex-end">{legend}</div>')
-
-            df_daily = pd.DataFrame([
-                {"Date": p.date, "p10": p.balance_p10, "p50": p.balance_p50, "p90": p.balance_p90,
-                 "p10_txt": inr(p.balance_p10), "p50_txt": inr(p.balance_p50), "p90_txt": inr(p.balance_p90)}
-                for p in fc_res.daily_points
-            ])
-            lakh_expr = "(datum.value < 0 ? '−₹' : '₹') + format(abs(datum.value) / 100000, ',.0f') + 'L'"
-            x = alt.X("Date:T", title=None, axis=alt.Axis(format="%d %b", tickCount="month", grid=False, domain=False,
-                                                          tickColor="#EDEDE9", labelColor=SUBTLE, labelPadding=6))
-            y_axis = alt.Axis(labelExpr=lakh_expr, gridColor="#EDEDE9", domain=False, ticks=False, labelColor=SUBTLE,
-                              labelPadding=8, tickCount=5)
-            # Floating Edition chart: ink line on a faint ink band, red marks only where attention is needed.
-            band = alt.Chart(df_daily).mark_area(opacity=0.08, color=INK).encode(
-                x=x, y=alt.Y("p10:Q", title=None, axis=y_axis), y2="p90:Q",
-                tooltip=[alt.Tooltip("Date:T", title="Date", format="%d %b %Y"),
-                         alt.Tooltip("p10_txt:N", title="Worst case (P10)"),
-                         alt.Tooltip("p50_txt:N", title="Most likely (P50)"),
-                         alt.Tooltip("p90_txt:N", title="Optimistic (P90)")])
-            line = alt.Chart(df_daily).mark_line(strokeWidth=2.5, color=INK).encode(x="Date:T", y="p50:Q")
-            low = df_daily.loc[[df_daily.p50.idxmin()]].assign(label=lambda d: "Lowest " + d["p50_txt"])
-            low_pt = alt.Chart(low).mark_point(filled=True, fill="white", stroke=ACCENT, strokeWidth=2, size=70).encode(
-                x="Date:T", y="p50:Q")
-            low_txt = alt.Chart(low).mark_text(dy=22, fontSize=12, fontWeight=700, color=ACCENT).encode(
-                x="Date:T", y="p50:Q", text="label:N")
-            layers = [band, line, low_pt, low_txt]
-            if limit_amt:
-                floor_df = pd.DataFrame([{"Floor": -limit_amt}])
-                layers.append(alt.Chart(floor_df).mark_rule(strokeDash=[6, 5], color=NEG, strokeWidth=1.5).encode(y="Floor:Q"))
-            chart = (alt.layer(*layers).properties(height=340)
-                     .configure(font=FONT).configure_view(strokeWidth=0)
-                     .configure_axis(labelFontSize=11, labelFontWeight=600))
-            st.altair_chart(chart, use_container_width=True, theme=None)
-            H(f'<div class="cc-note">{t("Simulated from your own payment history up to the start date.", "शुरुआती तारीख तक के आपके भुगतान इतिहास से तैयार।")}</div>')
-
-        # Plain-language reading of the chart (15 Nov demo feedback)
-        low_pt = min(fc_res.daily_points, key=lambda p: p.balance_p50)
-        worst = min(p.balance_p10 for p in fc_res.daily_points)
-        lines = [t(f"Your lowest point is <b>{esc(inr(low_pt.balance_p50))}</b> on <b>{low_pt.date:%d %b %Y}</b>.",
-                   f"आपका सबसे निचला स्तर <b>{low_pt.date:%d %b %Y}</b> को <b>{esc(inr(low_pt.balance_p50))}</b> रहेगा।")]
-        if limit_amt:
-            room = low_pt.balance_p50 + limit_amt
-            lines.append(t(f"You do not need to draw on your {esc(inr(limit_amt))} cash-credit limit.",
-                           f"आपको अपनी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा का उपयोग नहीं करना पड़ेगा।") if low_pt.balance_p50 >= 0 else
-                         t(f"That leaves {esc(inr(room))} of your {esc(inr(limit_amt))} cash-credit limit unused.",
-                           f"उस दिन आपकी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा में से {esc(inr(room))} बची रहेगी।") if room >= 0 else
-                         t(f"That is {esc(inr(-room))} beyond your {esc(inr(limit_amt))} cash-credit limit.",
-                           f"यह आपकी {esc(inr(limit_amt))} की कैश-क्रेडिट सीमा से {esc(inr(-room))} ज़्यादा है।"))
-        elif low_pt.balance_p50 < 0:
-            lines.append(t("Your bank balance goes below zero on that day.", "उस दिन आपका बैंक बैलेंस शून्य से नीचे चला जाएगा।"))
-        # No "1 in 10" wording: on the holdout only ~22% of actuals landed inside this band.
-        lines.append(t(f"If customers pay slower than usual, the simulation's low case is {esc(inr(worst))}. Treat it as a rough guide.",
-                       f"अगर ग्राहक सामान्य से देर से भुगतान करें, तो अनुमान का निचला स्तर {esc(inr(worst))} है। इसे मोटा अंदाज़ा मानें।"))
-        if what_if:
-            base_low = min(p.balance_p50 for p in fc_base.daily_points)
-            lines.append(t(f"With the what-ifs switched on, the lowest point moves from {esc(inr(base_low))} to "
-                           f"{esc(inr(low_pt.balance_p50))}.",
-                           f"ऊपर चुनी गई स्थितियों में सबसे निचला स्तर {esc(inr(base_low))} से बदलकर {esc(inr(low_pt.balance_p50))} हो जाता है।"))
-        top_cust = by_customer(open_items(pack, biz, fc_start)).head(1)
-        if not top_cust.empty:
-            tc = top_cust.iloc[0]
-            lines.append(t(f"The one collection that helps most: <b>{esc(inr(tc.outstanding))}</b> from "
-                           f"<b>{esc(tc.customer_name)}</b> (oldest invoice {int(tc.oldest_days)} days).",
-                           f"सबसे ज़्यादा मदद करने वाली वसूली: <b>{esc(tc.customer_name)}</b> से <b>{esc(inr(tc.outstanding))}</b> "
-                           f"(सबसे पुराना इनवॉइस {int(tc.oldest_days)} दिन)।"))
-        H(f'<div class="cc-card-modern" data-testid="fc-plain"><div style="font-size:1.05rem;font-weight:700;color:#0F172A;margin-bottom:8px;">'
-          f'{t("What this forecast means for you", "इस अनुमान का आपके लिए क्या मतलब है")}</div>'
-          + "".join(f'<div style="font-size:0.92rem;color:#334155;line-height:1.6;">{ln}</div>' for ln in lines) + '</div>')
-
-    st.write("")
-    section("Month by month")
-    rows = []
-    for mf in fc_res.monthly_forecasts:
-        month = pd.Timestamp(mf.month + "-01")
-        out_range = (f'<span class="range">{esc(inr(mf.outflows_p10))} – {esc(inr(mf.outflows_p90))}</span>'
-                     if round(mf.outflows_p10) != round(mf.outflows_p90) else "")
-        net_cls = "up" if mf.net_p50 >= 0 else "down"
-        net_txt = ("+" if mf.net_p50 >= 0 else "") + inr(mf.net_p50)
-        rows.append(
-            f'<tr><td>{month:%b %Y}</td>'
-            f'<td>{esc(inr(mf.inflows_p50))}<span class="range">{esc(inr(mf.inflows_p10))} – {esc(inr(mf.inflows_p90))}</span></td>'
-            f'<td>{esc(inr(mf.outflows_p50))}{out_range}</td>'
-            f'<td class="{net_cls}">{esc(net_txt)}</td>'
-            f'<td>{esc(inr(mf.min_balance_p50))}</td>'
-            f'<td style="font-weight:600">{esc(inr(mf.closing_balance_p50))}</td></tr>')
-    H(f"""
-    <div class="cc-card-modern">
-      <div style="font-size:1.05rem;font-weight:700;color:#17191D;margin-bottom:12px;">{t("Month-by-Month Operating Outlook", "माह-दर-माह नकद प्रवाह विश्लेषण")}</div>
-      <div class="cc-scroll">
-        <table class="cc-table" style="min-width:720px">
-          <thead>
-            <tr>
-              <th style="text-align:left;">{t("Month", "माह")}</th>
-              <th data-tip="{t('Expected customer receipts and receivables with P10–P90 sensitivity bounds.', 'अपेक्षित आवक')}">{t("Expected Inflows", "अपेक्षित आवक")} <span class="cc-info-dot">i</span></th>
-              <th data-tip="{t('Committed payroll, vendor dues, and fixed overhead obligations.', 'देय खर्च')}">{t("Committed Outflows", "देय खर्च")} <span class="cc-info-dot">i</span></th>
-              <th data-tip="{t('Monthly operating cash surplus or deficit (Inflows minus Outflows).', 'शुद्ध प्रवाह')}">{t("Net Cash Flow", "शुद्ध प्रवाह")} <span class="cc-info-dot">i</span></th>
-              <th data-tip="{t('The lowest projected cash balance point reached during the calendar month.', 'न्यूनतम स्तर')}">{t("Lowest Day Balance", "न्यूनतम स्तर")} <span class="cc-info-dot">i</span></th>
-              <th data-tip="{t('Projected closing bank liquidity at the end of the calendar month.', 'अंतिम शेष')}">{t("Closing Balance", "अंतिम शेष")} <span class="cc-info-dot">i</span></th>
-            </tr>
-          </thead>
-          <tbody>{"".join(rows)}</tbody>
-        </table>
-      </div>
-      <div class="cc-note" style="margin-top:10px;">{t("P50 median estimates with P10–P90 sensitivity bounds.", "P50 सबसे संभावित स्तर और P10–P90 सीमाएं।")}</div>
-    </div>
-    """)
-
-    st.write("")
-    holdout_res = holdout_scores()
-    with st.expander(f"How accurate is this forecast? {holdout_res.mape:.2%} average error on the holdout", expanded=False):
-        mape_label = f"{holdout_res.mape:.2%}"
-        if holdout_res.mape > 0.182:
-            mape_note = "worse than the simple 3-month average; kill metric (D31)"
+    # One plain sentence about the credit line or zero balance.
+    if limit_amt:
+        room = low.p50 + limit_amt
+        if low.p50 >= 0:
+            msg, tone = t("You should not need your cash-credit limit in this period.",
+                          "इस दौरान कैश-क्रेडिट सीमा की ज़रूरत नहीं पड़नी चाहिए।"), "ok"
+        elif room >= 250_000:
+            msg, tone = t(f"At the lowest point you use part of your credit line, with {inr(room)} of the {inr(limit_amt)} limit still free.",
+                          f"सबसे कम स्तर पर क्रेडिट लाइन का कुछ हिस्सा लगेगा; {inr(limit_amt)} में से {inr(room)} बचा रहेगा।"), "ok"
         else:
-            mape_note = "target ≤ 10%"
-        H('<div class="cc-tiles">'
-          + tile("Model error (MAPE) on the frozen holdout", mape_label,
-                 f"{mape_note} · naive 3-month baseline {holdout_res.naive_mape:.2%}")
-          + tile("Agency inflows error", f"{holdout_res.agency_inflow_mape:.2%}",
-                 f"naive baseline {holdout_res.naive_agency_inflow_mape:.2%}")
-          + tile("Paired bootstrap improvement (naive − model)", f"{holdout_res.bootstrap_diff_mean:+.2%}",
-                 f"95% CI {holdout_res.bootstrap_diff_ci[0]:+.2%} to {holdout_res.bootstrap_diff_ci[1]:+.2%}")
-          + tile("Holdout P10–P90 coverage", f"{holdout_res.coverage_p10_p90:.1%}", "of actuals fell inside the range")
-          + tile("Holdout likely warnings", f"{holdout_res.false_alarms.get(biz, 0)}", "for this business")
-          + '</div>')
-        H('<div class="cc-note" style="margin-top:8px">Scored on the Jul–Sep 2026 holdout; data pack only.</div>')
+            msg, tone = t(f"Careful: around {low.date:%d %b} only {inr(max(room, 0))} of your {inr(limit_amt)} credit limit is left.",
+                          f"सावधान: {low.date:%d %b} के आसपास {inr(limit_amt)} की सीमा में से केवल {inr(max(room, 0))} बचेगा।"), "warn"
+    else:
+        msg, tone = ((t("Your balance stays above zero in this period.", "इस दौरान बैलेंस शून्य से ऊपर रहेगा।"), "ok") if low.p50 >= 0 else
+                     (t(f"Careful: your balance may go below zero around {low.date:%d %b}.",
+                        f"सावधान: {low.date:%d %b} के आसपास बैलेंस शून्य से नीचे जा सकता है।"), "warn"))
+    if tone == "ok":
+        st.success(msg, icon=":material/check_circle:")
+    else:
+        st.warning(msg, icon=":material/warning:")
+
+    df = pd.DataFrame([{"Date": p.date, "p10": p.p10, "p50": p.p50, "p90": p.p90, "actual": p.actual,
+                        "p50_txt": inr(p.p50), "range_txt": f"{inr(p.p10)} – {inr(p.p90)}",
+                        "act_txt": inr(p.actual) if p.actual is not None else "—"} for p in fc.points])
+    with st.container(border=True):
+        legend = (f'<span><i style="width:14px;height:10px;border-radius:2px;background:rgba(23,25,29,0.10)"></i>{t("Likely range", "संभावित दायरा")}</span>'
+                  f'<span><i style="width:16px;height:2.5px;background:{INK}"></i>{t("Forecast", "अनुमान")}</span>')
+        if fc.has_actuals:
+            legend += f'<span><i style="width:16px;height:2.5px;background:{ACCENT}"></i>{t("What really happened", "असल में क्या हुआ")}</span>'
+        if limit_amt:
+            legend += f'<span><i style="width:16px;border-top:2px dashed {NEG}"></i>{t("Credit limit", "क्रेडिट सीमा")}</span>'
+        H(f'<div class="cc-legend">{legend}</div>')
+        lakh_expr = "(datum.value < 0 ? '−₹' : '₹') + format(abs(datum.value) / 100000, ',.0f') + 'L'"
+        x = alt.X("Date:T", title=None, axis=alt.Axis(format="%d %b", grid=False, domain=False, labelColor=SUBTLE))
+        y = alt.Y("p10:Q", title=None, axis=alt.Axis(labelExpr=lakh_expr, gridColor="#EDEDE9", domain=False, ticks=False,
+                                                     labelColor=SUBTLE, tickCount=5))
+        tip = [alt.Tooltip("Date:T", title=t("Date", "तारीख"), format="%d %b %Y"),
+               alt.Tooltip("p50_txt:N", title=t("Forecast", "अनुमान")),
+               alt.Tooltip("range_txt:N", title=t("Likely range", "संभावित दायरा"))]
+        if fc.has_actuals:
+            tip.append(alt.Tooltip("act_txt:N", title=t("Actual", "असल")))
+        layers = [alt.Chart(df).mark_area(opacity=0.10, color=INK).encode(x=x, y=y, y2="p90:Q", tooltip=tip),
+                  alt.Chart(df).mark_line(strokeWidth=2.5, color=INK).encode(x="Date:T", y="p50:Q", tooltip=tip)]
+        if fc.has_actuals:
+            layers.append(alt.Chart(df.dropna(subset=["actual"])).mark_line(strokeWidth=2.5, color=ACCENT)
+                          .encode(x="Date:T", y="actual:Q", tooltip=tip))
+        if limit_amt:
+            layers.append(alt.Chart(pd.DataFrame([{"Floor": -limit_amt}]))
+                          .mark_rule(strokeDash=[6, 5], color=NEG, strokeWidth=1.5).encode(y="Floor:Q"))
+        st.altair_chart(alt.layer(*layers).properties(height=340).configure(font=FONT).configure_view(strokeWidth=0)
+                        .configure_axis(labelFontSize=11, labelFontWeight=600), use_container_width=True, theme=None)
+        if what_if:
+            H(f'<div class="cc-note">{t("What-ifs are switched on, so this is a scenario, not the plain forecast.", "बदलाव चालू हैं, इसलिए यह एक परिदृश्य है।")}</div>')
+
+    # Checking mode: the start date is in the past, so we can show how close it came.
+    if fc.accuracy:
+        a = fc.accuracy
+        better = a["avg_error"] < a["flat_error"]
+        H(f'<div class="cc-card-modern" data-testid="fc-check"><div style="font-size:1.05rem;font-weight:700;margin-bottom:8px;">'
+          f'{t("How close did it get?", "अनुमान असल के कितना करीब रहा?")}</div>'
+          f'<div style="font-size:0.95rem;line-height:1.65;color:#334155">'
+          + t(f"Over these {a['days']} days the forecast was off by <b>{esc(inr(a['avg_error']))}</b> on an average day. "
+              f"Guessing that the balance would simply stay at {esc(inr(fc.opening_balance))} was off by {esc(inr(a['flat_error']))}, "
+              f"so the forecast did {'better' if better else 'worse'} than that guess here. "
+              f"The real balance stayed inside the likely range on <b>{a['inside_range']:.0%}</b> of days.",
+              f"इन {a['days']} दिनों में अनुमान औसतन <b>{esc(inr(a['avg_error']))}</b> से चूका। "
+              f"बैलेंस वहीं {esc(inr(fc.opening_balance))} रहेगा, यह अंदाज़ा {esc(inr(a['flat_error']))} से चूकता। "
+              f"असल बैलेंस <b>{a['inside_range']:.0%}</b> दिनों में संभावित दायरे के अंदर रहा।")
+          + '</div></div>')
+    elif fc.start < config.AS_OF.normalize() and what_if:
+        st.caption(t("Switch the what-ifs off to compare the forecast with what really happened.",
+                     "असल से तुलना के लिए बदलाव बंद करें।"))
+
+    with st.expander(t("How this forecast works", "यह अनुमान कैसे बनता है"), expanded=False):
+        H('<div style="font-size:0.92rem;line-height:1.7;color:#334155">' + t(
+            "It starts from the bank balance on the start date and uses nothing after it. It adds this business's usual "
+            "month: the days money normally goes out (salaries, GST, rent) and comes in, averaged over the last six months. "
+            "Unusually high or low balances drift slowly back toward the six-month average. "
+            f"The likely range comes from replaying the same method on this business's own past {fc.backtest_runs} times "
+            "and seeing how far off it was. To check it yourself, pick an earlier start date.",
+            "यह शुरुआती तारीख के बैंक बैलेंस से शुरू होता है और उसके बाद का कोई डेटा नहीं लेता। इसमें पिछले छह महीनों का "
+            "आपका सामान्य महीना जुड़ता है: किन दिनों पैसा जाता है (सैलरी, GST, किराया) और आता है। संभावित दायरा इसी तरीके को "
+            f"आपके अपने पुराने डेटा पर {fc.backtest_runs} बार चलाकर बनाया गया है।") + '</div>')
 
 
 # ── PAGE: REVIEW QUEUE ───────────────────────────────────────────────────────
@@ -3031,20 +3053,26 @@ def page_setup():
 
 # ── NAVIGATION ───────────────────────────────────────────────────────────────
 PAGES = {
-    "overview": st.Page(page_overview, title="Overview", icon=":material/home:", default=True),
+    "overview": st.Page(page_overview, title="Today", icon=":material/home:", default=True),
     "cash": st.Page(page_cash_book, title="Cash book", icon=":material/payments:", url_path="cash-book"),
     "forecast": st.Page(page_forecast, title="Forecast", icon=":material/trending_up:", url_path="forecast"),
-    "review": st.Page(page_review, title="Review", icon=":material/inbox:", url_path="review"),
-    "recv": st.Page(page_receivables, title="Receivables", icon=":material/receipt_long:", url_path="receivables"),
-    "ask": st.Page(page_ask, title="Ask Copilot", icon=":material/chat_bubble:", url_path="ask"),
-    "quality": st.Page(page_quality, title="Data quality", icon=":material/verified_user:", url_path="data-quality"),
+    "review": st.Page(page_review, title="To check", icon=":material/inbox:", url_path="review"),
+    "recv": st.Page(page_receivables, title="Who owes me", icon=":material/receipt_long:", url_path="receivables"),
+    "ask": st.Page(page_ask, title="Ask", icon=":material/chat_bubble:", url_path="ask"),
+    "quality": st.Page(page_quality, title="Data checks", icon=":material/verified_user:", url_path="data-quality"),
     "setup": st.Page(page_setup, title="Setup guide", icon=":material/flag:", url_path="setup"),
 }
 current = st.navigation(list(PAGES.values()), position="hidden")
 
 # Refined Sidebar layout: the pages live in the sidebar. On phones, where Streamlit folds the sidebar away,
 # the top bar repeats the primary pages.
-TOP_NAV = ("overview", "cash", "forecast", "review", "recv", "ask")
+ALL_NAV = ("overview", "cash", "forecast", "review", "recv", "ask")
+# Only what each person needs. The owner decides, the accountant checks, the counter keeps the day's cash.
+ROLE_NAV = {
+    "Owner": ("overview", "forecast", "recv", "cash", "ask"),
+    "Accountant (CA)": ("overview", "review", "cash", "recv", "ask"),
+    "Counter staff": ("overview", "cash", "recv"),
+}
 MORE_NAV = ("quality", "setup")
 NAV_ICONS = {"overview": ":material/dashboard:", "cash": ":material/menu_book:", "forecast": ":material/monitoring:",
              "review": ":material/fact_check:", "recv": ":material/inbox:", "ask": ":material/auto_awesome:",
@@ -3060,8 +3088,17 @@ def nav_label(k: str) -> str:
     label = PAGE_TITLES_HI.get(k, PAGES[k].title) if is_hi() else PAGES[k].title
     if k == "review":
         rev_c = sum(v for tier, v in queue_counts(biz).items() if tier in (SUGGEST, ASK))
-        label = f"{t('Review', 'समीक्षा')} · {rev_c:,}"
+        label = f"{t('To check', 'जांचना है')} · {rev_c:,}"
     return label
+
+
+def _on_role_change():
+    new_role = st.session_state.get("role", "Owner")
+    st.session_state["role_choice"] = new_role
+    if new_role != "Owner":
+        if vault is not None and hasattr(vault, "lock"):
+            vault.lock()
+        st.session_state["vault_unlocked"] = False
 
 
 # ── SIDEBAR (Refined Sidebar draft): BRAND · WORKSPACE · PAGES · SECURITY · ACCOUNT ──
@@ -3075,6 +3112,14 @@ with st.sidebar:
                            index=_biz_options.index(st.session_state["biz_choice"]), label_visibility="collapsed",
                            on_change=lambda: st.session_state.update(biz_choice=st.session_state["biz"]))
         H(f'<div class="cc-bizsub">{esc(biz_type_label())}</div>')
+        role = st.selectbox(
+            t("Who is using this?", "कौन इस्तेमाल कर रहा है?"), ROLES, key="role",
+            index=ROLES.index(st.session_state["role_choice"]), on_change=_on_role_change,
+            format_func=lambda r: {"Owner": t("Owner", "मालिक"), "Accountant (CA)": t("Accountant", "एकाउंटेंट"),
+                                   "Counter staff": t("Counter staff", "काउंटर स्टाफ")}[r],
+            help=t("Each person sees only what they need. The forecast and the cash vault are for the owner.",
+                   "हर व्यक्ति को केवल उसकी ज़रूरत की चीज़ें दिखती हैं। अनुमान और वॉल्ट केवल मालिक के लिए हैं।"))
+    TOP_NAV = ROLE_NAV[role]
     with st.container(key="snav"):
         if not st.session_state.get("onboarded", False):
             st.page_link(PAGES["setup"], label=t("Start here", "यहाँ से शुरू करें"), icon=NAV_ICONS["setup"])
@@ -3083,14 +3128,6 @@ with st.sidebar:
     with st.container(key="ssec"):
         H(f'<div class="cc-shead"><span class="cc-slabel">{t("Security", "सुरक्षा")}</span>'
           f'<span class="cc-shield">{svg(ICON_SHIELD_CHECK, 15, width=2.2)}</span></div>')
-
-        def _on_role_change():
-            new_role = st.session_state.get("role", "Owner")
-            st.session_state["role_choice"] = new_role
-            if new_role != "Owner":
-                if vault is not None and hasattr(vault, "lock"):
-                    vault.lock()
-                st.session_state["vault_unlocked"] = False
 
         # Only the owner may keep the vault open; settle that before the card shows the state.
         if st.session_state.get("role", st.session_state["role_choice"]) != "Owner":
@@ -3108,17 +3145,9 @@ with st.sidebar:
         # "Manage access" keeps the card quiet: who is viewing, the PIN and the lock open on demand.
         with st.container(key="vaultmgr"):
             # An expander, not a popover: a popover in the sidebar drops clicks on the buttons inside it.
-            with st.expander(t("Manage access", "पहुंच प्रबंधित करें"), expanded=False):
+            with st.expander(t("Owner PIN", "मालिक PIN"), expanded=False):
                 H(f'<div class="cc-pop-title">{t("Access", "पहुंच")}</div>'
-                  f'<div class="cc-pop-sub">{t("Who is viewing, and the owner PIN for the cash book.", "कौन देख रहा है, और रोकड़ बही के लिए मालिक का PIN।")}</div>')
-                role = st.selectbox(
-                    t("Viewing as", "भूमिका (Viewing as)"), ROLES, key="role", index=ROLES.index(st.session_state["role_choice"]),
-                    on_change=_on_role_change,
-                    help=t("Owner sees all books; Counter staff need the owner PIN for the cash book; "
-                           "the Accountant (CA) view respects the owner's sharing setting.",
-                           "मालिक सभी बही-खाते देख सकते हैं; काउंटर स्टाफ को गल्ले के लिए PIN चाहिए; "
-                           "एकाउंटेंट को मालिक की अनुमति से ही गल्ला दिखता है।"),
-                )
+                  f'<div class="cc-pop-sub">{t("The owner PIN opens the cash vault on this device.", "मालिक का PIN इस डिवाइस पर कैश वॉल्ट खोलता है।")}</div>')
                 if role != "Owner":
                     if vault is not None and hasattr(vault, "lock"):
                         vault.lock()
@@ -3194,7 +3223,7 @@ with st.sidebar:
     with st.container(key="sacct"):
         H(f'<div class="cc-sacct" title="{esc(role_tip_text())}"><div class="av">{esc(_initials)}</div>'
           f'<div><div class="n">{esc(BIZ_NAME)}</div><div class="r">{esc(role_label_text())}</div></div></div>')
-        with st.expander(t("Language & more", "भाषा और अन्य"), expanded=False):
+        with st.expander(t("More details & language", "और जानकारी व भाषा"), expanded=False):
             _lang_options = ["English", "हिन्दी"]
             st.radio(
                 "Language / भाषा", _lang_options, horizontal=True, key="lang",
@@ -3230,7 +3259,9 @@ def render_topbar() -> None:
     # Mark the open page: a dark pill in the sidebar, a coral label in the phone menu.
     css = ""
     if pos := active_position(TOP_NAV):
-        link = f'.st-key-snav > div:nth-child({pos}) [data-testid="stPageLink-NavLink"]'
+        # "Start here" sits above the page links until setup is done, so it shifts the sidebar count by one.
+        side_pos = pos + (0 if st.session_state.get("onboarded", False) else 1)
+        link = f'.st-key-snav > div:nth-child({side_pos}) [data-testid="stPageLink-NavLink"]'
         css += (f'{link} {{ background: var(--cc-ink) !important; box-shadow: 0 5px 14px rgba(23,25,29,0.14); transform: none !important; }}'
                 f'{link} p, {link} [data-testid="stIconMaterial"] {{ color: #FFFFFF !important; }}'
                 f'.st-key-tnav > div:nth-child({pos}) [data-testid="stPageLink-NavLink"] p {{ color: var(--cc-primary) !important; }}')
